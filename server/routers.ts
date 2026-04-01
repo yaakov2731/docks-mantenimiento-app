@@ -49,7 +49,7 @@ export const appRouter = router({
         local: z.string().min(1),
         planta: z.enum(['baja', 'alta']),
         contacto: z.string().optional(),
-        emailLocatario: z.string().email().optional().or(z.literal('')),
+        emailLocatario: z.string().optional(),
         categoria: z.enum(['electrico', 'plomeria', 'estructura', 'limpieza', 'seguridad', 'climatizacion', 'otro']),
         prioridad: z.enum(['baja', 'media', 'alta', 'urgente']),
         titulo: z.string().min(1).max(500),
@@ -145,7 +145,7 @@ export const appRouter = router({
       .input(z.object({
         nombre: z.string().min(1),
         telefono: z.string().optional(),
-        email: z.string().email().optional().or(z.literal('')),
+        email: z.string().optional(),
         waId: z.string().optional(),
         rubro: z.string().optional(),
         tipoLocal: z.string().optional(),
