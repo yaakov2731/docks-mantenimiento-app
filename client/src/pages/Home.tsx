@@ -66,7 +66,7 @@ export default function Home() {
       {/* Header */}
       <div className="bg-sidebar-bg text-white px-4 py-6">
         <div className="max-w-2xl mx-auto flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center font-heading font-bold text-xl">D</div>
+          <img src="/logo.png" alt="Docks del Puerto" className="h-12 w-12 rounded-xl object-cover bg-white" />
           <div>
             <h1 className="font-heading font-bold text-xl">Docks del Puerto</h1>
             <p className="text-white/60 text-sm">Reporte de Mantenimiento</p>

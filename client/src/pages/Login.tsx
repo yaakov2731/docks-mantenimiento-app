@@ -16,9 +16,7 @@ export default function Login() {
     <div className="min-h-screen bg-sidebar-bg flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-heading font-bold text-2xl">D</span>
-          </div>
+          <img src="/logo.png" alt="Docks del Puerto" className="w-24 h-24 mx-auto mb-4 rounded-2xl object-cover" />
           <h1 className="font-heading font-bold text-2xl text-sidebar-bg">Docks del Puerto</h1>
           <p className="text-gray-500 text-sm mt-1">Panel de Gestión de Mantenimiento</p>
         </div>
