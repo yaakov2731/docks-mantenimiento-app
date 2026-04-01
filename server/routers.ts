@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import bcrypt from 'bcryptjs'
-import { router, publicProcedure, protectedProcedure } from './_core/trpc'
+import jwt from 'jsonwebtoken'
+import { router, publicProcedure, protectedProcedure, JWT_COOKIE } from './_core/trpc'
 import { notifyOwner, notifyCompleted } from './_core/notification'
 import {
   getUserByUsername,
@@ -11,7 +12,6 @@ import {
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead,
 } from './db'
-import { COOKIE_NAME } from '../shared/const'
 
 export const appRouter = router({
   auth: router({
@@ -23,12 +23,21 @@ export const appRouter = router({
         if (!user) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Usuario o contraseña incorrectos' })
         const ok = await bcrypt.compare(input.password, user.password)
         if (!ok) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Usuario o contraseña incorrectos' })
-        ;(ctx.req.session as any).user = { id: user.id, username: user.username, name: user.name, role: user.role }
+        const token = jwt.sign(
+          { id: user.id, username: user.username, name: user.name, role: user.role },
+          process.env.SESSION_SECRET ?? 'dev-secret-change-me',
+          { expiresIn: '7d' }
+        )
+        ctx.res.cookie(JWT_COOKIE, token, {
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        })
         return { success: true, user: { id: user.id, name: user.name, role: user.role } }
       }),
     logout: publicProcedure.mutation(({ ctx }) => {
-      ctx.req.session.destroy(() => {})
-      ctx.res.clearCookie(COOKIE_NAME)
+      ctx.res.clearCookie(JWT_COOKIE)
       return { success: true }
     }),
   }),

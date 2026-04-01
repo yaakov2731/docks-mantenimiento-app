@@ -1,9 +1,25 @@
 import { initTRPC, TRPCError } from '@trpc/server'
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express'
-import type { Request, Response } from 'express'
+import jwt from 'jsonwebtoken'
+
+const JWT_SECRET = process.env.SESSION_SECRET ?? 'dev-secret-change-me'
+export const JWT_COOKIE = 'docks_token'
+
+export type SessionUser = {
+  id: number
+  username: string
+  name: string
+  role: 'admin' | 'employee'
+}
 
 export function createContext({ req, res }: CreateExpressContextOptions) {
-  const user = (req.session as any)?.user ?? null
+  let user: SessionUser | null = null
+  const token = req.cookies?.[JWT_COOKIE]
+  if (token) {
+    try {
+      user = jwt.verify(token, JWT_SECRET) as SessionUser
+    } catch {}
+  }
   return { req, res, user }
 }
 
