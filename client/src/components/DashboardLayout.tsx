@@ -28,7 +28,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
       {/* Logo */}
       <div className="px-6 py-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Docks del Puerto" className="w-10 h-10 rounded-lg object-cover bg-white" />
+          <img src="/logo.png" alt="Docks del Puerto" className="w-10 h-10 rounded-full object-contain bg-white p-0.5" />
           <div>
             <div className="font-heading font-bold text-sm leading-tight">Docks del Puerto</div>
             <div className="text-xs text-white/50">Mantenimiento</div>
