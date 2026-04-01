@@ -1,29 +1,16 @@
-import { createClient } from '@libsql/client'
+import { createClient } from '@libsql/client/web'
 import { drizzle } from 'drizzle-orm/libsql'
 import { eq, and, or, like } from 'drizzle-orm'
 import * as schema from '../drizzle/schema'
-import path from 'path'
-import fs from 'fs'
 
 const TURSO_URL = process.env.TURSO_URL
 const TURSO_TOKEN = process.env.TURSO_TOKEN
 
-let clientUrl: string
-if (TURSO_URL) {
-  clientUrl = TURSO_URL
-  console.log('[DB] Using Turso remote database')
-} else {
-  const DATA_DIR = path.join(process.cwd(), 'data')
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
-  clientUrl = `file:${path.join(DATA_DIR, 'docks.db')}`
-  console.log('[DB] Using local SQLite database')
+if (!TURSO_URL || !TURSO_TOKEN) {
+  throw new Error('TURSO_URL and TURSO_TOKEN env vars are required')
 }
 
-const client = createClient(
-  TURSO_URL && TURSO_TOKEN
-    ? { url: TURSO_URL, authToken: TURSO_TOKEN }
-    : { url: clientUrl }
-)
+const client = createClient({ url: TURSO_URL, authToken: TURSO_TOKEN })
 export const db = drizzle(client, { schema })
 
 // --- Init tables ---
