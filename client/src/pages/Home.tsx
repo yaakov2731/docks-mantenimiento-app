@@ -202,7 +202,7 @@ export default function Home() {
             <div>
               <label className="block text-xs text-gray-500 mb-1">Email</label>
               <input
-                type="email"
+                type="text"
                 value={form.emailLocatario}
                 onChange={e => setForm(f => ({ ...f, emailLocatario: e.target.value }))}
                 placeholder="tu@email.com"
