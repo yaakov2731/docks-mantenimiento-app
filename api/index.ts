@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import express from 'express'
+import express, { Request, Response, NextFunction } from 'express'
 import cookieParser from 'cookie-parser'
 import { createExpressMiddleware } from '@trpc/server/adapters/express'
 import { appRouter } from '../server/routers'
@@ -27,7 +27,11 @@ function getInitPromise() {
           role: 'admin',
         })
       }
-    })()
+    })().catch(err => {
+      // Reset so next request retries
+      initPromise = null
+      throw err
+    })
   }
   return initPromise
 }
@@ -44,5 +48,14 @@ app.use(async (_req, _res, next) => {
 app.use('/trpc', createExpressMiddleware({ router: appRouter, createContext }))
 app.use('/api/bot', botRouter)
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
+
+// Global error handler — returns JSON so client can parse it
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[API ERROR]', err)
+  res.status(500).json({
+    error: true,
+    message: err?.message ?? 'Internal server error',
+  })
+})
 
 export default app
