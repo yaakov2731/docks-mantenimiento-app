@@ -1,0 +1,131 @@
+import { useState } from 'react'
+import DashboardLayout from '../components/DashboardLayout'
+import { trpc } from '../lib/trpc'
+import { Button } from '../components/ui/button'
+import { Plus, Trash2, Mail, MessageCircle, ChevronDown } from 'lucide-react'
+
+const emptyForm = { tipo: 'email' as 'email'|'telegram', nombre: '', destino: '', recibeNuevos: true, recibeUrgentes: true, recibeCompletados: false }
+
+export default function Configuracion() {
+  const [form, setForm] = useState(emptyForm)
+  const [showForm, setShowForm] = useState(false)
+  const [showTgHelp, setShowTgHelp] = useState(false)
+  const { data: notifs = [], refetch } = trpc.configuracion.listarNotificaciones.useQuery()
+  const agregar = trpc.configuracion.agregarNotificacion.useMutation({ onSuccess: () => { setForm(emptyForm); setShowForm(false); refetch() } })
+  const toggle = trpc.configuracion.toggleNotificacion.useMutation({ onSuccess: refetch })
+  const eliminar = trpc.configuracion.eliminarNotificacion.useMutation({ onSuccess: refetch })
+
+  return (
+    <DashboardLayout title="Configuración de Notificaciones">
+      <div className="max-w-2xl space-y-6">
+        <div className="flex justify-between items-center">
+          <p className="text-sm text-gray-500">Configurá quién recibe alertas de nuevos reclamos y completados.</p>
+          <Button onClick={() => setShowForm(v => !v)}><Plus size={16}/> Agregar contacto</Button>
+        </div>
+
+        {showForm && (
+          <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+            <h3 className="font-heading font-semibold">Nuevo contacto de notificación</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as any }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                  <option value="email">Email</option>
+                  <option value="telegram">Telegram</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+                  placeholder="Ej: Encargado"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {form.tipo === 'email' ? 'Dirección de email' : 'Chat ID de Telegram'}
+              </label>
+              <input value={form.destino} onChange={e => setForm(f => ({ ...f, destino: e.target.value }))}
+                placeholder={form.tipo === 'email' ? 'admin@docks.com' : '-1001234567890'}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+            </div>
+            <div className="flex gap-6">
+              {[
+                { key: 'recibeNuevos', label: 'Nuevos reclamos' },
+                { key: 'recibeUrgentes', label: 'Solo urgentes' },
+                { key: 'recibeCompletados', label: 'Completados' },
+              ].map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={(form as any)[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))}
+                    className="w-4 h-4 rounded accent-primary" />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={() => agregar.mutate(form)} loading={agregar.isLoading} disabled={!form.nombre || !form.destino}>
+                Guardar
+              </Button>
+              <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            </div>
+          </div>
+        )}
+
+        {/* Telegram Help */}
+        <div className="bg-blue-50 rounded-xl overflow-hidden">
+          <button onClick={() => setShowTgHelp(v => !v)}
+            className="w-full flex items-center gap-3 px-5 py-4 text-left">
+            <MessageCircle size={18} className="text-blue-500" />
+            <span className="text-sm font-medium text-blue-700 flex-1">¿Cómo configurar Telegram?</span>
+            <ChevronDown size={16} className={`text-blue-500 transition-transform ${showTgHelp ? 'rotate-180' : ''}`} />
+          </button>
+          {showTgHelp && (
+            <div className="px-5 pb-4 text-sm text-blue-700 space-y-1.5">
+              <p>1. Creá un bot en <strong>@BotFather</strong> → copiá el token</p>
+              <p>2. Agregá el bot al grupo o canal</p>
+              <p>3. Enviá un mensaje al grupo</p>
+              <p>4. Visitá <code className="bg-blue-100 px-1 rounded">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code></p>
+              <p>5. Copiá el <strong>chat_id</strong> negativo (ej: <code className="bg-blue-100 px-1 rounded">-1001234567890</code>)</p>
+              <p>6. Agregá el token como <code className="bg-blue-100 px-1 rounded">TELEGRAM_BOT_TOKEN</code> en tu archivo .env</p>
+            </div>
+          )}
+        </div>
+
+        {/* Contact list */}
+        <div className="space-y-3">
+          {notifs.length === 0 ? (
+            <div className="bg-white rounded-xl p-8 text-center shadow-sm text-gray-400 text-sm">
+              No hay contactos configurados
+            </div>
+          ) : notifs.map(n => (
+            <div key={n.id} className={`bg-white rounded-xl shadow-sm p-4 flex items-center gap-4 ${!n.activo ? 'opacity-50' : ''}`}>
+              <div className={`p-2 rounded-lg ${n.tipo === 'telegram' ? 'bg-blue-100' : 'bg-orange-100'}`}>
+                {n.tipo === 'telegram' ? <MessageCircle size={18} className="text-blue-500" /> : <Mail size={18} className="text-orange-500" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm">{n.nombre}</div>
+                <div className="text-xs text-gray-400 truncate">{n.destino}</div>
+                <div className="flex gap-3 mt-1 text-xs text-gray-500">
+                  {n.recibeNuevos && <span>✓ Nuevos</span>}
+                  {n.recibeUrgentes && <span>✓ Urgentes</span>}
+                  {n.recibeCompletados && <span>✓ Completados</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => toggle.mutate({ id: n.id, activo: !n.activo })}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${n.activo ? 'bg-primary' : 'bg-gray-300'}`}>
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${n.activo ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </button>
+                <button onClick={() => { if (confirm('¿Eliminar?')) eliminar.mutate({ id: n.id }) }}
+                  className="text-gray-300 hover:text-danger transition-colors">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </DashboardLayout>
+  )
+}
