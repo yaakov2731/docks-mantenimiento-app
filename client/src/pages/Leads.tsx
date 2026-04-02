@@ -45,7 +45,7 @@ export default function Leads() {
       TurnoHora: l.turnoHora ?? '',
       Notas: l.notas ?? '',
       Fuente: l.fuente,
-      Fecha: l.createdAt ? new Date((l.createdAt as any)*1000).toLocaleDateString('es-AR') : '',
+      Fecha: l.createdAt ? new Date(l.createdAt).toLocaleDateString('es-AR') : '',
     })))
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Leads')
@@ -87,7 +87,7 @@ export default function Leads() {
               {l.turnoFecha && <div className="flex items-center gap-1.5 text-primary font-medium"><Calendar size={11}/>Turno: {l.turnoFecha} {l.turnoHora}</div>}
             </div>
             <div className="mt-3 text-xs text-gray-400">
-              {l.fuente === 'whatsapp' ? '📱 WhatsApp' : '🌐 Web'} · {l.createdAt ? new Date((l.createdAt as any)*1000).toLocaleDateString('es-AR') : ''}
+              {l.fuente === 'whatsapp' ? '📱 WhatsApp' : '🌐 Web'} · {l.createdAt ? new Date(l.createdAt).toLocaleDateString('es-AR') : ''}
             </div>
           </div>
         ))}

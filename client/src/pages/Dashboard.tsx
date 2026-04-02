@@ -215,7 +215,7 @@ export default function Dashboard() {
                   <td className="px-4 py-3"><Badge value={r.prioridad} options={PRIORIDADES} /></td>
                   <td className="px-4 py-3"><Badge value={r.estado} options={ESTADOS} /></td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{r.asignadoA ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-400 text-xs">{r.createdAt ? new Date((r.createdAt as any)*1000).toLocaleDateString('es-AR') : ''}</td>
+                  <td className="px-4 py-3 text-gray-400 text-xs">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : ''}</td>
                   <td className="px-4 py-3">
                     <button className="text-primary text-xs hover:underline" onClick={e => { e.stopPropagation(); window.open(`/imprimir?id=${r.id}`, '_blank') }}>
                       Imprimir
@@ -327,7 +327,7 @@ export default function Dashboard() {
                           <span className="font-medium">{a.usuarioNombre}</span>
                           <span className="text-gray-400"> · </span>
                           <span className="text-gray-600">{a.descripcion}</span>
-                          <div className="text-xs text-gray-400">{a.createdAt ? new Date(a.createdAt*1000).toLocaleString('es-AR') : ''}</div>
+                          <div className="text-xs text-gray-400">{a.createdAt ? new Date(a.createdAt).toLocaleString('es-AR') : ''}</div>
                         </div>
                       </div>
                     ))}

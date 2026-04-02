@@ -55,7 +55,7 @@ export default function Historial() {
                   <td className="px-4 py-3"><Badge value={r.prioridad} options={PRIORIDADES} /></td>
                   <td className="px-4 py-3 text-gray-600">{duracion(r)}</td>
                   <td className="px-4 py-3 text-gray-400 text-xs">
-                    {r.completadoAt ? new Date((r.completadoAt as any)*1000).toLocaleDateString('es-AR') : '—'}
+                    {r.completadoAt ? new Date(r.completadoAt).toLocaleDateString('es-AR') : '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{r.asignadoA ?? '—'}</td>
                 </tr>

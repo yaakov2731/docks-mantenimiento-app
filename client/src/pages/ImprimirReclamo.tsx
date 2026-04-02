@@ -46,7 +46,7 @@ export default function ImprimirReclamo() {
           {/* Datos */}
           <div className="grid grid-cols-2 gap-4">
             {[
-              { label: 'Fecha', value: reporte.createdAt ? new Date((reporte.createdAt as any)*1000).toLocaleDateString('es-AR') : '—' },
+              { label: 'Fecha', value: reporte.createdAt ? new Date(reporte.createdAt).toLocaleDateString('es-AR') : '—' },
               { label: 'Locatario', value: reporte.locatario },
               { label: 'Local / Área', value: reporte.local },
               { label: 'Planta', value: reporte.planta === 'baja' ? 'Planta Baja' : 'Planta Alta' },
@@ -93,7 +93,7 @@ export default function ImprimirReclamo() {
                       <span className="font-medium">{a.usuarioNombre}</span>
                       <span className="text-gray-400"> — </span>
                       <span className="text-gray-600">{a.descripcion}</span>
-                      <div className="text-xs text-gray-400">{a.createdAt ? new Date(a.createdAt*1000).toLocaleString('es-AR') : ''}</div>
+                      <div className="text-xs text-gray-400">{a.createdAt ? new Date(a.createdAt).toLocaleString('es-AR') : ''}</div>
                     </div>
                   </div>
                 ))}
