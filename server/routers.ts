@@ -7,12 +7,17 @@ import { notifyOwner, notifyCompleted } from './_core/notification'
 import { readEnv } from './_core/env'
 import {
   getUserByUsername,
+  getUsers, getSalesUsers, getUserById, createPanelUser, updateUserPassword, deactivateUser, updateUserWhatsapp,
   crearReporte, getReportes, getReporteById, actualizarReporte, getEstadisticas,
   crearActualizacion, getActualizacionesByReporte,
-  getEmpleados, crearEmpleado, actualizarEmpleado,
+  getEmpleados, crearEmpleado, actualizarEmpleado, getEmpleadoById,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead,
   enqueueBotMessage,
+  iniciarTrabajoReporte,
+  pausarTrabajoReporte,
+  completarTrabajoReporte,
+  limpiarDatosDemo,
 } from './db'
 
 export const appRouter = router({
@@ -94,9 +99,20 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const reporte = await getReporteById(input.id)
         if (!reporte) throw new TRPCError({ code: 'NOT_FOUND' })
-        const updateData: any = { estado: input.estado }
-        if (input.estado === 'completado') updateData.completadoAt = new Date()
-        await actualizarReporte(input.id, updateData)
+        if (input.estado === 'en_progreso') {
+          await iniciarTrabajoReporte(input.id)
+        } else if (input.estado === 'pausado') {
+          await pausarTrabajoReporte(input.id)
+        } else if (input.estado === 'completado') {
+          await completarTrabajoReporte(input.id)
+        } else {
+          const updateData: any = { estado: input.estado }
+          if (['en_progreso', 'pausado', 'completado'].includes(input.estado) && reporte.asignadoId) {
+            updateData.asignacionEstado = 'aceptada'
+            updateData.asignacionRespondidaAt = reporte.asignacionRespondidaAt ?? new Date()
+          }
+          await actualizarReporte(input.id, updateData)
+        }
         await crearActualizacion({
           reporteId: input.id,
           usuarioId: ctx.user.id,
@@ -116,18 +132,24 @@ export const appRouter = router({
       .input(z.object({ id: z.number(), empleadoNombre: z.string(), empleadoId: z.number().optional() }))
       .mutation(async ({ input, ctx }) => {
         const reporte = await getReporteById(input.id)
-        await actualizarReporte(input.id, { asignadoA: input.empleadoNombre, asignadoId: input.empleadoId, estado: 'en_progreso' })
+        if (!reporte) throw new TRPCError({ code: 'NOT_FOUND' })
+        await actualizarReporte(input.id, {
+          asignadoA: input.empleadoNombre,
+          asignadoId: input.empleadoId,
+          estado: 'pendiente',
+          trabajoIniciadoAt: null as any,
+          asignacionEstado: input.empleadoId ? 'pendiente_confirmacion' : 'sin_asignar',
+          asignacionRespondidaAt: null as any,
+        })
         await crearActualizacion({
           reporteId: input.id,
           usuarioId: ctx.user.id,
           usuarioNombre: ctx.user.name,
           tipo: 'asignacion',
-          descripcion: `Asignado a: ${input.empleadoNombre}`,
+          descripcion: `Asignado a: ${input.empleadoNombre}. Pendiente de confirmación del empleado.`,
         })
-        // Notify employee via WhatsApp if they have a wa_id
-        if (input.empleadoId && reporte) {
-          const empleados = await getEmpleados()
-          const emp = empleados.find(e => e.id === input.empleadoId)
+        if (input.empleadoId) {
+          const emp = await getEmpleadoById(input.empleadoId)
           if (emp?.waId) {
             const msg =
               `*Nueva tarea asignada — Docks del Puerto*\n\n` +
@@ -135,8 +157,10 @@ export const appRouter = router({
               `Local: ${reporte.local} (${reporte.planta})\n` +
               `Prioridad: ${reporte.prioridad}\n\n` +
               `${reporte.descripcion}\n\n` +
-              `Escribime para reportar avances o marcarla como completada.`
-            enqueueBotMessage(emp.waId, msg).catch(console.error)
+              `Respondé con una opción:\n` +
+              `1. Tarea recibida\n` +
+              `2. No puedo tomarla`
+            await enqueueBotMessage(emp.waId, msg)
           }
         }
         return { success: true }
@@ -200,10 +224,81 @@ export const appRouter = router({
         turnoFecha: z.string().optional(),
         turnoHora: z.string().optional(),
         notas: z.string().optional(),
+        asignadoA: z.string().optional(),
+        asignadoId: z.number().optional(),
       }))
       .mutation(async ({ input }) => {
         const { id, ...data } = input
+        const leadBeforeUpdate = await getLeadById(id)
+        if (!leadBeforeUpdate) throw new TRPCError({ code: 'NOT_FOUND', message: 'Lead no encontrado' })
         await actualizarLead(id, data as any)
+        let notificationSent = false
+        let notificationWarning: string | null = null
+
+        if (typeof input.asignadoId === 'number') {
+          const assignedUser = await getUserById(input.asignadoId)
+          if (assignedUser?.waId) {
+            const message = buildLeadAssignmentMessage({
+              lead: { ...leadBeforeUpdate, ...data },
+              assignedUserName: assignedUser.name,
+            })
+            await enqueueBotMessage(assignedUser.waId, message)
+            notificationSent = true
+          } else {
+            notificationWarning = 'El usuario asignado no tiene WhatsApp cargado.'
+          }
+        }
+
+        return { success: true, notificationSent, notificationWarning }
+      }),
+  }),
+
+  usuarios: router({
+    listar: protectedProcedure.query(() => getUsers()),
+    listarComerciales: protectedProcedure.query(() => getSalesUsers()),
+    crear: protectedProcedure
+      .input(z.object({
+        username: z.string().min(3),
+        password: z.string().min(6),
+        name: z.string().min(1),
+        role: z.enum(['admin', 'sales']),
+        waId: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const existing = await getUserByUsername(input.username)
+        if (existing) throw new TRPCError({ code: 'CONFLICT', message: 'Ese usuario ya existe' })
+        await createPanelUser(input)
+        return { success: true }
+      }),
+    cambiarClave: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        password: z.string().min(6),
+      }))
+      .mutation(async ({ input }) => {
+        const user = await getUserById(input.id)
+        if (!user) throw new TRPCError({ code: 'NOT_FOUND', message: 'Usuario no encontrado' })
+        await updateUserPassword(input.id, input.password)
+        return { success: true }
+      }),
+    actualizarWhatsapp: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        waId: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const user = await getUserById(input.id)
+        if (!user) throw new TRPCError({ code: 'NOT_FOUND', message: 'Usuario no encontrado' })
+        await updateUserWhatsapp(input.id, input.waId)
+        return { success: true }
+      }),
+    desactivar: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.id === input.id) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'No podés desactivar tu propio usuario' })
+        }
+        await deactivateUser(input.id)
         return { success: true }
       }),
   }),
@@ -216,9 +311,24 @@ export const appRouter = router({
         email: z.string().email().optional().or(z.literal('')),
         telefono: z.string().optional(),
         especialidad: z.string().optional(),
+        waId: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
         await crearEmpleado(input as any)
+        return { success: true }
+      }),
+    actualizar: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        nombre: z.string().min(1),
+        email: z.string().email().optional().or(z.literal('')),
+        telefono: z.string().optional(),
+        especialidad: z.string().optional(),
+        waId: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input
+        await actualizarEmpleado(id, data as any)
         return { success: true }
       }),
     desactivar: protectedProcedure
@@ -247,7 +357,42 @@ export const appRouter = router({
     eliminarNotificacion: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => { await eliminarNotificacion(input.id); return { success: true } }),
+    limpiarDatosDemo: protectedProcedure
+      .mutation(async () => {
+        const result = await limpiarDatosDemo()
+        return { success: true, ...result }
+      }),
   }),
 })
 
 export type AppRouter = typeof appRouter
+
+function buildLeadAssignmentMessage({
+  lead,
+  assignedUserName,
+}: {
+  lead: any
+  assignedUserName: string
+}) {
+  const lines = [
+    '*Nuevo lead asignado — Docks del Puerto*',
+    '',
+    `Asignado a: ${assignedUserName}`,
+    `Lead #${lead.id}`,
+    `Nombre: ${lead.nombre}`,
+    lead.telefono ? `Teléfono: ${lead.telefono}` : '',
+    lead.email ? `Email: ${lead.email}` : '',
+    lead.waId ? `WhatsApp del interesado: ${lead.waId}` : '',
+    lead.rubro ? `Rubro: ${lead.rubro}` : '',
+    lead.tipoLocal ? `Tipo de local: ${lead.tipoLocal}` : '',
+    `Estado: ${lead.estado ?? 'nuevo'}`,
+    `Origen: ${lead.fuente ?? 'web'}`,
+    lead.turnoFecha ? `Turno: ${lead.turnoFecha}${lead.turnoHora ? ` ${lead.turnoHora}` : ''}` : '',
+    lead.notas ? `Notas internas: ${lead.notas}` : '',
+    lead.mensaje ? `Consulta: ${lead.mensaje}` : '',
+    '',
+    'Abrí el panel y seguí el lead desde la sección Leads.',
+  ]
+
+  return lines.filter(Boolean).join('\n')
+}

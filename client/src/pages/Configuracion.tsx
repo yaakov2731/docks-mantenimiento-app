@@ -5,15 +5,46 @@ import { Button } from '../components/ui/button'
 import { Plus, Trash2, Mail, MessageCircle, ChevronDown } from 'lucide-react'
 
 const emptyForm = { tipo: 'email' as 'email'|'telegram', nombre: '', destino: '', recibeNuevos: true, recibeUrgentes: true, recibeCompletados: false }
+const emptyUserForm = { name: '', username: '', password: '', role: 'admin' as 'admin' | 'sales', waId: '' }
 
 export default function Configuracion() {
   const [form, setForm] = useState(emptyForm)
   const [showForm, setShowForm] = useState(false)
   const [showTgHelp, setShowTgHelp] = useState(false)
+  const [cleanupResult, setCleanupResult] = useState<string>('')
+  const [userForm, setUserForm] = useState(emptyUserForm)
+  const [showUserForm, setShowUserForm] = useState(false)
+  const [passwordReset, setPasswordReset] = useState<{ id: number; password: string } | null>(null)
+  const [waEdits, setWaEdits] = useState<Record<number, string>>({})
   const { data: notifs = [], refetch } = trpc.configuracion.listarNotificaciones.useQuery()
+  const { data: usuarios = [], refetch: refetchUsuarios } = trpc.usuarios.listar.useQuery()
   const agregar = trpc.configuracion.agregarNotificacion.useMutation({ onSuccess: () => { setForm(emptyForm); setShowForm(false); refetch() } })
   const toggle = trpc.configuracion.toggleNotificacion.useMutation({ onSuccess: refetch })
   const eliminar = trpc.configuracion.eliminarNotificacion.useMutation({ onSuccess: refetch })
+  const limpiarDemo = trpc.configuracion.limpiarDatosDemo.useMutation({
+    onSuccess: (result) => {
+      setCleanupResult(`Demo limpiada: ${result.reportes} reclamos, ${result.leads} leads y ${result.colaBot} mensajes de cola.`)
+    },
+  })
+  const crearUsuario = trpc.usuarios.crear.useMutation({
+    onSuccess: () => {
+      setUserForm(emptyUserForm)
+      setShowUserForm(false)
+      refetchUsuarios()
+    },
+  })
+  const cambiarClave = trpc.usuarios.cambiarClave.useMutation({
+    onSuccess: () => {
+      setPasswordReset(null)
+      refetchUsuarios()
+    },
+  })
+  const actualizarWhatsapp = trpc.usuarios.actualizarWhatsapp.useMutation({
+    onSuccess: () => {
+      refetchUsuarios()
+    },
+  })
+  const desactivarUsuario = trpc.usuarios.desactivar.useMutation({ onSuccess: refetchUsuarios })
 
   return (
     <DashboardLayout title="Configuración de Notificaciones">
@@ -21,6 +52,157 @@ export default function Configuracion() {
         <div className="flex justify-between items-center">
           <p className="text-sm text-gray-500">Configurá quién recibe alertas de nuevos reclamos y completados.</p>
           <Button onClick={() => setShowForm(v => !v)}><Plus size={16}/> Agregar contacto</Button>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3">
+          <div>
+            <h3 className="font-heading font-semibold text-amber-900">Limpieza de datos demo</h3>
+            <p className="text-sm text-amber-800 mt-1">
+              Borra solo registros marcados como prueba/demo/test y sus historiales asociados. No toca datos reales.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="destructive"
+              loading={limpiarDemo.isLoading}
+              onClick={() => {
+                if (!confirm('Se van a borrar reclamos, leads y mensajes de prueba. ¿Continuar?')) return
+                limpiarDemo.mutate()
+              }}
+            >
+              <Trash2 size={16} /> Limpiar datos demo
+            </Button>
+            {cleanupResult && <span className="text-sm text-amber-900">{cleanupResult}</span>}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-heading font-semibold">Usuarios del panel</h3>
+              <p className="text-sm text-gray-500 mt-1">Creá usuarios administrativos o comerciales y reseteá su clave de acceso.</p>
+            </div>
+            <Button onClick={() => setShowUserForm(v => !v)}><Plus size={16}/> Agregar usuario</Button>
+          </div>
+
+          {showUserForm && (
+            <div className="grid md:grid-cols-2 gap-4 rounded-xl border border-gray-100 bg-slate-50 p-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <input value={userForm.name} onChange={e => setUserForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+                <input value={userForm.username} onChange={e => setUserForm(f => ({ ...f, username: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Clave inicial</label>
+                <input type="password" value={userForm.password} onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+                <select value={userForm.role} onChange={e => setUserForm(f => ({ ...f, role: e.target.value as 'admin' | 'sales' }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                  <option value="admin">Administrativo</option>
+                  <option value="sales">Comercial / Ventas</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
+                <input value={userForm.waId} onChange={e => setUserForm(f => ({ ...f, waId: e.target.value }))}
+                  placeholder="5491112345678"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                <p className="text-xs text-gray-400 mt-1">Se usa para avisarle automáticamente cuando le asignás un lead.</p>
+              </div>
+              <div className="md:col-span-2 flex gap-3">
+                <Button
+                  onClick={() => crearUsuario.mutate(userForm)}
+                  loading={crearUsuario.isLoading}
+                  disabled={!userForm.name || !userForm.username || !userForm.password}
+                >
+                  Guardar usuario
+                </Button>
+                <Button variant="ghost" onClick={() => setShowUserForm(false)}>Cancelar</Button>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {usuarios.length === 0 ? (
+              <div className="text-sm text-gray-400">No hay usuarios activos.</div>
+            ) : usuarios.map((usuario: any) => (
+              <div key={usuario.id} className="rounded-xl border border-gray-100 p-4 flex flex-col md:flex-row md:items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm text-gray-800">{usuario.name}</div>
+                  <div className="text-xs text-gray-400">{usuario.username}</div>
+                  <div className="text-xs text-primary mt-1 capitalize">
+                    {usuario.role === 'sales' ? 'Comercial / Ventas' : 'Administrativo'}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    WhatsApp: {usuario.waId || 'no cargado'}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={waEdits[usuario.id] ?? usuario.waId ?? ''}
+                      onChange={e => setWaEdits(current => ({ ...current, [usuario.id]: e.target.value }))}
+                      placeholder="5491112345678"
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={actualizarWhatsapp.isLoading}
+                      onClick={() => actualizarWhatsapp.mutate({ id: usuario.id, waId: waEdits[usuario.id] ?? usuario.waId ?? '' })}
+                    >
+                      Guardar WA
+                    </Button>
+                  </div>
+                  {passwordReset?.id === usuario.id ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={passwordReset.password}
+                        onChange={e => setPasswordReset({ id: usuario.id, password: e.target.value })}
+                        placeholder="Nueva clave"
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      />
+                      <Button
+                        size="sm"
+                        disabled={!passwordReset.password || passwordReset.password.length < 6}
+                        loading={cambiarClave.isLoading}
+                        onClick={() => cambiarClave.mutate({ id: usuario.id, password: passwordReset.password })}
+                      >
+                        Guardar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setPasswordReset(null)}>Cancelar</Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => setPasswordReset({ id: usuario.id, password: '' })}>
+                        Cambiar clave
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (!confirm(`¿Desactivar el usuario ${usuario.username}?`)) return
+                          desactivarUsuario.mutate({ id: usuario.id })
+                        }}
+                      >
+                        Desactivar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {showForm && (

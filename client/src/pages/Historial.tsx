@@ -2,6 +2,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
 import { exportarExcel } from '../lib/exportExcel'
+import WorkingTime from '../components/WorkingTime'
 import { PRIORIDADES, ESTADOS } from '@shared/const'
 import { Download } from 'lucide-react'
 
@@ -19,9 +20,10 @@ export default function Historial() {
   const completados = todos.filter(r => r.estado === 'completado')
 
   function duracion(r: any) {
-    if (!r.completadoAt || !r.createdAt) return '—'
-    const h = Math.round((r.completadoAt - r.createdAt) / 3600)
-    return h < 24 ? `${h}h` : `${Math.round(h/24)}d`
+    if (typeof r.tiempoTrabajadoSegundos === 'number') {
+      return <WorkingTime seconds={r.tiempoTrabajadoSegundos} className="font-medium text-cyan-700" />
+    }
+    return '—'
   }
 
   return (
@@ -33,10 +35,10 @@ export default function Historial() {
         </Button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+            <thead className="bg-slate-50 text-gray-500 text-xs uppercase">
               <tr>
                 {['#','Locatario','Local','Categoría','Prioridad','Duración','Completado','Asignado'].map(h => (
                   <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
@@ -47,13 +49,13 @@ export default function Historial() {
               {completados.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-12 text-gray-400">No hay reclamos completados aún</td></tr>
               ) : completados.map(r => (
-                <tr key={r.id} className="hover:bg-gray-50">
+                <tr key={r.id} className="hover:bg-slate-50/80">
                   <td className="px-4 py-3 font-mono text-gray-400 text-xs">#{r.id.toString().padStart(4,'0')}</td>
                   <td className="px-4 py-3 font-medium">{r.locatario}</td>
                   <td className="px-4 py-3 text-gray-600">{r.local}</td>
                   <td className="px-4 py-3 text-gray-600 capitalize">{r.categoria}</td>
                   <td className="px-4 py-3"><Badge value={r.prioridad} options={PRIORIDADES} /></td>
-                  <td className="px-4 py-3 text-gray-600">{duracion(r)}</td>
+                  <td className="px-4 py-3">{duracion(r)}</td>
                   <td className="px-4 py-3 text-gray-400 text-xs">
                     {r.completadoAt ? new Date(r.completadoAt).toLocaleDateString('es-AR') : '—'}
                   </td>

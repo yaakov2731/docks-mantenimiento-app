@@ -57,6 +57,7 @@ export default function BrandLogo({
   const archCenter = (AX[0] + AX[3] + AW) / 2
   const tx = archCenter
   const ta = 'middle' as const
+  const svgClassName = `block ${align === 'center' ? 'mx-auto' : ''} ${className}`.trim()
 
   return (
     <svg
@@ -67,8 +68,7 @@ export default function BrandLogo({
       xmlns="http://www.w3.org/2000/svg"
       role="img"
       aria-label="Docks del Puerto"
-      className={className}
-      className={`block ${align === 'center' ? 'mx-auto' : ''} ${className}`}
+      className={svgClassName}
     >
       {/* Arches */}
       {ARCH_COLORS.map((color, i) => (

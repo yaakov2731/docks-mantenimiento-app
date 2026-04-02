@@ -3,12 +3,18 @@ import { useLocation } from 'wouter'
 import { trpc } from '../lib/trpc'
 import BrandLogo from '../components/BrandLogo'
 
+type PanelRole = 'admin' | 'employee' | 'sales'
+
+function getDefaultRoute(role?: PanelRole) {
+  return role === 'sales' ? '/leads' : '/dashboard'
+}
+
 export default function Login() {
   const [, navigate] = useLocation()
   const [form, setForm] = useState({ username: '', password: '' })
   const [error, setError] = useState('')
   const login = trpc.auth.login.useMutation({
-    onSuccess: () => navigate('/dashboard'),
+    onSuccess: (result) => navigate(getDefaultRoute((result as { user?: { role?: PanelRole } } | undefined)?.user?.role)),
     onError: (e) => setError(e.message),
   })
 

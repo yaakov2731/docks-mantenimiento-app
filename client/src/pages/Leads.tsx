@@ -26,10 +26,24 @@ export default function Leads() {
   const [filterEstado, setFilterEstado] = useState('')
   const [selected, setSelected] = useState<number | null>(null)
   const [turnoForm, setTurnoForm] = useState({ fecha: '', hora: '', notas: '' })
+  const [asignadoId, setAsignadoId] = useState('')
+  const [feedback, setFeedback] = useState('')
 
   const { data: leads = [], refetch } = trpc.leads.listar.useQuery({ estado: filterEstado || undefined })
   const { data: lead } = trpc.leads.obtener.useQuery({ id: selected! }, { enabled: !!selected })
-  const actualizar = trpc.leads.actualizar.useMutation({ onSuccess: () => { refetch(); setSelected(null) } })
+  const { data: comerciales = [] } = trpc.usuarios.listarComerciales.useQuery()
+  const actualizar = trpc.leads.actualizar.useMutation({
+    onSuccess: (result) => {
+      refetch()
+      if (result.notificationWarning) {
+        setFeedback(result.notificationWarning)
+      } else if (result.notificationSent) {
+        setFeedback('Lead asignado y notificación enviada por WhatsApp.')
+      } else {
+        setFeedback('')
+      }
+    },
+  })
 
   function exportLeads() {
     const ws = XLSX.utils.json_to_sheet(leads.map(l => ({
@@ -44,6 +58,7 @@ export default function Leads() {
       TurnoFecha: l.turnoFecha ?? '',
       TurnoHora: l.turnoHora ?? '',
       Notas: l.notas ?? '',
+      AsignadoA: (l as any).asignadoA ?? '',
       Fuente: l.fuente,
       Fecha: l.createdAt ? new Date(l.createdAt).toLocaleDateString('es-AR') : '',
     })))
@@ -84,7 +99,8 @@ export default function Leads() {
               {l.telefono && <div className="flex items-center gap-1.5"><Phone size={11}/>{l.telefono}</div>}
               {l.email && <div className="flex items-center gap-1.5"><Mail size={11}/>{l.email}</div>}
               {l.waId && <div className="flex items-center gap-1.5"><MessageCircle size={11}/>WA: {l.waId}</div>}
-              {l.turnoFecha && <div className="flex items-center gap-1.5 text-primary font-medium"><Calendar size={11}/>Turno: {l.turnoFecha} {l.turnoHora}</div>}
+                {l.turnoFecha && <div className="flex items-center gap-1.5 text-primary font-medium"><Calendar size={11}/>Turno: {l.turnoFecha} {l.turnoHora}</div>}
+              {(l as any).asignadoA && <div className="text-[11px] text-emerald-600 font-medium">Asignado a {(l as any).asignadoA}</div>}
             </div>
             <div className="mt-3 text-xs text-gray-400">
               {l.fuente === 'whatsapp' ? '📱 WhatsApp' : '🌐 Web'} · {l.createdAt ? new Date(l.createdAt).toLocaleDateString('es-AR') : ''}
@@ -109,15 +125,58 @@ export default function Leads() {
             </div>
 
             <div className="p-5 space-y-4">
+              {feedback && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {feedback}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {lead.telefono && <div><span className="text-gray-400">Teléfono:</span> {lead.telefono}</div>}
                 {lead.email && <div><span className="text-gray-400">Email:</span> {lead.email}</div>}
                 {lead.rubro && <div><span className="text-gray-400">Rubro:</span> {lead.rubro}</div>}
                 {lead.tipoLocal && <div><span className="text-gray-400">Tipo local:</span> {lead.tipoLocal}</div>}
+                {(lead as any).asignadoA && <div><span className="text-gray-400">Asignado a:</span> {(lead as any).asignadoA}</div>}
               </div>
               {lead.mensaje && (
                 <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600 italic">"{lead.mensaje}"</div>
               )}
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Asignar a comercial</label>
+                <div className="flex gap-2">
+                  <select
+                    value={asignadoId || String((lead as any).asignadoId ?? '')}
+                    onChange={e => setAsignadoId(e.target.value)}
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="">Seleccionar comercial...</option>
+                    {comerciales.map((usuario: any) => (
+                      <option key={usuario.id} value={usuario.id}>
+                        {usuario.name} · {usuario.role === 'sales' ? 'Ventas' : 'Admin'}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    disabled={!asignadoId && !(lead as any).asignadoId}
+                    onClick={() => {
+                      setFeedback('')
+                      const selectedId = Number(asignadoId || (lead as any).asignadoId)
+                      const comercial = comerciales.find((usuario: any) => usuario.id === selectedId)
+                      if (!comercial) return
+                      actualizar.mutate({
+                        id: lead.id,
+                        asignadoId: comercial.id,
+                        asignadoA: comercial.name,
+                        estado: lead.estado === 'nuevo' ? 'contactado' : lead.estado,
+                      })
+                    }}
+                    loading={actualizar.isLoading}
+                  >
+                    Asignar
+                  </Button>
+                </div>
+              </div>
 
               {/* Cambiar estado */}
               <div>

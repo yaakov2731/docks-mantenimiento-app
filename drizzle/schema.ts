@@ -6,7 +6,9 @@ export const users = sqliteTable('users', {
   username: text('username').notNull().unique(),
   password: text('password').notNull(),
   name: text('name').notNull(),
-  role: text('role', { enum: ['admin', 'employee'] }).default('employee').notNull(),
+  role: text('role', { enum: ['admin', 'employee', 'sales'] }).default('employee').notNull(),
+  waId: text('wa_id'),
+  activo: integer('activo', { mode: 'boolean' }).default(true).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
 
@@ -27,9 +29,15 @@ export const reportes = sqliteTable('reportes', {
   estado: text('estado', {
     enum: ['pendiente', 'en_progreso', 'pausado', 'completado', 'cancelado'],
   }).default('pendiente').notNull(),
+  asignacionEstado: text('asignacion_estado', {
+    enum: ['sin_asignar', 'pendiente_confirmacion', 'aceptada', 'rechazada'],
+  }).default('sin_asignar').notNull(),
   emailEnviado: integer('email_enviado', { mode: 'boolean' }).default(false).notNull(),
   asignadoA: text('asignado_a'),
   asignadoId: integer('asignado_id'),
+  asignacionRespondidaAt: integer('asignacion_respondida_at', { mode: 'timestamp' }),
+  trabajoIniciadoAt: integer('trabajo_iniciado_at', { mode: 'timestamp' }),
+  trabajoAcumuladoSegundos: integer('trabajo_acumulado_segundos').default(0).notNull(),
   completadoAt: integer('completado_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
@@ -40,7 +48,7 @@ export const actualizaciones = sqliteTable('actualizaciones', {
   reporteId: integer('reporte_id').notNull(),
   usuarioId: integer('usuario_id'),
   usuarioNombre: text('usuario_nombre').notNull(),
-  tipo: text('tipo', { enum: ['estado', 'asignacion', 'nota', 'completado', 'foto'] }).notNull(),
+  tipo: text('tipo', { enum: ['estado', 'asignacion', 'nota', 'completado', 'foto', 'progreso', 'timer'] }).notNull(),
   descripcion: text('descripcion').notNull(),
   estadoAnterior: text('estado_anterior'),
   estadoNuevo: text('estado_nuevo'),
@@ -83,6 +91,8 @@ export const leads = sqliteTable('leads', {
   mensaje: text('mensaje'),
   turnoFecha: text('turno_fecha'),
   turnoHora: text('turno_hora'),
+  asignadoA: text('asignado_a'),
+  asignadoId: integer('asignado_id'),
   estado: text('estado', {
     enum: ['nuevo', 'contactado', 'visito', 'cerrado', 'descartado'],
   }).default('nuevo').notNull(),

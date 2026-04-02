@@ -9,22 +9,39 @@ const empty = { nombre: '', email: '', telefono: '', especialidad: '', waId: '' 
 export default function Empleados() {
   const [form, setForm] = useState(empty)
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const { data: empleados = [], refetch } = trpc.empleados.listar.useQuery()
-  const crear = trpc.empleados.crear.useMutation({ onSuccess: () => { setForm(empty); setShowForm(false); refetch() } })
+  const resetForm = () => {
+    setForm(empty)
+    setShowForm(false)
+    setEditingId(null)
+  }
+  const crear = trpc.empleados.crear.useMutation({ onSuccess: () => { resetForm(); refetch() } })
+  const actualizar = trpc.empleados.actualizar.useMutation({ onSuccess: () => { resetForm(); refetch() } })
   const desactivar = trpc.empleados.desactivar.useMutation({ onSuccess: refetch })
 
   return (
     <DashboardLayout title="Empleados de Mantenimiento">
       <div className="flex justify-between items-center mb-6">
         <p className="text-sm text-gray-500">{empleados.length} empleados activos</p>
-        <Button onClick={() => setShowForm(v => !v)}>
+        <Button onClick={() => {
+          if (showForm && !editingId) {
+            resetForm()
+            return
+          }
+          setEditingId(null)
+          setForm(empty)
+          setShowForm(true)
+        }}>
           <UserPlus size={16} /> Agregar empleado
         </Button>
       </div>
 
       {showForm && (
         <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
-          <h3 className="font-heading font-semibold mb-4">Nuevo empleado</h3>
+          <h3 className="font-heading font-semibold mb-4">
+            {editingId ? 'Editar empleado' : 'Nuevo empleado'}
+          </h3>
           <div className="grid md:grid-cols-2 gap-4">
             {[
               { key: 'nombre', label: 'Nombre *', placeholder: 'Juan García' },
@@ -45,10 +62,20 @@ export default function Empleados() {
             ))}
           </div>
           <div className="flex gap-3 mt-4">
-            <Button onClick={() => crear.mutate(form)} loading={crear.isLoading} disabled={!form.nombre}>
+            <Button
+              onClick={() => {
+                if (editingId) {
+                  actualizar.mutate({ id: editingId, ...form })
+                  return
+                }
+                crear.mutate(form)
+              }}
+              loading={crear.isLoading || actualizar.isLoading}
+              disabled={!form.nombre}
+            >
               Guardar
             </Button>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={resetForm}>Cancelar</Button>
           </div>
         </div>
       )}
@@ -67,10 +94,28 @@ export default function Empleados() {
                 </div>
                 <h3 className="font-heading font-semibold">{e.nombre}</h3>
               </div>
-              <button onClick={() => { if (confirm('¿Desactivar este empleado?')) desactivar.mutate({ id: e.id }) }}
-                className="text-xs text-gray-400 hover:text-danger transition-colors">
-                Desactivar
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setEditingId(e.id)
+                    setForm({
+                      nombre: e.nombre ?? '',
+                      email: e.email ?? '',
+                      telefono: e.telefono ?? '',
+                      especialidad: e.especialidad ?? '',
+                      waId: (e as any).waId ?? '',
+                    })
+                    setShowForm(true)
+                  }}
+                  className="text-xs text-primary hover:underline transition-colors"
+                >
+                  Editar
+                </button>
+                <button onClick={() => { if (confirm('¿Desactivar este empleado?')) desactivar.mutate({ id: e.id }) }}
+                  className="text-xs text-gray-400 hover:text-danger transition-colors">
+                  Desactivar
+                </button>
+              </div>
             </div>
             <div className="space-y-1.5 text-xs text-gray-500">
               {e.especialidad && <div className="flex items-center gap-2"><Wrench size={12} />{e.especialidad}</div>}

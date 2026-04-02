@@ -2,6 +2,7 @@ import { useState } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
+import WorkingTime from '../components/WorkingTime'
 import { PRIORIDADES, ESTADOS } from '@shared/const'
 import { Clock, Play, Pause, CheckCircle2, MessageSquare } from 'lucide-react'
 
@@ -16,7 +17,7 @@ function Badge({ value, options }: { value: string; options: readonly { value: s
 
 export default function Tareas() {
   const [nota, setNota] = useState<{ id: number; text: string } | null>(null)
-  const { data: reportes = [], refetch } = trpc.reportes.listar.useQuery({ estado: '' })
+  const { data: reportes = [], refetch } = trpc.reportes.listar.useQuery({ estado: '' }, { refetchInterval: 30000 })
   const cambiar = trpc.reportes.actualizarEstado.useMutation({ onSuccess: refetch })
   const agregarNota = trpc.reportes.agregarNota.useMutation({ onSuccess: () => { setNota(null); refetch() } })
 
@@ -53,6 +54,18 @@ export default function Tareas() {
                   <div>{r.local} — {r.planta === 'baja' ? 'Planta Baja' : 'Planta Alta'}</div>
                   <div>{r.locatario}</div>
                   {r.asignadoA && <div className="text-primary">→ {r.asignadoA}</div>}
+                </div>
+                <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                    <Clock size={12} />
+                    Tiempo trabajado
+                  </div>
+                  <div className="mt-1 font-heading text-lg font-semibold text-slate-800">
+                    <WorkingTime
+                      seconds={(r as any).tiempoTrabajadoSegundos}
+                      isRunning={r.estado === 'en_progreso'}
+                    />
+                  </div>
                 </div>
                 <p className="text-xs text-gray-600 line-clamp-2">{r.descripcion}</p>
 
