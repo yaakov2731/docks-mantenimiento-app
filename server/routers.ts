@@ -100,7 +100,12 @@ export const appRouter = router({
         const reporte = await getReporteById(input.id)
         if (!reporte) throw new TRPCError({ code: 'NOT_FOUND' })
         if (input.estado === 'en_progreso') {
-          await iniciarTrabajoReporte(input.id)
+          // Only start timer if employee has already accepted (or no employee assigned)
+          if (reporte.asignacionEstado !== 'pendiente_confirmacion') {
+            await iniciarTrabajoReporte(input.id)
+          } else {
+            await actualizarReporte(input.id, { estado: 'en_progreso' })
+          }
         } else if (input.estado === 'pausado') {
           await pausarTrabajoReporte(input.id)
         } else if (input.estado === 'completado') {

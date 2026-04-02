@@ -255,11 +255,15 @@ botRouter.post('/reporte/:id/progreso', authBot, async (req, res) => {
     if (!nota) return res.status(400).json({ error: 'nota es requerida' })
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
-    const updated = reporte.trabajoIniciadoAt ? reporte : await iniciarTrabajoReporte(reporteId)
-    await actualizarReporte(reporteId, {
-      asignacionEstado: reporte.asignadoId ? 'aceptada' : reporte.asignacionEstado,
-      asignacionRespondidaAt: reporte.asignadoId && !reporte.asignacionRespondidaAt ? new Date() : reporte.asignacionRespondidaAt,
-    } as any)
+    // Only start timer if employee already accepted — don't auto-start on progress note
+    const alreadyAccepted = reporte.asignacionEstado === 'aceptada' || !reporte.asignadoId
+    const updated = (reporte.trabajoIniciadoAt || !alreadyAccepted) ? reporte : await iniciarTrabajoReporte(reporteId)
+    if (alreadyAccepted && !reporte.asignacionRespondidaAt) {
+      await actualizarReporte(reporteId, {
+        asignacionEstado: 'aceptada',
+        asignacionRespondidaAt: new Date(),
+      } as any)
+    }
     await crearActualizacion({
       reporteId,
       usuarioNombre: empleadoNombre ?? 'Empleado',
