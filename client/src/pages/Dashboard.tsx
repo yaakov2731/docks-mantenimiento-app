@@ -77,7 +77,10 @@ export default function Dashboard() {
   const { data: reportes = [], refetch } = trpc.reportes.listar.useQuery(filters, { refetchInterval: 30000 })
   const { data: reporte } = trpc.reportes.obtener.useQuery({ id: selected! }, { enabled: !!selected, refetchInterval: 15000 })
   const { data: empleados = [] } = trpc.empleados.listar.useQuery()
-  const cambiarEstado = trpc.reportes.actualizarEstado.useMutation({ onSuccess: () => { refetch(); setSelected(null) } })
+  const cambiarEstado = trpc.reportes.actualizarEstado.useMutation({
+    onSuccess: () => { refetch(); setSelected(null) },
+    onError: (err) => alert(err.message),
+  })
   const asignar = trpc.reportes.asignar.useMutation({ onSuccess: () => { refetch(); setAssigningTo('') } })
   const agregarNota = trpc.reportes.agregarNota.useMutation({ onSuccess: () => { refetch(); setNota(''); setShowNota(false) } })
   const prioridadTotal = stats?.porPrioridad?.reduce((acc: number, item: any) => acc + (item.count ?? 0), 0) ?? 0
@@ -361,10 +364,15 @@ export default function Dashboard() {
                     <Button size="sm" variant="success" onClick={() => cambiarEstado.mutate({ id: reporte.id, estado: 'completado' })} loading={cambiarEstado.isLoading}>
                       Completar
                     </Button>
-                    {reporte.estado === 'pendiente' && (
+                    {reporte.estado === 'pendiente' && reporte.asignacionEstado !== 'pendiente_confirmacion' && (
                       <Button size="sm" onClick={() => cambiarEstado.mutate({ id: reporte.id, estado: 'en_progreso' })}>
                         Iniciar
                       </Button>
+                    )}
+                    {reporte.asignacionEstado === 'pendiente_confirmacion' && (
+                      <span className="text-xs text-amber-600 font-medium px-2 py-1 bg-amber-50 rounded border border-amber-200">
+                        Esperando confirmación del empleado
+                      </span>
                     )}
                     {reporte.estado === 'en_progreso' && (
                       <Button size="sm" variant="outline" onClick={() => cambiarEstado.mutate({ id: reporte.id, estado: 'pausado' })}>

@@ -100,23 +100,20 @@ export const appRouter = router({
         const reporte = await getReporteById(input.id)
         if (!reporte) throw new TRPCError({ code: 'NOT_FOUND' })
         if (input.estado === 'en_progreso') {
-          // Only start timer if employee has already accepted (or no employee assigned)
-          if (reporte.asignacionEstado !== 'pendiente_confirmacion') {
-            await iniciarTrabajoReporte(input.id)
-          } else {
-            await actualizarReporte(input.id, { estado: 'en_progreso' })
+          // Block: can't go to en_progreso until employee accepts via WhatsApp
+          if (reporte.asignacionEstado === 'pendiente_confirmacion') {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'Esperando confirmación del empleado vía WhatsApp',
+            })
           }
+          await iniciarTrabajoReporte(input.id)
         } else if (input.estado === 'pausado') {
           await pausarTrabajoReporte(input.id)
         } else if (input.estado === 'completado') {
           await completarTrabajoReporte(input.id)
         } else {
-          const updateData: any = { estado: input.estado }
-          if (['en_progreso', 'pausado', 'completado'].includes(input.estado) && reporte.asignadoId) {
-            updateData.asignacionEstado = 'aceptada'
-            updateData.asignacionRespondidaAt = reporte.asignacionRespondidaAt ?? new Date()
-          }
-          await actualizarReporte(input.id, updateData)
+          await actualizarReporte(input.id, { estado: input.estado })
         }
         await crearActualizacion({
           reporteId: input.id,
