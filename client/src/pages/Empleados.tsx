@@ -2,9 +2,9 @@ import { useState } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
-import { UserPlus, Phone, Mail, Wrench } from 'lucide-react'
+import { UserPlus, Phone, Mail, Wrench, MessageCircle } from 'lucide-react'
 
-const empty = { nombre: '', email: '', telefono: '', especialidad: '' }
+const empty = { nombre: '', email: '', telefono: '', especialidad: '', waId: '' }
 
 export default function Empleados() {
   const [form, setForm] = useState(empty)
@@ -31,6 +31,7 @@ export default function Empleados() {
               { key: 'especialidad', label: 'Especialidad', placeholder: 'Electricista, Plomero...' },
               { key: 'telefono', label: 'Teléfono', placeholder: '+54 11...' },
               { key: 'email', label: 'Email', placeholder: 'juan@email.com' },
+              { key: 'waId', label: 'WhatsApp (número sin +)', placeholder: '5491112345678' },
             ].map(({ key, label, placeholder }) => (
               <div key={key}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -75,6 +76,7 @@ export default function Empleados() {
               {e.especialidad && <div className="flex items-center gap-2"><Wrench size={12} />{e.especialidad}</div>}
               {e.telefono && <div className="flex items-center gap-2"><Phone size={12} />{e.telefono}</div>}
               {e.email && <div className="flex items-center gap-2"><Mail size={12} />{e.email}</div>}
+              {(e as any).waId && <div className="flex items-center gap-2 text-green-600"><MessageCircle size={12} />WA: {(e as any).waId}</div>}
             </div>
           </div>
         ))}

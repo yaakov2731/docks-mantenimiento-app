@@ -53,6 +53,7 @@ export const empleados = sqliteTable('empleados', {
   email: text('email'),
   telefono: text('telefono'),
   especialidad: text('especialidad'),
+  waId: text('wa_id'),
   activo: integer('activo', { mode: 'boolean' }).default(true).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
@@ -91,9 +92,18 @@ export const leads = sqliteTable('leads', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
 
+export const botQueue = sqliteTable('bot_queue', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  waNumber: text('wa_number').notNull(),
+  message: text('message').notNull(),
+  status: text('status', { enum: ['pending', 'sent', 'failed'] }).default('pending').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
 export type User = typeof users.$inferSelect
 export type Reporte = typeof reportes.$inferSelect
 export type Actualizacion = typeof actualizaciones.$inferSelect
 export type Empleado = typeof empleados.$inferSelect
 export type Notificacion = typeof notificaciones.$inferSelect
 export type Lead = typeof leads.$inferSelect
+export type BotQueueItem = typeof botQueue.$inferSelect

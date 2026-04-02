@@ -12,6 +12,7 @@ import {
   getEmpleados, crearEmpleado, actualizarEmpleado,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead,
+  enqueueBotMessage,
 } from './db'
 
 export const appRouter = router({
@@ -114,6 +115,7 @@ export const appRouter = router({
     asignar: protectedProcedure
       .input(z.object({ id: z.number(), empleadoNombre: z.string(), empleadoId: z.number().optional() }))
       .mutation(async ({ input, ctx }) => {
+        const reporte = await getReporteById(input.id)
         await actualizarReporte(input.id, { asignadoA: input.empleadoNombre, asignadoId: input.empleadoId, estado: 'en_progreso' })
         await crearActualizacion({
           reporteId: input.id,
@@ -122,6 +124,21 @@ export const appRouter = router({
           tipo: 'asignacion',
           descripcion: `Asignado a: ${input.empleadoNombre}`,
         })
+        // Notify employee via WhatsApp if they have a wa_id
+        if (input.empleadoId && reporte) {
+          const empleados = await getEmpleados()
+          const emp = empleados.find(e => e.id === input.empleadoId)
+          if (emp?.waId) {
+            const msg =
+              `*Nueva tarea asignada — Docks del Puerto*\n\n` +
+              `*Reclamo #${reporte.id}:* ${reporte.titulo}\n` +
+              `Local: ${reporte.local} (${reporte.planta})\n` +
+              `Prioridad: ${reporte.prioridad}\n\n` +
+              `${reporte.descripcion}\n\n` +
+              `Escribime para reportar avances o marcarla como completada.`
+            enqueueBotMessage(emp.waId, msg).catch(console.error)
+          }
+        }
         return { success: true }
       }),
 

@@ -62,6 +62,7 @@ export async function initDb() {
       email TEXT,
       telefono TEXT,
       especialidad TEXT,
+      wa_id TEXT,
       activo INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
@@ -77,6 +78,13 @@ export async function initDb() {
       recibe_completados INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS bot_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wa_number TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
     `CREATE TABLE IF NOT EXISTS leads (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,6 +198,22 @@ export async function crearEmpleado(data: typeof schema.empleados.$inferInsert) 
 export async function actualizarEmpleado(id: number, data: Partial<typeof schema.empleados.$inferInsert>) {
   await db.update(schema.empleados).set(data as any).where(eq(schema.empleados.id, id)).run()
 }
+export async function getEmpleadoByWaId(waNumber: string) {
+  const normalized = waNumber.replace(/\D/g, '')
+  const rows = await db.select().from(schema.empleados).where(eq(schema.empleados.activo, true))
+  return rows.find(e => {
+    if (!e.waId) return false
+    const stored = e.waId.replace(/\D/g, '')
+    // Match exact OR if incoming number ends with stored (handles missing country code)
+    return normalized === stored || normalized.endsWith(stored)
+  }) ?? null
+}
+export async function getTareasEmpleado(empleadoId: number) {
+  const rows = await db.select().from(schema.reportes).where(eq(schema.reportes.asignadoId, empleadoId))
+  return rows
+    .filter(r => r.estado !== 'completado' && r.estado !== 'cancelado')
+    .sort((a, b) => (b.createdAt as any) - (a.createdAt as any))
+}
 
 // --- NOTIFICACIONES ---
 export async function getNotificaciones() {
@@ -203,6 +227,20 @@ export async function actualizarNotificacion(id: number, data: Partial<typeof sc
 }
 export async function eliminarNotificacion(id: number) {
   await db.delete(schema.notificaciones).where(eq(schema.notificaciones.id, id)).run()
+}
+
+// --- BOT QUEUE ---
+export async function enqueueBotMessage(waNumber: string, message: string) {
+  await db.insert(schema.botQueue).values({ waNumber, message }).run()
+}
+export async function getPendingBotMessages() {
+  return db.select().from(schema.botQueue).where(eq(schema.botQueue.status, 'pending'))
+}
+export async function markBotMessageSent(id: number) {
+  await db.update(schema.botQueue).set({ status: 'sent' }).where(eq(schema.botQueue.id, id)).run()
+}
+export async function markBotMessageFailed(id: number) {
+  await db.update(schema.botQueue).set({ status: 'failed' }).where(eq(schema.botQueue.id, id)).run()
 }
 
 // --- LEADS ---
