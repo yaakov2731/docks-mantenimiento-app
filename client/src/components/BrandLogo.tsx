@@ -53,8 +53,10 @@ export default function BrandLogo({
   const doorFill  = variant === 'dark' ? '#1E2832' : '#ffffff'
   const lineColor = variant === 'dark' ? 'rgba(255,255,255,0.20)' : '#C0C7D0'
   const textColor = variant === 'dark' ? 'rgba(255,255,255,0.65)' : '#787F8A'
-  const ta        = align === 'center' ? 'middle' : 'start'
-  const tx        = align === 'center' ? VBW / 2 : AX[0]
+  // Text always centered under the arch group
+  const archCenter = (AX[0] + AX[3] + AW) / 2
+  const tx = archCenter
+  const ta = 'middle' as const
 
   return (
     <svg
