@@ -27,20 +27,21 @@ const ARCHES = [
 const AX = [34, 86, 138, 190] // left edge x of each arch
 const AW = 46  // arch width
 const AH = 46  // arch height
-const AR = 5   // top corner radius — rectangular arch, not semicircle
+const AR = 5   // top corner radius
 const DW = 15  // door cutout width
-const DH = 26  // door cutout height (from bottom of arch)
+const DH = 26  // door cutout height
+const TOP = 8  // top padding — arches start here, not at y=0
 
 function archPath(x: number) {
-  // Rectangle with rounded top-left and top-right corners only
+  const y = TOP
   return (
-    `M ${x + AR},0 ` +
-    `L ${x + AW - AR},0 ` +
-    `Q ${x + AW},0 ${x + AW},${AR} ` +
-    `L ${x + AW},${AH} ` +
-    `L ${x},${AH} ` +
-    `L ${x},${AR} ` +
-    `Q ${x},0 ${x + AR},0 Z`
+    `M ${x + AR},${y} ` +
+    `L ${x + AW - AR},${y} ` +
+    `Q ${x + AW},${y} ${x + AW},${y + AR} ` +
+    `L ${x + AW},${y + AH} ` +
+    `L ${x},${y + AH} ` +
+    `L ${x},${y + AR} ` +
+    `Q ${x},${y} ${x + AR},${y} Z`
   )
 }
 
@@ -52,7 +53,7 @@ export default function BrandLogo({
   className = '',
 }: BrandLogoProps) {
   const svgW = WIDTHS[size]
-  const viewH = showTagline ? 78 : 52
+  const viewH = showTagline ? 86 : 60   // +8 for top padding
   const svgH = Math.round(svgW * viewH / 270)
 
   const doorFill  = variant === 'dark' ? '#1E2832' : '#ffffff'
@@ -66,6 +67,7 @@ export default function BrandLogo({
       width={svgW}
       height={svgH}
       viewBox={`0 0 270 ${viewH}`}
+      role="img"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
@@ -81,7 +83,7 @@ export default function BrandLogo({
             {/* Door cutout — centered, from bottom of arch upward */}
             <rect
               x={x + (AW - DW) / 2}
-              y={AH - DH}
+              y={TOP + AH - DH}
               width={DW}
               height={DH}
               fill={doorFill}
@@ -91,12 +93,12 @@ export default function BrandLogo({
       })}
 
       {/* ── Baseline rule ── */}
-      <line x1="14" y1="47.5" x2="256" y2="47.5" stroke={lineColor} strokeWidth="0.9" />
+      <line x1="14" y1={TOP + AH + 1.5} x2="256" y2={TOP + AH + 1.5} stroke={lineColor} strokeWidth="0.9" />
 
       {/* ── "Docks del Puerto" wordmark ── */}
       {showTagline && (
         <text
-          y="68"
+          y={TOP + AH + 22}
           fontFamily="Georgia, 'Times New Roman', 'Palatino Linotype', serif"
           fill={textColor}
           textAnchor={align === 'center' ? 'middle' : 'start'}
