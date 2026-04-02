@@ -7,6 +7,7 @@ import { appRouter } from './routers'
 import { createContext } from './_core/trpc'
 import { initDb, countUsers, createUser } from './db'
 import botRouter from './bot-api'
+import { readEnv } from './_core/env'
 import bcrypt from 'bcryptjs'
 import path from 'path'
 
@@ -37,8 +38,8 @@ if (process.env.NODE_ENV === 'production') {
 ;(async () => {
   await initDb()
   if (await countUsers() === 0) {
-    const username = process.env.ADMIN_USERNAME ?? 'admin'
-    const password = process.env.ADMIN_PASSWORD ?? 'admin123'
+    const username = readEnv('ADMIN_USERNAME') ?? 'admin'
+    const password = readEnv('ADMIN_PASSWORD') ?? 'admin123'
     const hash = await bcrypt.hash(password, 10)
     await createUser({ username, password: hash, name: 'Administrador', role: 'admin' })
     console.log(`[Server] Admin creado: ${username}`)

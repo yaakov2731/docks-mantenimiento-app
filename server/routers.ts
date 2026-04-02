@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { router, publicProcedure, protectedProcedure, JWT_COOKIE } from './_core/trpc'
 import { notifyOwner, notifyCompleted } from './_core/notification'
+import { readEnv } from './_core/env'
 import {
   getUserByUsername,
   crearReporte, getReportes, getReporteById, actualizarReporte, getEstadisticas,
@@ -25,7 +26,7 @@ export const appRouter = router({
         if (!ok) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Usuario o contraseña incorrectos' })
         const token = jwt.sign(
           { id: user.id, username: user.username, name: user.name, role: user.role },
-          process.env.SESSION_SECRET ?? 'dev-secret-change-me',
+          readEnv('SESSION_SECRET') ?? 'dev-secret-change-me',
           { expiresIn: '7d' }
         )
         ctx.res.cookie(JWT_COOKIE, token, {

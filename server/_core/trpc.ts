@@ -1,8 +1,9 @@
 import { initTRPC, TRPCError } from '@trpc/server'
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express'
 import jwt from 'jsonwebtoken'
+import { readEnv } from './env'
 
-const JWT_SECRET = process.env.SESSION_SECRET ?? 'dev-secret-change-me'
+const JWT_SECRET = readEnv('SESSION_SECRET') ?? 'dev-secret-change-me'
 export const JWT_COOKIE = 'docks_token'
 
 export type SessionUser = {

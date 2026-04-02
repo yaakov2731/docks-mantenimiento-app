@@ -2,14 +2,9 @@
   "version": 2,
   "buildCommand": "npm run build:client",
   "outputDirectory": "dist/client",
-  "functions": {
-    "api/index.ts": {
-      "runtime": "nodejs20.x",
-      "includeFiles": "node_modules/@libsql/**"
-    }
-  },
   "rewrites": [
     { "source": "/trpc/:path*", "destination": "/api/index" },
-    { "source": "/api/:path*", "destination": "/api/index" }
+    { "source": "/api/:path*", "destination": "/api/index" },
+    { "source": "/:path*", "destination": "/index.html" }
   ]
 }

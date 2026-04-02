@@ -2,9 +2,10 @@ import { createClient } from '@libsql/client/web'
 import { drizzle } from 'drizzle-orm/libsql'
 import { eq, and, or, like } from 'drizzle-orm'
 import * as schema from '../drizzle/schema'
+import { readEnv } from './_core/env'
 
-const TURSO_URL = process.env.TURSO_URL
-const TURSO_TOKEN = process.env.TURSO_TOKEN
+const TURSO_URL = readEnv('TURSO_URL')
+const TURSO_TOKEN = readEnv('TURSO_TOKEN')
 
 if (!TURSO_URL || !TURSO_TOKEN) {
   throw new Error('TURSO_URL and TURSO_TOKEN env vars are required')
@@ -146,18 +147,27 @@ export async function actualizarReporte(id: number, data: Partial<typeof schema.
 export async function getEstadisticas() {
   const all = await db.select().from(schema.reportes)
   const total = all.length
+  const pendientes = all.filter(r => r.estado === 'pendiente').length
+  const enProgreso = all.filter(r => r.estado === 'en_progreso').length
+  const pausados = all.filter(r => r.estado === 'pausado').length
   const completados = all.filter(r => r.estado === 'completado').length
+  const cancelados = all.filter(r => r.estado === 'cancelado').length
+  const abiertos = pendientes + enProgreso + pausados
+  const totalGestionable = total - cancelados
   return {
     total,
-    pendientes: all.filter(r => r.estado === 'pendiente').length,
-    enProgreso: all.filter(r => r.estado === 'en_progreso').length,
+    abiertos,
+    pendientes,
+    enProgreso,
+    pausados,
     completados,
-    urgentes: all.filter(r => r.prioridad === 'urgente' && r.estado !== 'completado').length,
-    tasaCompletitud: total > 0 ? Math.round((completados / total) * 100) : 0,
+    cancelados,
+    urgentes: all.filter(r => r.prioridad === 'urgente' && !['completado', 'cancelado'].includes(r.estado)).length,
+    tasaCompletitud: totalGestionable > 0 ? Math.round((completados / totalGestionable) * 100) : 0,
     porCategoria: ['electrico', 'plomeria', 'estructura', 'limpieza', 'seguridad', 'climatizacion', 'otro']
-      .map(c => ({ categoria: c, count: all.filter(r => r.categoria === c).length })),
+      .map(c => ({ categoria: c, count: all.filter(r => r.categoria === c && !['completado', 'cancelado'].includes(r.estado)).length })),
     porPrioridad: ['baja', 'media', 'alta', 'urgente']
-      .map(p => ({ prioridad: p, count: all.filter(r => r.prioridad === p).length })),
+      .map(p => ({ prioridad: p, count: all.filter(r => r.prioridad === p && !['completado', 'cancelado'].includes(r.estado)).length })),
   }
 }
 

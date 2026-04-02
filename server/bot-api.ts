@@ -5,12 +5,13 @@
 import { Router } from 'express'
 import { crearReporte, crearLead } from './db'
 import { notifyOwner } from './_core/notification'
+import { readEnv } from './_core/env'
 
 const botRouter = Router()
 
 function authBot(req: any, res: any, next: any) {
   const key = req.headers['x-bot-api-key']
-  if (!key || key !== process.env.BOT_API_KEY) {
+  if (!key || key !== readEnv('BOT_API_KEY')) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
   next()

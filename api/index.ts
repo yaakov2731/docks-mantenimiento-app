@@ -6,6 +6,7 @@ import { appRouter } from '../server/routers'
 import { createContext } from '../server/_core/trpc'
 import botRouter from '../server/bot-api'
 import { initDb, countUsers, createUser } from '../server/db'
+import { readEnv } from '../server/_core/env'
 import bcrypt from 'bcryptjs'
 
 const app = express()
@@ -19,9 +20,9 @@ function getInitPromise() {
     initPromise = (async () => {
       await initDb()
       if (await countUsers() === 0) {
-        const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD ?? 'admin123', 10)
+        const hash = await bcrypt.hash(readEnv('ADMIN_PASSWORD') ?? 'admin123', 10)
         await createUser({
-          username: process.env.ADMIN_USERNAME ?? 'admin',
+          username: readEnv('ADMIN_USERNAME') ?? 'admin',
           password: hash,
           name: 'Administrador',
           role: 'admin',
