@@ -1,75 +1,76 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'wouter'
 import { trpc } from '../lib/trpc'
-import { Button } from './ui/button'
+import BrandLogo from './BrandLogo'
 import {
-  LayoutDashboard, ClipboardList, History, Users, Settings,
-  LogOut, Menu, X, Home, UserCheck, ChevronRight
+  LayoutDashboard, ClipboardList, History, Users,
+  Settings, LogOut, Menu, Home, UserCheck, X,
 } from 'lucide-react'
 
 const navItems = [
-  { href: '/',              label: 'Reportar Problema', icon: Home },
-  { href: '/dashboard',     label: 'Dashboard',         icon: LayoutDashboard },
-  { href: '/tareas',        label: 'Mis Tareas',        icon: ClipboardList },
-  { href: '/leads',         label: 'Leads Alquiler',    icon: UserCheck },
-  { href: '/historial',     label: 'Historial',         icon: History },
-  { href: '/empleados',     label: 'Empleados',         icon: Users },
-  { href: '/configuracion', label: 'Configuración',     icon: Settings },
+  { href: '/',              label: 'Formulario público', icon: Home },
+  { href: '/dashboard',     label: 'Dashboard',          icon: LayoutDashboard },
+  { href: '/tareas',        label: 'Mis Tareas',         icon: ClipboardList },
+  { href: '/leads',         label: 'Leads Alquiler',     icon: UserCheck },
+  { href: '/historial',     label: 'Historial',          icon: History },
+  { href: '/empleados',     label: 'Empleados',          icon: Users },
+  { href: '/configuracion', label: 'Configuración',      icon: Settings },
 ]
 
 export default function DashboardLayout({ children, title }: { children: React.ReactNode; title?: string }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [open, setOpen] = useState(false)
   const [location] = useLocation()
   const { data: user } = trpc.auth.me.useQuery()
   const logout = trpc.auth.logout.useMutation({ onSuccess: () => { window.location.href = '/login' } })
 
-  const Sidebar = ({ mobile = false }) => (
-    <div className={`flex flex-col h-full bg-sidebar-bg text-white ${mobile ? 'w-72' : 'w-64'}`}>
+  const Sidebar = () => (
+    <div className="flex flex-col h-full bg-[#1E2832] text-white w-64">
+
       {/* Logo */}
-      <div className="px-6 py-6 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Docks del Puerto" className="w-10 h-10 rounded-full object-contain bg-white p-0.5" />
-          <div>
-            <div className="font-heading font-bold text-sm leading-tight">Docks del Puerto</div>
-            <div className="text-xs text-white/50">Mantenimiento</div>
-          </div>
-        </div>
-        {user && (
-          <div className="mt-4 px-3 py-2 bg-white/5 rounded-lg">
-            <div className="text-xs text-white/50">Conectado como</div>
-            <div className="text-sm font-medium truncate">{user.name}</div>
-            <div className="text-xs text-primary capitalize">{(user as any).role}</div>
-          </div>
-        )}
+      <div className="px-6 pt-7 pb-5 border-b border-white/8">
+        <BrandLogo variant="dark" size="sm" showTagline />
       </div>
 
+      {/* User */}
+      {user && (
+        <div className="px-4 py-3 mx-3 mt-4 rounded-xl bg-white/5 border border-white/8">
+          <p className="text-[10px] uppercase tracking-widest text-white/35 font-medium">Conectado como</p>
+          <p className="text-sm font-semibold text-white mt-0.5 truncate">{user.name}</p>
+          <p className="text-xs text-white/40 capitalize">{(user as any).role}</p>
+        </div>
+      )}
+
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <div className="text-xs text-white/30 uppercase px-3 mb-2 font-heading tracking-wider">Navegación</div>
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <p className="text-[10px] uppercase tracking-widest text-white/25 px-3 mb-2 font-medium">Navegación</p>
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = location === href
           return (
-            <Link key={href} href={href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all group ${
-                active ? 'bg-primary text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+                active
+                  ? 'bg-white text-[#1E2832] font-semibold'
+                  : 'text-white/55 hover:text-white hover:bg-white/8'
               }`}
             >
-              <Icon size={18} className={active ? 'text-white' : 'text-white/50 group-hover:text-white'} />
+              <Icon size={16} className={active ? 'text-primary' : ''} />
               {label}
-              {active && <ChevronRight size={14} className="ml-auto" />}
             </Link>
           )
         })}
       </nav>
 
       {/* Logout */}
-      <div className="px-3 py-4 border-t border-white/10">
+      <div className="px-3 py-4 border-t border-white/8">
         <button
+          type="button"
           onClick={() => logout.mutate()}
-          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-white/70 hover:bg-white/10 hover:text-white transition-all"
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-sm text-white/45 hover:text-white hover:bg-white/8 transition-all"
         >
-          <LogOut size={18} className="text-white/50" />
+          <LogOut size={16} />
           Cerrar sesión
         </button>
       </div>
@@ -77,34 +78,49 @@ export default function DashboardLayout({ children, title }: { children: React.R
   )
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[#F4F6F8]">
+
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-shrink-0">
         <Sidebar />
       </aside>
 
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-          <div className="absolute left-0 top-0 h-full z-50">
-            <Sidebar mobile />
+      {/* Mobile drawer */}
+      {open && (
+        <div className="fixed inset-0 z-40 md:hidden flex">
+          <div className="flex-shrink-0">
+            <Sidebar />
           </div>
+          <div className="flex-1 bg-black/40" onClick={() => setOpen(false)} />
         </div>
       )}
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex items-center gap-4 flex-shrink-0">
-          <button className="md:hidden p-2 rounded-lg hover:bg-gray-100" onClick={() => setSidebarOpen(true)}>
-            <Menu size={20} />
-          </button>
-          <h1 className="font-heading font-semibold text-lg text-sidebar-bg flex-1">{title ?? 'Dashboard'}</h1>
-          <a href="/" target="_blank" rel="noopener noreferrer"
-            className="hidden md:flex items-center gap-2 text-sm text-primary hover:underline"
+
+        {/* Top bar */}
+        <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center gap-3 flex-shrink-0">
+          <button
+            type="button"
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            onClick={() => setOpen(!open)}
+            aria-label="Abrir menú"
           >
-            <Home size={14} /> Ver formulario público
+            {open ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-heading font-semibold text-lg text-[#1E2832] truncate">
+              {title ?? 'Dashboard'}
+            </h1>
+          </div>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-2 text-xs text-gray-500 hover:text-primary border border-gray-200 rounded-lg px-3 py-2 transition-colors"
+          >
+            <Home size={13} />
+            Ver formulario
           </a>
         </header>
 
