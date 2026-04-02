@@ -22,7 +22,7 @@ export default function Login() {
 
           <div>
             <p className="text-xs uppercase tracking-widest text-white/35 font-medium mb-4">Panel interno</p>
-            <h2 className="font-heading font-semibold text-2xl leading-snug text-white/90">
+            <h2 className="font-heading font-semibold text-lg leading-snug text-white/80">
               Gestión de reclamos, seguimiento operativo y atención a locatarios.
             </h2>
             <div className="mt-8 space-y-3">
@@ -54,7 +54,7 @@ export default function Login() {
 
           <div className="mb-8">
             <p className="text-xs uppercase tracking-widest text-gray-400 font-medium mb-1">Acceso restringido</p>
-            <h1 className="font-heading font-bold text-2xl text-[#1E2832]">Ingreso al panel</h1>
+            <h1 className="font-heading font-semibold text-xl text-[#1E2832]">Ingreso al panel</h1>
           </div>
 
           <form

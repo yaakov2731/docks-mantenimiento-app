@@ -111,7 +111,7 @@ export default function Home() {
       <div className="bg-[#1E2832] border-t border-white/5 pb-8 px-6">
         <div className="max-w-2xl mx-auto pt-2">
           <p className="text-xs text-white/40 uppercase tracking-widest font-medium">Formulario público</p>
-          <h1 className="font-heading font-semibold text-white text-xl mt-1">Reporte de Mantenimiento</h1>
+          <h1 className="font-heading font-semibold text-white text-base mt-0.5">Reporte de Mantenimiento</h1>
         </div>
       </div>
 
