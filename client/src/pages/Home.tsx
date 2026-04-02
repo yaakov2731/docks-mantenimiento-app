@@ -94,26 +94,18 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#F4F6F8]">
 
-      {/* Header */}
-      <header className="bg-[#1E2832] px-6 py-5">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <BrandLogo variant="dark" size="sm" />
+      {/* Header — single dark band */}
+      <header className="bg-[#1E2832] px-6 pt-6 pb-10">
+        <div className="max-w-2xl mx-auto flex items-start justify-between gap-4">
+          <BrandLogo variant="dark" size="md" showTagline />
           <a
             href="/login"
-            className="text-xs text-white/40 hover:text-white/70 transition-colors font-medium tracking-wide"
+            className="mt-1 text-xs text-white/35 hover:text-white/65 transition-colors font-medium tracking-wide whitespace-nowrap"
           >
             Admin →
           </a>
         </div>
       </header>
-
-      {/* Page title */}
-      <div className="bg-[#1E2832] border-t border-white/5 pb-8 px-6">
-        <div className="max-w-2xl mx-auto pt-2">
-          <p className="text-xs text-white/40 uppercase tracking-widest font-medium">Formulario público</p>
-          <h1 className="font-heading font-semibold text-white text-base mt-0.5">Reporte de Mantenimiento</h1>
-        </div>
-      </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-4 md:px-6 -mt-4 pb-16 space-y-4">
@@ -187,10 +179,10 @@ export default function Home() {
                     : 'border-gray-100 hover:border-gray-200 bg-white text-gray-500'
                 }`}
               >
-                <span className={form.categoria === cat.value ? 'text-primary' : 'text-gray-400'}>
+                <span className={form.categoria === cat.value ? 'text-primary' : 'text-gray-500'}>
                   {CAT_ICONS[cat.value]}
                 </span>
-                <span className="text-xs font-medium leading-tight">{cat.label}</span>
+                <span className={`text-xs font-medium leading-tight ${form.categoria === cat.value ? 'text-primary' : 'text-gray-600'}`}>{cat.label}</span>
               </button>
             ))}
           </div>
