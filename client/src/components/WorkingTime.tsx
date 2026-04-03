@@ -24,7 +24,7 @@ export default function WorkingTime({
 
   useEffect(() => {
     setDisplaySeconds(Math.max(0, Math.floor(seconds)))
-  }, [seconds])
+  }, [seconds, isRunning])
 
   useEffect(() => {
     if (!isRunning) return
