@@ -3,6 +3,7 @@
  * Autenticación: header X-Bot-Api-Key
  */
 import { Router } from 'express'
+import { z } from 'zod'
 import {
   crearReporte,
   crearLead,
@@ -25,6 +26,53 @@ import { notifyOwner } from './_core/notification'
 import { readEnv } from './_core/env'
 
 const botRouter = Router()
+
+const reporteSchema = z.object({
+  locatario: z.string().min(1),
+  local: z.string().min(1),
+  planta: z.string().min(1),
+  contacto: z.string().optional(),
+  categoria: z.string().min(1),
+  prioridad: z.enum(['urgente', 'media', 'baja']),
+  titulo: z.string().min(1),
+  descripcion: z.string().min(1),
+})
+
+const leadSchema = z.object({
+  nombre: z.string().min(1),
+  telefono: z.string().optional(),
+  email: z.string().email().optional(),
+  waId: z.string().optional(),
+  rubro: z.string().optional(),
+  tipoLocal: z.string().optional(),
+  mensaje: z.string().optional(),
+})
+
+const reporteRespuestaSchema = z.object({
+  respuesta: z.enum(['recibida', 'no_puede', 'ocupado', 'franco']),
+  empleadoNombre: z.string().optional(),
+})
+
+const reporteAccionSchema = z.object({
+  empleadoNombre: z.string().optional(),
+  empleadoId: z.number().int().positive().optional(),
+  nota: z.string().optional(),
+})
+
+function parsePositiveId(value: string) {
+  const id = Number(value)
+  return Number.isInteger(id) && id > 0 ? id : null
+}
+
+function validationError(res: any, error: z.ZodError) {
+  return res.status(400).json({
+    error: 'Payload inválido',
+    details: error.issues.map(issue => ({
+      path: issue.path.join('.') || 'root',
+      message: issue.message,
+    })),
+  })
+}
 
 function formatDuration(seconds: number) {
   const safe = Math.max(0, Math.floor(seconds))
@@ -62,10 +110,10 @@ function authBot(req: any, res: any, next: any) {
 // POST /api/bot/reporte
 botRouter.post('/reporte', authBot, async (req, res) => {
   try {
-    const { locatario, local, planta, contacto, categoria, prioridad, titulo, descripcion } = req.body
-    if (!locatario || !local || !planta || !categoria || !prioridad || !titulo || !descripcion) {
-      return res.status(400).json({ error: 'Faltan campos requeridos' })
-    }
+    const parsed = reporteSchema.safeParse(req.body)
+    if (!parsed.success) return validationError(res, parsed.error)
+
+    const { locatario, local, planta, contacto, categoria, prioridad, titulo, descripcion } = parsed.data
     const id = await crearReporte({ locatario, local, planta, contacto, categoria, prioridad, titulo, descripcion } as any)
     notifyOwner({
       title: `[${prioridad.toUpperCase()}] Reclamo vía WhatsApp — ${local}`,
@@ -81,8 +129,10 @@ botRouter.post('/reporte', authBot, async (req, res) => {
 // POST /api/bot/lead
 botRouter.post('/lead', authBot, async (req, res) => {
   try {
-    const { nombre, telefono, email, waId, rubro, tipoLocal, mensaje } = req.body
-    if (!nombre) return res.status(400).json({ error: 'nombre es requerido' })
+    const parsed = leadSchema.safeParse(req.body)
+    if (!parsed.success) return validationError(res, parsed.error)
+
+    const { nombre, telefono, email, waId, rubro, tipoLocal, mensaje } = parsed.data
     const id = await crearLead({ nombre, telefono, email, waId, rubro, tipoLocal, mensaje, fuente: 'whatsapp' } as any)
     notifyOwner({
       title: `Nuevo lead WhatsApp`,
@@ -116,7 +166,10 @@ botRouter.get('/empleado/identificar/:waNumber', authBot, async (req, res) => {
 // GET /api/bot/empleado/:id/tareas
 botRouter.get('/empleado/:id/tareas', authBot, async (req, res) => {
   try {
-    const tareas = await getTareasEmpleado(Number(req.params.id))
+    const empleadoId = parsePositiveId(req.params.id)
+    if (!empleadoId) return res.status(400).json({ error: 'id inválido' })
+
+    const tareas = await getTareasEmpleado(empleadoId)
     return res.json({ tareas: tareas.map(t => buildTaskPayload(t, t.tiempoTrabajadoSegundos ?? 0)) })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
@@ -126,16 +179,15 @@ botRouter.get('/empleado/:id/tareas', authBot, async (req, res) => {
 // POST /api/bot/reporte/:id/respuesta
 botRouter.post('/reporte/:id/respuesta', authBot, async (req, res) => {
   try {
-    const reporteId = Number(req.params.id)
-    const { respuesta, empleadoNombre } = req.body as {
-      respuesta?: 'recibida' | 'no_puede' | 'ocupado' | 'franco'
-      empleadoNombre?: string
-    }
+    const reporteId = parsePositiveId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id inválido' })
+
+    const parsed = reporteRespuestaSchema.safeParse(req.body)
+    if (!parsed.success) return validationError(res, parsed.error)
+
+    const { respuesta, empleadoNombre } = parsed.data
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
-    if (!respuesta || !['recibida', 'no_puede', 'ocupado', 'franco'].includes(respuesta)) {
-      return res.status(400).json({ error: 'respuesta inválida' })
-    }
 
     if (respuesta === 'recibida') {
       const updated = await iniciarTrabajoReporte(reporteId)
@@ -192,8 +244,13 @@ botRouter.post('/reporte/:id/respuesta', authBot, async (req, res) => {
 // POST /api/bot/reporte/:id/iniciar
 botRouter.post('/reporte/:id/iniciar', authBot, async (req, res) => {
   try {
-    const reporteId = Number(req.params.id)
-    const { empleadoNombre } = req.body
+    const reporteId = parsePositiveId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id inválido' })
+
+    const parsed = reporteAccionSchema.safeParse(req.body)
+    if (!parsed.success) return validationError(res, parsed.error)
+
+    const { empleadoNombre } = parsed.data
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
     const updated = await iniciarTrabajoReporte(reporteId)
@@ -223,8 +280,13 @@ botRouter.post('/reporte/:id/iniciar', authBot, async (req, res) => {
 // POST /api/bot/reporte/:id/pausar
 botRouter.post('/reporte/:id/pausar', authBot, async (req, res) => {
   try {
-    const reporteId = Number(req.params.id)
-    const { nota, empleadoNombre } = req.body
+    const reporteId = parsePositiveId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id inválido' })
+
+    const parsed = reporteAccionSchema.safeParse(req.body)
+    if (!parsed.success) return validationError(res, parsed.error)
+
+    const { nota, empleadoNombre } = parsed.data
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
     const updated = await pausarTrabajoReporte(reporteId)
@@ -250,9 +312,13 @@ botRouter.post('/reporte/:id/pausar', authBot, async (req, res) => {
 // POST /api/bot/reporte/:id/progreso
 botRouter.post('/reporte/:id/progreso', authBot, async (req, res) => {
   try {
-    const reporteId = Number(req.params.id)
-    const { nota, empleadoId, empleadoNombre } = req.body
-    if (!nota) return res.status(400).json({ error: 'nota es requerida' })
+    const reporteId = parsePositiveId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id inválido' })
+
+    const parsed = reporteAccionSchema.extend({ nota: z.string().min(1) }).safeParse(req.body)
+    if (!parsed.success) return validationError(res, parsed.error)
+
+    const { nota, empleadoNombre } = parsed.data
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
     // Only start timer if employee already accepted — don't auto-start on progress note
@@ -285,8 +351,13 @@ botRouter.post('/reporte/:id/progreso', authBot, async (req, res) => {
 // POST /api/bot/reporte/:id/completar
 botRouter.post('/reporte/:id/completar', authBot, async (req, res) => {
   try {
-    const reporteId = Number(req.params.id)
-    const { nota, empleadoId, empleadoNombre } = req.body
+    const reporteId = parsePositiveId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id inválido' })
+
+    const parsed = reporteAccionSchema.safeParse(req.body)
+    if (!parsed.success) return validationError(res, parsed.error)
+
+    const { nota, empleadoId, empleadoNombre } = parsed.data
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
     const updated = await completarTrabajoReporte(reporteId)
@@ -365,7 +436,10 @@ botRouter.get('/queue', authBot, async (_req, res) => {
 // POST /api/bot/queue/:id/sent
 botRouter.post('/queue/:id/sent', authBot, async (req, res) => {
   try {
-    await markBotMessageSent(Number(req.params.id))
+    const queueId = parsePositiveId(req.params.id)
+    if (!queueId) return res.status(400).json({ error: 'id inválido' })
+
+    await markBotMessageSent(queueId)
     return res.json({ success: true })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
@@ -375,7 +449,10 @@ botRouter.post('/queue/:id/sent', authBot, async (req, res) => {
 // POST /api/bot/queue/:id/failed
 botRouter.post('/queue/:id/failed', authBot, async (req, res) => {
   try {
-    await markBotMessageFailed(Number(req.params.id))
+    const queueId = parsePositiveId(req.params.id)
+    if (!queueId) return res.status(400).json({ error: 'id inválido' })
+
+    await markBotMessageFailed(queueId)
     return res.json({ success: true })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
