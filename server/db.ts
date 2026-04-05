@@ -323,10 +323,11 @@ export async function getEmpleados() {
   return db.select().from(schema.empleados).where(eq(schema.empleados.activo, true))
 }
 export async function crearEmpleado(data: typeof schema.empleados.$inferInsert) {
-  await db.insert(schema.empleados).values(data).run()
+  await db.insert(schema.empleados).values({ ...data, waId: normalizeWaNumber(data.waId) || null }).run()
 }
 export async function actualizarEmpleado(id: number, data: Partial<typeof schema.empleados.$inferInsert>) {
-  await db.update(schema.empleados).set(data as any).where(eq(schema.empleados.id, id)).run()
+  const normalized = 'waId' in data ? { ...data, waId: normalizeWaNumber(data.waId) || null } : data
+  await db.update(schema.empleados).set(normalized as any).where(eq(schema.empleados.id, id)).run()
 }
 export async function getEmpleadoById(id: number) {
   const rows = await db.select().from(schema.empleados).where(eq(schema.empleados.id, id))
