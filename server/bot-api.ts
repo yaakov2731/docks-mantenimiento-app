@@ -29,6 +29,7 @@ const RESPUESTAS_EMPLEADO = ['recibida', 'no_puede', 'ocupado', 'franco'] as con
 type RespuestaEmpleado = typeof RESPUESTAS_EMPLEADO[number]
 const PRIORIDADES = ['baja', 'media', 'alta', 'urgente'] as const
 const CATEGORIAS = ['electrico', 'plomeria', 'estructura', 'limpieza', 'seguridad', 'climatizacion', 'otro'] as const
+const PLANTAS = ['baja', 'alta'] as const
 
 function formatDuration(seconds: number) {
   const safe = Math.max(0, Math.floor(seconds))
@@ -86,6 +87,10 @@ function isValidCategoria(value: string): value is typeof CATEGORIAS[number] {
   return (CATEGORIAS as readonly string[]).includes(value)
 }
 
+function isValidPlanta(value: string): value is typeof PLANTAS[number] {
+  return (PLANTAS as readonly string[]).includes(value)
+}
+
 function parseOptionalBodyId(value: unknown) {
   if (value === null || value === undefined || value === '') return null
   const parsed = Number(value)
@@ -112,6 +117,9 @@ botRouter.post('/reporte', authBot, async (req, res) => {
     const descripcion = normalizeText(req.body?.descripcion)
     if (!locatario || !local || !planta || !categoria || !prioridad || !titulo || !descripcion) {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
+    }
+    if (!isValidPlanta(planta)) {
+      return res.status(400).json({ error: `planta inválida. Debe ser una de: ${PLANTAS.join(', ')}` })
     }
     if (!isValidCategoria(categoria)) {
       return res.status(400).json({ error: `categoria inválida. Debe ser una de: ${CATEGORIAS.join(', ')}` })
