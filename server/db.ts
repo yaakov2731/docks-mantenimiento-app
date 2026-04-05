@@ -112,6 +112,15 @@ export async function initDb() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    `CREATE TABLE IF NOT EXISTS asistencias (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      empleado_id INTEGER NOT NULL,
+      empleado_nombre TEXT NOT NULL,
+      tipo TEXT NOT NULL,
+      wa_number TEXT,
+      nota TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
   ]
   for (const sql of stmts) {
     await client.execute(sql)
@@ -323,10 +332,11 @@ export async function getEmpleados() {
   return db.select().from(schema.empleados).where(eq(schema.empleados.activo, true))
 }
 export async function crearEmpleado(data: typeof schema.empleados.$inferInsert) {
-  await db.insert(schema.empleados).values(data).run()
+  await db.insert(schema.empleados).values({ ...data, waId: normalizeWaNumber(data.waId) || null }).run()
 }
 export async function actualizarEmpleado(id: number, data: Partial<typeof schema.empleados.$inferInsert>) {
-  await db.update(schema.empleados).set(data as any).where(eq(schema.empleados.id, id)).run()
+  const normalized = 'waId' in data ? { ...data, waId: normalizeWaNumber(data.waId) || null } : data
+  await db.update(schema.empleados).set(normalized as any).where(eq(schema.empleados.id, id)).run()
 }
 export async function getEmpleadoById(id: number) {
   const rows = await db.select().from(schema.empleados).where(eq(schema.empleados.id, id))
@@ -384,6 +394,47 @@ export async function actualizarNotificacion(id: number, data: Partial<typeof sc
 }
 export async function eliminarNotificacion(id: number) {
   await db.delete(schema.notificaciones).where(eq(schema.notificaciones.id, id)).run()
+}
+
+// --- ASISTENCIAS ---
+export async function registrarAsistencia(data: {
+  empleadoId: number
+  empleadoNombre: string
+  tipo: 'entrada' | 'salida'
+  waNumber?: string
+  nota?: string
+}) {
+  const rows = await db.insert(schema.asistencias).values(data).returning({ id: schema.asistencias.id })
+  return rows[0].id
+}
+
+export async function getAsistenciasEmpleadoHoy(empleadoId: number) {
+  const { start, end } = getBuenosAiresDayRange()
+  const rows = await db.select().from(schema.asistencias)
+    .where(eq(schema.asistencias.empleadoId, empleadoId))
+  return rows
+    .filter(a => {
+      const ms = toMs(a.createdAt)
+      return ms >= start && ms < end
+    })
+    .sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt))
+}
+
+export async function getAsistenciasHoy() {
+  const { start, end } = getBuenosAiresDayRange()
+  const rows = await db.select().from(schema.asistencias)
+  return rows
+    .filter(a => {
+      const ms = toMs(a.createdAt)
+      return ms >= start && ms < end
+    })
+    .sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt))
+}
+
+export async function getUltimaAsistenciaEmpleado(empleadoId: number) {
+  const rows = await db.select().from(schema.asistencias)
+    .where(eq(schema.asistencias.empleadoId, empleadoId))
+  return rows.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))[0] ?? null
 }
 
 // --- BOT QUEUE ---
