@@ -7,6 +7,9 @@ import {
   crearReporte,
   crearLead,
   getEmpleadoByWaId,
+  getJornadaActivaEmpleado,
+  registrarEntradaEmpleado,
+  registrarSalidaEmpleado,
   getTareasEmpleado,
   crearActualizacion,
   getPendingBotMessages,
@@ -38,6 +41,12 @@ function formatDuration(seconds: number) {
   if (hours > 0) return `${hours}h ${minutes}m`
   if (minutes > 0) return `${minutes}m`
   return `${safe}s`
+}
+
+function formatDateTime(value?: Date | string | number | null) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 function buildTaskPayload(reporte: any, tiempoTrabajadoSegundos?: number) {
@@ -175,6 +184,80 @@ botRouter.get('/empleado/identificar/:waNumber', authBot, async (req, res) => {
     const empleado = await getEmpleadoByWaId(req.params.waNumber)
     if (!empleado) return res.status(404).json({ found: false })
     return res.json({ found: true, id: empleado.id, nombre: empleado.nombre, especialidad: empleado.especialidad })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/bot/empleado/:id/entrada
+botRouter.post('/empleado/:id/entrada', authBot, async (req, res) => {
+  try {
+    const empleadoId = parseId(req.params.id)
+    if (!empleadoId) return res.status(400).json({ error: 'id de empleado inválido' })
+    const empleado = await getEmpleadoById(empleadoId)
+    if (!empleado || empleado.activo === false) return res.status(404).json({ error: 'Empleado no encontrado' })
+    const nota = normalizeOptionalText(req.body?.nota)
+    const { marcacion, alreadyOpen } = await registrarEntradaEmpleado(empleadoId, { fuente: 'whatsapp', nota })
+    return res.json({
+      success: true,
+      alreadyOpen,
+      empleado: { id: empleado.id, nombre: empleado.nombre },
+      jornada: {
+        id: marcacion.id,
+        entradaAt: formatDateTime(marcacion.entradaAt),
+        salidaAt: formatDateTime(marcacion.salidaAt),
+      },
+      message: alreadyOpen ? 'La jornada ya estaba iniciada.' : 'Entrada registrada correctamente.',
+    })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/bot/empleado/:id/salida
+botRouter.post('/empleado/:id/salida', authBot, async (req, res) => {
+  try {
+    const empleadoId = parseId(req.params.id)
+    if (!empleadoId) return res.status(400).json({ error: 'id de empleado inválido' })
+    const empleado = await getEmpleadoById(empleadoId)
+    if (!empleado || empleado.activo === false) return res.status(404).json({ error: 'Empleado no encontrado' })
+    const nota = normalizeOptionalText(req.body?.nota)
+    const marcacion = await registrarSalidaEmpleado(empleadoId, { nota })
+    if (!marcacion) {
+      return res.status(409).json({ error: 'No hay una jornada activa para registrar salida.' })
+    }
+    return res.json({
+      success: true,
+      empleado: { id: empleado.id, nombre: empleado.nombre },
+      jornada: {
+        id: marcacion.id,
+        entradaAt: formatDateTime(marcacion.entradaAt),
+        salidaAt: formatDateTime(marcacion.salidaAt),
+        duracionSegundos: marcacion.duracionSegundos ?? 0,
+        duracion: formatDuration(marcacion.duracionSegundos ?? 0),
+      },
+      message: 'Salida registrada correctamente.',
+    })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/bot/empleado/:id/jornada
+botRouter.get('/empleado/:id/jornada', authBot, async (req, res) => {
+  try {
+    const empleadoId = parseId(req.params.id)
+    if (!empleadoId) return res.status(400).json({ error: 'id de empleado inválido' })
+    const jornada = await getJornadaActivaEmpleado(empleadoId)
+    if (!jornada) return res.json({ active: false, jornada: null })
+    return res.json({
+      active: true,
+      jornada: {
+        id: jornada.id,
+        entradaAt: formatDateTime(jornada.entradaAt),
+        salidaAt: formatDateTime(jornada.salidaAt),
+      },
+    })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
   }

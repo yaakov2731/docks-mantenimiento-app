@@ -74,6 +74,18 @@ export async function initDb() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    `CREATE TABLE IF NOT EXISTS marcaciones_empleados (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      empleado_id INTEGER NOT NULL,
+      entrada_at INTEGER NOT NULL,
+      salida_at INTEGER,
+      duracion_segundos INTEGER,
+      fuente TEXT NOT NULL DEFAULT 'whatsapp',
+      nota_entrada TEXT,
+      nota_salida TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
     `CREATE TABLE IF NOT EXISTS notificaciones (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tipo TEXT NOT NULL,
@@ -341,6 +353,38 @@ export async function getEmpleadoByWaId(waNumber: string) {
     // Match exact OR if incoming number ends with stored (handles missing country code)
     return normalized === stored || normalized.endsWith(stored)
   }) ?? null
+}
+export async function getJornadaActivaEmpleado(empleadoId: number) {
+  const rows = await db.select().from(schema.marcacionesEmpleados).where(eq(schema.marcacionesEmpleados.empleadoId, empleadoId))
+  return rows
+    .filter(row => !row.salidaAt)
+    .sort((a, b) => new Date(b.entradaAt as any).getTime() - new Date(a.entradaAt as any).getTime())[0] ?? null
+}
+export async function registrarEntradaEmpleado(empleadoId: number, opts?: { fuente?: 'whatsapp' | 'panel' | 'otro'; nota?: string }) {
+  const jornadaActiva = await getJornadaActivaEmpleado(empleadoId)
+  if (jornadaActiva) return { marcacion: jornadaActiva, alreadyOpen: true as const }
+  const inserted = await db.insert(schema.marcacionesEmpleados).values({
+    empleadoId,
+    entradaAt: new Date(),
+    fuente: opts?.fuente ?? 'whatsapp',
+    notaEntrada: opts?.nota?.trim() || null,
+  } as any).returning()
+  return { marcacion: inserted[0], alreadyOpen: false as const }
+}
+export async function registrarSalidaEmpleado(empleadoId: number, opts?: { nota?: string }) {
+  const jornadaActiva = await getJornadaActivaEmpleado(empleadoId)
+  if (!jornadaActiva) return null
+  const now = new Date()
+  const entradaMs = new Date(jornadaActiva.entradaAt as any).getTime()
+  const duracionSegundos = Math.max(0, Math.floor((now.getTime() - entradaMs) / 1000))
+  await db.update(schema.marcacionesEmpleados).set({
+    salidaAt: now,
+    duracionSegundos,
+    notaSalida: opts?.nota?.trim() || null,
+    updatedAt: now,
+  } as any).where(eq(schema.marcacionesEmpleados.id, jornadaActiva.id)).run()
+  const rows = await db.select().from(schema.marcacionesEmpleados).where(eq(schema.marcacionesEmpleados.id, jornadaActiva.id))
+  return rows[0] ?? null
 }
 export async function getTareasEmpleado(empleadoId: number) {
   const rows = await db.select().from(schema.reportes).where(eq(schema.reportes.asignadoId, empleadoId))
