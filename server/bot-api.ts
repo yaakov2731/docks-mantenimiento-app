@@ -20,6 +20,10 @@ import {
   pausarTrabajoReporte,
   completarTrabajoReporte,
   actualizarReporte,
+  registrarAsistencia,
+  getAsistenciasEmpleadoHoy,
+  getUltimaAsistenciaEmpleado,
+  getAsistenciasHoy,
 } from './db'
 import { notifyOwner } from './_core/notification'
 import { readEnv } from './_core/env'
@@ -463,6 +467,140 @@ botRouter.post('/queue/:id/failed', authBot, async (req, res) => {
     if (!id) return res.status(400).json({ error: 'id de mensaje inválido' })
     await markBotMessageFailed(id)
     return res.json({ success: true })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/bot/asistencia/entrada
+botRouter.post('/asistencia/entrada', authBot, async (req, res) => {
+  try {
+    const waNumber = normalizeText(req.body?.waNumber)
+    const nota = normalizeOptionalText(req.body?.nota)
+    if (!waNumber) return res.status(400).json({ error: 'waNumber es requerido' })
+
+    const empleado = await getEmpleadoByWaId(waNumber)
+    if (!empleado) return res.status(404).json({ error: 'Empleado no encontrado para ese número WhatsApp' })
+
+    const ultima = await getUltimaAsistenciaEmpleado(empleado.id)
+    if (ultima?.tipo === 'entrada') {
+      const asistenciasHoy = await getAsistenciasEmpleadoHoy(empleado.id)
+      const entradaHoy = asistenciasHoy.find(a => a.tipo === 'entrada')
+      if (entradaHoy) {
+        const horaEntrada = new Date(entradaHoy.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
+        return res.status(409).json({
+          error: 'Ya registraste entrada hoy',
+          horaEntrada,
+          mensaje: `Ya marcaste entrada a las ${horaEntrada}. Primero registrá la salida.`,
+        })
+      }
+    }
+
+    const id = await registrarAsistencia({
+      empleadoId: empleado.id,
+      empleadoNombre: empleado.nombre,
+      tipo: 'entrada',
+      waNumber,
+      nota,
+    })
+
+    const hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
+    return res.json({
+      success: true,
+      id,
+      tipo: 'entrada',
+      empleado: { id: empleado.id, nombre: empleado.nombre },
+      hora,
+      mensaje: `✅ Entrada registrada a las ${hora}. ¡Buen día, ${empleado.nombre}!`,
+    })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/bot/asistencia/salida
+botRouter.post('/asistencia/salida', authBot, async (req, res) => {
+  try {
+    const waNumber = normalizeText(req.body?.waNumber)
+    const nota = normalizeOptionalText(req.body?.nota)
+    if (!waNumber) return res.status(400).json({ error: 'waNumber es requerido' })
+
+    const empleado = await getEmpleadoByWaId(waNumber)
+    if (!empleado) return res.status(404).json({ error: 'Empleado no encontrado para ese número WhatsApp' })
+
+    const asistenciasHoy = await getAsistenciasEmpleadoHoy(empleado.id)
+    const entradaHoy = asistenciasHoy.find(a => a.tipo === 'entrada')
+    if (!entradaHoy) {
+      return res.status(409).json({
+        error: 'No hay entrada registrada hoy',
+        mensaje: 'Primero registrá la entrada del día.',
+      })
+    }
+    if (asistenciasHoy.some(a => a.tipo === 'salida')) {
+      const salidaHoy = asistenciasHoy.find(a => a.tipo === 'salida')!
+      const horaSalida = new Date(salidaHoy.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
+      return res.status(409).json({
+        error: 'Ya registraste salida hoy',
+        horaSalida,
+        mensaje: `Ya marcaste salida a las ${horaSalida}.`,
+      })
+    }
+
+    const id = await registrarAsistencia({
+      empleadoId: empleado.id,
+      empleadoNombre: empleado.nombre,
+      tipo: 'salida',
+      waNumber,
+      nota,
+    })
+
+    // Calcular horas trabajadas
+    const entradaMs = new Date(entradaHoy.createdAt).getTime()
+    const salidaMs = Date.now()
+    const totalSegundos = Math.floor((salidaMs - entradaMs) / 1000)
+    const horaEntrada = new Date(entradaHoy.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
+    const horaSalida = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
+
+    return res.json({
+      success: true,
+      id,
+      tipo: 'salida',
+      empleado: { id: empleado.id, nombre: empleado.nombre },
+      horaEntrada,
+      horaSalida,
+      horasTrabajadas: formatDuration(totalSegundos),
+      horasTrabajadasSegundos: totalSegundos,
+      mensaje: `✅ Salida registrada a las ${horaSalida}. Entrada: ${horaEntrada} — Trabajaste ${formatDuration(totalSegundos)}. ¡Hasta mañana, ${empleado.nombre}!`,
+    })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/bot/asistencia/hoy/:empleadoId
+botRouter.get('/asistencia/hoy/:empleadoId', authBot, async (req, res) => {
+  try {
+    const empleadoId = parseId(req.params.empleadoId)
+    if (!empleadoId) return res.status(400).json({ error: 'id de empleado inválido' })
+    const asistencias = await getAsistenciasEmpleadoHoy(empleadoId)
+    const entrada = asistencias.find(a => a.tipo === 'entrada')
+    const salida = asistencias.find(a => a.tipo === 'salida')
+    const horasTrabajadas = entrada && salida
+      ? formatDuration(Math.floor((new Date(salida.createdAt).getTime() - new Date(entrada.createdAt).getTime()) / 1000))
+      : entrada
+        ? formatDuration(Math.floor((Date.now() - new Date(entrada.createdAt).getTime()) / 1000)) + ' (en curso)'
+        : null
+    return res.json({ asistencias, entrada: entrada ?? null, salida: salida ?? null, horasTrabajadas })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/bot/asistencia/hoy
+botRouter.get('/asistencia/hoy', authBot, async (_req, res) => {
+  try {
+    const asistencias = await getAsistenciasHoy()
+    return res.json({ asistencias })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
   }

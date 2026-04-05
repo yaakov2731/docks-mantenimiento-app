@@ -110,6 +110,16 @@ export const botQueue = sqliteTable('bot_queue', {
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
 
+export const asistencias = sqliteTable('asistencias', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  empleadoId: integer('empleado_id').notNull(),
+  empleadoNombre: text('empleado_nombre').notNull(),
+  tipo: text('tipo', { enum: ['entrada', 'salida'] }).notNull(),
+  waNumber: text('wa_number'),
+  nota: text('nota'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
 export type User = typeof users.$inferSelect
 export type Reporte = typeof reportes.$inferSelect
 export type Actualizacion = typeof actualizaciones.$inferSelect
@@ -117,3 +127,4 @@ export type Empleado = typeof empleados.$inferSelect
 export type Notificacion = typeof notificaciones.$inferSelect
 export type Lead = typeof leads.$inferSelect
 export type BotQueueItem = typeof botQueue.$inferSelect
+export type Asistencia = typeof asistencias.$inferSelect
