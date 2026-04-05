@@ -166,7 +166,7 @@ export async function createPanelUser(data: { username: string; password: string
     password: hash,
     name: data.name,
     role: data.role,
-    waId: normalizeWaNumber(data.waId),
+    waId: normalizeWaNumber(data.waId) || null,
     activo: true,
   }).run()
 }
@@ -618,7 +618,11 @@ function estimateWorkedSecondsToday(reporte: any, actualizaciones: any[], daySta
 
 function isStartTimerEvent(evento: any) {
   const text = normalizeText(`${evento.tipo} ${evento.descripcion}`)
-  return evento.tipo === 'timer' && (text.includes('iniciada') || text.includes('confirmo recepcion') || text.includes('confirmo recepcion'))
+  return evento.tipo === 'timer' && (
+    text.includes('iniciada') ||
+    text.includes('acepto la tarea') ||
+    text.includes('confirmo recepcion')
+  )
 }
 
 function isStopTimerEvent(evento: any) {
@@ -642,7 +646,11 @@ function isAssignmentAcceptedEvent(evento: any) {
 
 function isAssignmentRejectedEvent(evento: any) {
   const text = normalizeText(`${evento.tipo} ${evento.descripcion}`)
-  return text.includes('no puede tomar la tarea')
+  return (
+    text.includes('no puede tomar la tarea') ||
+    text.includes('esta de franco') ||
+    text.includes('esta ocupado')
+  )
 }
 
 function getBuenosAiresDayRange(reference = Date.now()) {
