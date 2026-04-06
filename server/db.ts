@@ -151,13 +151,13 @@ export async function initDb() {
 // --- USERS ---
 export async function getUserByUsername(username: string) {
   const rows = await db.select().from(schema.users).where(eq(schema.users.username, username))
-  const active = rows.find(user => user.activo !== false)
+  const active = rows.find(user => user.activo === true)
   return active ?? null
 }
 export async function getUsers() {
   const rows = await db.select().from(schema.users)
   return rows
-    .filter(user => user.activo !== false)
+    .filter(user => user.activo === true)
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 export async function getSalesUsers() {
