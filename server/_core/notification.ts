@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getNotificaciones } from '../db'
+import { readEnv } from './env'
 
 export async function notifyOwner(params: { title: string; content: string; urgent?: boolean }) {
   const contacts = await getNotificaciones()
@@ -27,7 +28,7 @@ export async function notifyCompleted(params: { title: string; content: string }
 }
 
 async function sendTelegram(chatId: string, text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN
+  const token = readEnv('TELEGRAM_BOT_TOKEN')
   if (!token) return
   await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
     chat_id: chatId,

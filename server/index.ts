@@ -40,6 +40,9 @@ if (process.env.NODE_ENV === 'production') {
   if (await countUsers() === 0) {
     const username = readEnv('ADMIN_USERNAME') ?? 'admin'
     const password = readEnv('ADMIN_PASSWORD') ?? 'admin123'
+    if (!readEnv('ADMIN_USERNAME') || !readEnv('ADMIN_PASSWORD')) {
+      console.warn('[Server] ⚠️  ADVERTENCIA: Usando credenciales de admin por defecto. Configura ADMIN_USERNAME y ADMIN_PASSWORD en producción.')
+    }
     const hash = await bcrypt.hash(password, 10)
     await createUser({ username, password: hash, name: 'Administrador', role: 'admin' })
     console.log(`[Server] Admin creado: ${username}`)
