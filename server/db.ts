@@ -335,10 +335,17 @@ export async function getEmpleados() {
   return db.select().from(schema.empleados).where(eq(schema.empleados.activo, true))
 }
 export async function crearEmpleado(data: typeof schema.empleados.$inferInsert) {
-  await db.insert(schema.empleados).values(data).run()
+  await db.insert(schema.empleados).values({
+    ...data,
+    waId: normalizeWaNumber(data.waId ?? undefined) || null,
+  }).run()
 }
 export async function actualizarEmpleado(id: number, data: Partial<typeof schema.empleados.$inferInsert>) {
-  await db.update(schema.empleados).set(data as any).where(eq(schema.empleados.id, id)).run()
+  const normalized = { ...data }
+  if ('waId' in normalized) {
+    normalized.waId = normalizeWaNumber(normalized.waId ?? undefined) || null
+  }
+  await db.update(schema.empleados).set(normalized as any).where(eq(schema.empleados.id, id)).run()
 }
 export async function getEmpleadoById(id: number) {
   const rows = await db.select().from(schema.empleados).where(eq(schema.empleados.id, id))
@@ -432,7 +439,9 @@ export async function eliminarNotificacion(id: number) {
 
 // --- BOT QUEUE ---
 export async function enqueueBotMessage(waNumber: string, message: string) {
-  await db.insert(schema.botQueue).values({ waNumber, message }).run()
+  const normalized = normalizeWaNumber(waNumber)
+  if (!normalized) return
+  await db.insert(schema.botQueue).values({ waNumber: normalized, message }).run()
 }
 export async function getPendingBotMessages() {
   return db.select().from(schema.botQueue).where(eq(schema.botQueue.status, 'pending'))
