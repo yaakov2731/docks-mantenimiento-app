@@ -468,6 +468,178 @@ export async function getNextAssignableReporteForEmpleado(empleadoId: number) {
   return preferido ?? disponibles[0]
 }
 
+// --- TAREAS OPERATIVAS ---
+export async function getOperationalTaskById(id: number) {
+  const rows = await db.select().from(schema.tareasOperativas).where(eq(schema.tareasOperativas.id, id))
+  const task = rows[0] ?? null
+  return task ? toOperationalTaskRecord(task) : null
+}
+
+export async function getActiveOperationalTaskForEmployee(empleadoId: number) {
+  const rows = await db.select().from(schema.tareasOperativas).where(and(
+    eq(schema.tareasOperativas.empleadoId, empleadoId),
+    eq(schema.tareasOperativas.estado, 'en_progreso'),
+  ))
+  const task = rows[0] ?? null
+  return task ? toOperationalTaskRecord(task) : null
+}
+
+export async function updateOperationalTask(id: number, data: Partial<typeof schema.tareasOperativas.$inferInsert>) {
+  await db.update(schema.tareasOperativas)
+    .set({
+      ...data,
+      empleadoWaId: data.empleadoWaId !== undefined ? normalizeOptionalWaNumber(data.empleadoWaId) : undefined,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(schema.tareasOperativas.id, id))
+    .run()
+}
+
+export async function createOperationalTask(data: typeof schema.tareasOperativas.$inferInsert): Promise<number> {
+  const assigned = Boolean(data.empleadoId)
+  const now = new Date()
+  const rows = await db.insert(schema.tareasOperativas).values({
+    ...data,
+    empleadoWaId: normalizeOptionalWaNumber(data.empleadoWaId),
+    estado: data.estado ?? (assigned ? 'pendiente_confirmacion' : 'pendiente_asignacion'),
+    asignadoAt: data.asignadoAt ?? (assigned ? now : null),
+    trabajoAcumuladoSegundos: Number(data.trabajoAcumuladoSegundos ?? 0),
+    ordenAsignacion: Number(data.ordenAsignacion ?? 0),
+    updatedAt: data.updatedAt ?? now,
+  }).returning({ id: schema.tareasOperativas.id })
+  return rows[0].id
+}
+
+export async function listOperationalTasks() {
+  const rows = await db.select().from(schema.tareasOperativas)
+  return rows.map(toOperationalTaskRecord).sort(compareOperationalTasks)
+}
+
+export async function listOperationalTasksByEmployee(empleadoId: number) {
+  const rows = await db.select().from(schema.tareasOperativas).where(eq(schema.tareasOperativas.empleadoId, empleadoId))
+  return rows.map(toOperationalTaskRecord).sort(compareOperationalTasks)
+}
+
+export async function getNextOperationalTaskForEmployee(empleadoId: number, currentTaskId?: number) {
+  const rows = await listOperationalTasksByEmployee(empleadoId)
+  return rows.find(task => task.estado === 'pendiente_confirmacion' && task.id !== currentTaskId) ?? null
+}
+
+export async function addOperationalTaskEvent(event: {
+  tareaId: number
+  tipo: 'asignacion' | 'aceptacion' | 'rechazo' | 'inicio' | 'pausa' | 'reanudar' | 'terminacion' | 'cancelacion' | 'reasignacion' | 'admin_update'
+  actorTipo?: 'system' | 'employee' | 'admin'
+  actorId?: number | null
+  actorNombre?: string | null
+  descripcion: string
+  metadata?: Record<string, unknown> | null
+  createdAt?: Date
+}) {
+  await db.insert(schema.tareasOperativasEvento).values({
+    tareaId: event.tareaId,
+    tipo: event.tipo,
+    actorTipo: event.actorTipo ?? 'system',
+    actorId: event.actorId ?? null,
+    actorNombre: event.actorNombre ?? null,
+    descripcion: event.descripcion,
+    metadataJson: event.metadata ? JSON.stringify(event.metadata) : null,
+    createdAt: event.createdAt ?? new Date(),
+  }).run()
+}
+
+export async function persistOperationalTaskChange(
+  taskId: number,
+  data: Partial<typeof schema.tareasOperativas.$inferInsert>,
+  events: Array<{
+    tareaId: number
+    tipo: 'asignacion' | 'aceptacion' | 'rechazo' | 'inicio' | 'pausa' | 'reanudar' | 'terminacion' | 'cancelacion' | 'reasignacion' | 'admin_update'
+    actorTipo?: 'system' | 'employee' | 'admin'
+    actorId?: number | null
+    actorNombre?: string | null
+    descripcion: string
+    metadata?: Record<string, unknown> | null
+    createdAt?: Date
+  }>
+) {
+  await db.transaction(async (tx) => {
+    await tx.update(schema.tareasOperativas)
+      .set({
+        ...data,
+        empleadoWaId: data.empleadoWaId !== undefined ? normalizeOptionalWaNumber(data.empleadoWaId) : undefined,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(schema.tareasOperativas.id, taskId))
+      .run()
+
+    if (events.length === 0) return
+
+    await tx.insert(schema.tareasOperativasEvento).values(events.map((event) => ({
+      tareaId: event.tareaId,
+      tipo: event.tipo,
+      actorTipo: event.actorTipo ?? 'system',
+      actorId: event.actorId ?? null,
+      actorNombre: event.actorNombre ?? null,
+      descripcion: event.descripcion,
+      metadataJson: event.metadata ? JSON.stringify(event.metadata) : null,
+      createdAt: event.createdAt ?? new Date(),
+    }))).run()
+  })
+}
+
+export async function getOperationalTasksOverview() {
+  const [rows, events] = await Promise.all([
+    listOperationalTasks(),
+    db.select().from(schema.tareasOperativasEvento),
+  ])
+  const { start, end } = getBuenosAiresDayRange()
+  const employeeMap = new Map<number, {
+    empleadoId: number
+    empleadoNombre: string
+    activas: number
+    pausadas: number
+    pendientes: number
+    terminadasHoy: number
+    tiempoActivoSegundos: number
+  }>()
+
+  for (const task of rows) {
+    if (!task.empleadoId) continue
+    const bucket = employeeMap.get(task.empleadoId) ?? {
+      empleadoId: task.empleadoId,
+      empleadoNombre: task.empleadoNombre ?? `Empleado ${task.empleadoId}`,
+      activas: 0,
+      pausadas: 0,
+      pendientes: 0,
+      terminadasHoy: 0,
+      tiempoActivoSegundos: 0,
+    }
+    if (task.estado === 'en_progreso') bucket.activas += 1
+    if (task.estado === 'pausada') bucket.pausadas += 1
+    if (task.estado === 'pendiente_confirmacion') bucket.pendientes += 1
+    if (isWithinDay(task.terminadoAt, start, end)) bucket.terminadasHoy += 1
+    bucket.tiempoActivoSegundos += Number(task.tiempoTrabajadoSegundos ?? 0)
+    employeeMap.set(task.empleadoId, bucket)
+  }
+
+  return {
+    total: rows.length,
+    activas: rows.filter(task => task.estado === 'en_progreso').length,
+    pausadas: rows.filter(task => task.estado === 'pausada').length,
+    pendientesAsignacion: rows.filter(task => task.estado === 'pendiente_asignacion').length,
+    pendientesConfirmacion: rows.filter(task => task.estado === 'pendiente_confirmacion').length,
+    terminadasHoy: rows.filter(task => isWithinDay(task.terminadoAt, start, end)).length,
+    rechazadasHoy: events.filter(event => event.tipo === 'rechazo' && isWithinDay(event.createdAt, start, end)).length,
+    derivadasDesdeReportes: rows.filter(task => task.origen === 'reclamo').length,
+    empleadosConColaAlta: [...employeeMap.values()].filter(item => item.pendientes >= 3).length,
+    porEmpleado: [...employeeMap.values()].sort((a, b) =>
+      b.activas - a.activas ||
+      b.pendientes - a.pendientes ||
+      b.tiempoActivoSegundos - a.tiempoActivoSegundos ||
+      a.empleadoNombre.localeCompare(b.empleadoNombre)
+    ),
+  }
+}
+
 // --- NOTIFICACIONES ---
 export async function getNotificaciones() {
   return db.select().from(schema.notificaciones)
@@ -899,6 +1071,41 @@ export async function limpiarDatosDemo() {
     leads: leadsDemo.length,
     colaBot: queueDemo.length,
     total: reportesDemo.length + leadsDemo.length + queueDemo.length,
+  }
+}
+
+function getOperationalTaskTiempoTrabajadoSegundos(task: any) {
+  const acumulado = Number(task.trabajoAcumuladoSegundos ?? 0)
+  if (!task.trabajoIniciadoAt) return acumulado
+  const iniciadoAt = new Date(task.trabajoIniciadoAt).getTime()
+  const adicional = Math.max(0, Math.floor((Date.now() - iniciadoAt) / 1000))
+  return acumulado + adicional
+}
+
+function toOperationalTaskRecord(task: schema.TareaOperativa) {
+  return {
+    ...task,
+    tiempoTrabajadoSegundos: getOperationalTaskTiempoTrabajadoSegundos(task),
+  }
+}
+
+function compareOperationalTasks(left: any, right: any) {
+  return operationalTaskStateRank(left.estado) - operationalTaskStateRank(right.estado) ||
+    priorityRank(right.prioridad) - priorityRank(left.prioridad) ||
+    Number(left.ordenAsignacion ?? 0) - Number(right.ordenAsignacion ?? 0) ||
+    toMs(left.createdAt) - toMs(right.createdAt)
+}
+
+function operationalTaskStateRank(estado: string) {
+  switch (estado) {
+    case 'en_progreso': return 0
+    case 'pausada': return 1
+    case 'pendiente_confirmacion': return 2
+    case 'pendiente_asignacion': return 3
+    case 'rechazada': return 4
+    case 'terminada': return 5
+    case 'cancelada': return 6
+    default: return 7
   }
 }
 
