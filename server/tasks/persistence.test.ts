@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import * as schema from '../../drizzle/schema'
 
@@ -9,10 +8,7 @@ describe('operational tasks persistence', () => {
     expect(schema.tareasOperativas).toBeTruthy()
     expect(schema.tareasOperativasEvento).toBeTruthy()
 
-    const dbBootstrap = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '..', 'db.ts'),
-      'utf8'
-    )
+    const dbBootstrap = readFileSync(join(__dirname, '..', 'db.ts'), 'utf8')
 
     expect(dbBootstrap).toContain('CREATE TABLE IF NOT EXISTS tareas_operativas')
     expect(dbBootstrap).toContain('CREATE TABLE IF NOT EXISTS tareas_operativas_evento')

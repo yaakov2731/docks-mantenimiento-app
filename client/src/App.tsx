@@ -1,15 +1,18 @@
+import { Suspense, lazy, type ComponentType } from 'react'
 import { Switch, Route, Redirect } from 'wouter'
 import { trpc } from './lib/trpc'
 import Login from './pages/Login'
 import Home from './pages/Home'
-import Dashboard from './pages/Dashboard'
-import Tareas from './pages/Tareas'
-import Historial from './pages/Historial'
-import Empleados from './pages/Empleados'
-import Configuracion from './pages/Configuracion'
-import ImprimirReclamo from './pages/ImprimirReclamo'
-import Leads from './pages/Leads'
-import Operaciones from './pages/Operaciones'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Tareas = lazy(() => import('./pages/Tareas'))
+const Historial = lazy(() => import('./pages/Historial'))
+const Empleados = lazy(() => import('./pages/Empleados'))
+const Configuracion = lazy(() => import('./pages/Configuracion'))
+const ImprimirReclamo = lazy(() => import('./pages/ImprimirReclamo'))
+const Leads = lazy(() => import('./pages/Leads'))
+const Operaciones = lazy(() => import('./pages/Operaciones'))
+const TareasOperativas = lazy(() => import('./pages/TareasOperativas'))
 
 type PanelRole = 'admin' | 'employee' | 'sales'
 
@@ -21,7 +24,7 @@ function ProtectedRoute({
   component: Component,
   allowedRoles,
 }: {
-  component: React.ComponentType
+  component: ComponentType
   allowedRoles?: PanelRole[]
 }) {
   const { data: user, isLoading } = trpc.auth.me.useQuery()
@@ -30,7 +33,11 @@ function ProtectedRoute({
   if (allowedRoles && !allowedRoles.includes((user as any).role)) {
     return <Redirect to={getDefaultRoute((user as any).role)} />
   }
-  return <Component />
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen text-gray-500">Cargando panel...</div>}>
+      <Component />
+    </Suspense>
+  )
 }
 
 export default function App() {
@@ -40,6 +47,7 @@ export default function App() {
       <Route path="/login" component={Login} />
       <Route path="/dashboard">{() => <ProtectedRoute component={Dashboard} allowedRoles={['admin', 'employee']} />}</Route>
       <Route path="/operaciones">{() => <ProtectedRoute component={Operaciones} allowedRoles={['admin']} />}</Route>
+      <Route path="/tareas-operativas">{() => <ProtectedRoute component={TareasOperativas} allowedRoles={['admin']} />}</Route>
       <Route path="/tareas">{() => <ProtectedRoute component={Tareas} allowedRoles={['admin', 'employee']} />}</Route>
       <Route path="/historial">{() => <ProtectedRoute component={Historial} allowedRoles={['admin', 'employee']} />}</Route>
       <Route path="/empleados">{() => <ProtectedRoute component={Empleados} allowedRoles={['admin']} />}</Route>

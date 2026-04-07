@@ -1,14 +1,13 @@
-import { useState, type ReactNode } from 'react'
+import { Suspense, lazy, useState, type ReactNode } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import { RoundsSummaryCard } from '../components/rounds/RoundsSummaryCard'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
 import WorkingTime from '../components/WorkingTime'
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { ESTADOS, PRIORIDADES, CATEGORIAS } from '@shared/const'
+import { ESTADOS, PRIORIDADES } from '@shared/const'
 import { AlertCircle, Clock, CheckCircle2, TrendingUp, X, Building2, PauseCircle } from 'lucide-react'
 
-const COLORS_PIE = ['#22C55E','#EAB308','#FF6B35','#EF4444']
+const DashboardCharts = lazy(() => import('../components/dashboard/DashboardCharts'))
 const ESTADOS_ASIGNACION = [
   { value: 'sin_asignar', label: 'Sin asignar', color: '#94A3B8' },
   { value: 'pendiente_confirmacion', label: 'Sin confirmar', color: '#EAB308' },
@@ -76,6 +75,7 @@ export default function Dashboard() {
 
   const { data: stats } = trpc.reportes.estadisticas.useQuery(undefined, { refetchInterval: 30000 })
   const { data: roundsSummary } = trpc.rondas.resumenHoy.useQuery(undefined, { refetchInterval: 30000 })
+  const { data: tareasResumen } = trpc.tareasOperativas.resumenHoy.useQuery(undefined, { refetchInterval: 30000 })
   const { data: reportes = [], refetch } = trpc.reportes.listar.useQuery(filters, { refetchInterval: 30000 })
   const { data: reporte } = trpc.reportes.obtener.useQuery({ id: selected! }, { enabled: !!selected, refetchInterval: 15000 })
   const { data: empleados = [] } = trpc.empleados.listar.useQuery()
@@ -85,6 +85,11 @@ export default function Dashboard() {
   })
   const asignar = trpc.reportes.asignar.useMutation({ onSuccess: () => { refetch(); setAssigningTo('') } })
   const agregarNota = trpc.reportes.agregarNota.useMutation({ onSuccess: () => { refetch(); setNota(''); setShowNota(false) } })
+  const crearTareaDesdeReclamo = trpc.tareasOperativas.crearDesdeReclamo.useMutation({
+    onSuccess: () => {
+      refetch()
+    },
+  })
   const prioridadTotal = stats?.porPrioridad?.reduce((acc: number, item: any) => acc + (item.count ?? 0), 0) ?? 0
   const empleadoSeleccionado = empleados.find((empleado: any) => String(empleado.id) === assigningTo)
 
@@ -93,6 +98,15 @@ export default function Dashboard() {
       {roundsSummary ? (
         <div className="mb-4">
           <RoundsSummaryCard resumen={roundsSummary} />
+        </div>
+      ) : null}
+
+      {tareasResumen ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <KpiCard label="Tareas activas" value={tareasResumen.activas} color="#0F6C86" icon={Clock} />
+          <KpiCard label="Pausadas" value={tareasResumen.pausadas} color="#EAB308" icon={PauseCircle} />
+          <KpiCard label="Terminadas hoy" value={tareasResumen.terminadasHoy} color="#22C55E" icon={CheckCircle2} />
+          <KpiCard label="Rechazadas" value={tareasResumen.rechazadasHoy} color="#EF4444" icon={AlertCircle} />
         </div>
       ) : null}
 
@@ -183,70 +197,15 @@ export default function Dashboard() {
 
       {/* Charts */}
       {stats && stats.abiertos > 0 && (
-        <div className="grid md:grid-cols-2 gap-4 mb-4">
-          <div className="surface-panel rounded-[22px] p-4">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <h3 className="font-heading font-semibold text-base text-gray-800">Distribución por prioridad</h3>
-                <p className="text-[13px] text-slate-500">Lectura rápida del volumen operativo actual.</p>
-              </div>
+        <Suspense
+          fallback={
+            <div className="surface-panel rounded-[22px] p-5 mb-4 text-sm text-slate-500">
+              Cargando gráficos operativos...
             </div>
-            <div className="grid lg:grid-cols-[210px_1fr] gap-4 items-center">
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={stats.porPrioridad}
-                    dataKey="count"
-                    nameKey="prioridad"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={52}
-                    outerRadius={84}
-                    paddingAngle={3}
-                    stroke="none"
-                    label={false}
-                  >
-                    {stats.porPrioridad.map((_: any, i: number) => <Cell key={i} fill={COLORS_PIE[i % COLORS_PIE.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(value: any, _name: any, item: any) => [`${value}`, item.payload?.prioridad]} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-3">
-                {stats.porPrioridad.map((item: any, index: number) => {
-                  const label = PRIORIDADES.find(p => p.value === item.prioridad)?.label ?? item.prioridad
-                  const percent = prioridadTotal ? Math.round((item.count / prioridadTotal) * 100) : 0
-                  return (
-                    <div key={item.prioridad} className="rounded-[18px] bg-white/80 border border-slate-200 px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS_PIE[index % COLORS_PIE.length] }} />
-                        <div className="flex-1">
-                          <div className="text-[13px] font-medium text-slate-700">{label}</div>
-                          <div className="text-[11px] text-slate-400">{item.count} reclamos</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-heading text-base font-semibold text-slate-800">{percent}%</div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-          <div className="surface-panel rounded-[22px] p-4">
-            <h3 className="font-heading font-semibold text-base text-gray-800">Distribución por categoría</h3>
-            <p className="text-[13px] text-slate-500 mb-4">Qué tipo de problemas se concentran entre reclamos abiertos.</p>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={stats.porCategoria} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(15, 108, 134, 0.10)" />
-                <XAxis dataKey="categoria" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#0F6C86" radius={[10,10,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+          }
+        >
+          <DashboardCharts stats={stats} prioridadTotal={prioridadTotal} />
+        </Suspense>
       )}
 
       {stats && stats.abiertos === 0 && stats.total > 0 && (
@@ -394,6 +353,18 @@ export default function Dashboard() {
                 )}
                 <Button size="sm" variant="outline" onClick={() => window.open(`/imprimir?id=${reporte.id}`, '_blank')}>
                   Imprimir A4
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={crearTareaDesdeReclamo.isLoading}
+                  onClick={() => crearTareaDesdeReclamo.mutate({
+                    reporteId: reporte.id,
+                    tipoTrabajo: reporte.categoria,
+                    empleadoId: empleadoSeleccionado?.id,
+                  })}
+                >
+                  Crear trabajo operativo
                 </Button>
               </div>
 

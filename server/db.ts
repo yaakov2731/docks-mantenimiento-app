@@ -522,6 +522,42 @@ export async function createOperationalTask(data: typeof schema.tareasOperativas
   return rows[0].id
 }
 
+export async function createOperationalTaskFromReporte(input: {
+  reporteId: number
+  tipoTrabajo: string
+  empleadoId?: number
+}) {
+  const reporte = await getReporteById(input.reporteId)
+  if (!reporte) throw new Error('Reporte no encontrado')
+
+  const empleado = typeof input.empleadoId === 'number'
+    ? await getEmpleadoById(input.empleadoId)
+    : null
+
+  if (typeof input.empleadoId === 'number' && !empleado) {
+    throw new Error('Empleado no encontrado')
+  }
+
+  const ubicacion = typeof reporte.local === 'string' && reporte.local.trim().toLowerCase().startsWith('local')
+    ? reporte.local.trim()
+    : `Local ${reporte.local}`.trim()
+
+  const id = await createOperationalTask({
+    origen: 'reclamo',
+    reporteId: reporte.id,
+    tipoTrabajo: input.tipoTrabajo,
+    titulo: reporte.titulo,
+    descripcion: reporte.descripcion,
+    ubicacion,
+    prioridad: reporte.prioridad as any,
+    empleadoId: empleado?.id,
+    empleadoNombre: empleado?.nombre ?? undefined,
+    empleadoWaId: empleado?.waId ?? undefined,
+  } as any)
+
+  return { id }
+}
+
 export async function listOperationalTasks() {
   const rows = await db.select().from(schema.tareasOperativas)
   return rows.map(toOperationalTaskRecord).sort(compareOperationalTasks)
