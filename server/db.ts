@@ -174,6 +174,40 @@ export async function initDb() {
       metadata_json TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    `CREATE TABLE IF NOT EXISTS tareas_operativas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      origen TEXT NOT NULL,
+      reporte_id INTEGER,
+      tipo_trabajo TEXT NOT NULL,
+      titulo TEXT NOT NULL,
+      descripcion TEXT NOT NULL,
+      ubicacion TEXT NOT NULL,
+      prioridad TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente_asignacion',
+      empleado_id INTEGER,
+      empleado_nombre TEXT,
+      empleado_wa_id TEXT,
+      asignado_at INTEGER,
+      aceptado_at INTEGER,
+      trabajo_iniciado_at INTEGER,
+      trabajo_acumulado_segundos INTEGER NOT NULL DEFAULT 0,
+      pausado_at INTEGER,
+      terminado_at INTEGER,
+      orden_asignacion INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS tareas_operativas_evento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tarea_id INTEGER NOT NULL,
+      tipo TEXT NOT NULL,
+      actor_tipo TEXT NOT NULL DEFAULT 'system',
+      actor_id INTEGER,
+      actor_nombre TEXT,
+      descripcion TEXT NOT NULL,
+      metadata_json TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
   ]
   for (const sql of stmts) {
     await client.execute(sql)

@@ -110,6 +110,116 @@ export const botQueue = sqliteTable('bot_queue', {
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
 
+export const rondasPlantilla = sqliteTable('rondas_plantilla', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  nombre: text('nombre').notNull(),
+  tipo: text('tipo', { enum: ['ronda_banos'] }).default('ronda_banos').notNull(),
+  descripcion: text('descripcion'),
+  intervaloHoras: integer('intervalo_horas').notNull(),
+  checklistObjetivo: text('checklist_objetivo'),
+  activo: integer('activo', { mode: 'boolean' }).default(true).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+export const rondasProgramacion = sqliteTable('rondas_programacion', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  plantillaId: integer('plantilla_id').notNull(),
+  modoProgramacion: text('modo_programacion', { enum: ['semanal', 'fecha_especial'] }).notNull(),
+  diaSemana: integer('dia_semana'),
+  fechaEspecial: text('fecha_especial'),
+  horaInicio: text('hora_inicio').notNull(),
+  horaFin: text('hora_fin').notNull(),
+  empleadoId: integer('empleado_id').notNull(),
+  empleadoNombre: text('empleado_nombre').notNull(),
+  empleadoWaId: text('empleado_wa_id').notNull(),
+  supervisorUserId: integer('supervisor_user_id'),
+  supervisorNombre: text('supervisor_nombre'),
+  supervisorWaId: text('supervisor_wa_id'),
+  escalacionHabilitada: integer('escalacion_habilitada', { mode: 'boolean' }).default(true).notNull(),
+  activo: integer('activo', { mode: 'boolean' }).default(true).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+export const rondasOcurrencia = sqliteTable('rondas_ocurrencia', {
+  id: integer('id').primaryKey(),
+  plantillaId: integer('plantilla_id').notNull(),
+  programacionId: integer('programacion_id').notNull(),
+  fechaOperativa: text('fecha_operativa').notNull(),
+  programadoAt: integer('programado_at', { mode: 'timestamp' }).notNull(),
+  programadoAtLabel: text('programado_at_label'),
+  recordatorioEnviadoAt: integer('recordatorio_enviado_at', { mode: 'timestamp' }),
+  confirmadoAt: integer('confirmado_at', { mode: 'timestamp' }),
+  empleadoId: integer('empleado_id').notNull(),
+  empleadoNombre: text('empleado_nombre').notNull(),
+  empleadoWaId: text('empleado_wa_id').notNull(),
+  supervisorWaId: text('supervisor_wa_id'),
+  nombreRonda: text('nombre_ronda').notNull(),
+  estado: text('estado', {
+    enum: ['pendiente', 'cumplido', 'cumplido_con_observacion', 'vencido', 'cancelado'],
+  }).default('pendiente').notNull(),
+  canalConfirmacion: text('canal_confirmacion', { enum: ['whatsapp', 'panel', 'system'] }).default('whatsapp').notNull(),
+  nota: text('nota'),
+  escaladoAt: integer('escalado_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+export const rondasEvento = sqliteTable('rondas_evento', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ocurrenciaId: integer('ocurrencia_id').notNull(),
+  tipo: text('tipo', {
+    enum: ['recordatorio', 'confirmacion', 'observacion', 'vencimiento', 'escalacion', 'admin_update'],
+  }).notNull(),
+  actorTipo: text('actor_tipo', { enum: ['system', 'employee', 'admin'] }).default('system').notNull(),
+  actorId: integer('actor_id'),
+  actorNombre: text('actor_nombre'),
+  descripcion: text('descripcion').notNull(),
+  metadataJson: text('metadata_json'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+export const tareasOperativas = sqliteTable('tareas_operativas', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  origen: text('origen', { enum: ['manual', 'reclamo'] }).notNull(),
+  reporteId: integer('reporte_id'),
+  tipoTrabajo: text('tipo_trabajo').notNull(),
+  titulo: text('titulo').notNull(),
+  descripcion: text('descripcion').notNull(),
+  ubicacion: text('ubicacion').notNull(),
+  prioridad: text('prioridad', { enum: ['baja', 'media', 'alta', 'urgente'] }).notNull(),
+  estado: text('estado', {
+    enum: ['pendiente_asignacion', 'pendiente_confirmacion', 'en_progreso', 'pausada', 'terminada', 'cancelada', 'rechazada'],
+  }).default('pendiente_asignacion').notNull(),
+  empleadoId: integer('empleado_id'),
+  empleadoNombre: text('empleado_nombre'),
+  empleadoWaId: text('empleado_wa_id'),
+  asignadoAt: integer('asignado_at', { mode: 'timestamp' }),
+  aceptadoAt: integer('aceptado_at', { mode: 'timestamp' }),
+  trabajoIniciadoAt: integer('trabajo_iniciado_at', { mode: 'timestamp' }),
+  trabajoAcumuladoSegundos: integer('trabajo_acumulado_segundos').default(0).notNull(),
+  pausadoAt: integer('pausado_at', { mode: 'timestamp' }),
+  terminadoAt: integer('terminado_at', { mode: 'timestamp' }),
+  ordenAsignacion: integer('orden_asignacion').default(0).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+export const tareasOperativasEvento = sqliteTable('tareas_operativas_evento', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tareaId: integer('tarea_id').notNull(),
+  tipo: text('tipo', {
+    enum: ['asignacion', 'aceptacion', 'rechazo', 'inicio', 'pausa', 'reanudar', 'terminacion', 'cancelacion', 'reasignacion', 'admin_update'],
+  }).notNull(),
+  actorTipo: text('actor_tipo', { enum: ['system', 'employee', 'admin'] }).default('system').notNull(),
+  actorId: integer('actor_id'),
+  actorNombre: text('actor_nombre'),
+  descripcion: text('descripcion').notNull(),
+  metadataJson: text('metadata_json'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
 export type User = typeof users.$inferSelect
 export type Reporte = typeof reportes.$inferSelect
 export type Actualizacion = typeof actualizaciones.$inferSelect
@@ -117,3 +227,9 @@ export type Empleado = typeof empleados.$inferSelect
 export type Notificacion = typeof notificaciones.$inferSelect
 export type Lead = typeof leads.$inferSelect
 export type BotQueueItem = typeof botQueue.$inferSelect
+export type RondaPlantilla = typeof rondasPlantilla.$inferSelect
+export type RondaProgramacion = typeof rondasProgramacion.$inferSelect
+export type RondaOcurrencia = typeof rondasOcurrencia.$inferSelect
+export type RondaEvento = typeof rondasEvento.$inferSelect
+export type TareaOperativa = typeof tareasOperativas.$inferSelect
+export type TareaOperativaEvento = typeof tareasOperativasEvento.$inferSelect
