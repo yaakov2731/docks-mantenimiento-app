@@ -57,9 +57,10 @@ export function TasksHeroCard({
       : 'text-slate-600'
 
   return (
-    <div className={`rounded-[24px] p-5 md:p-6 ${wrapperClass}`}>
+    <div className={`relative overflow-hidden rounded-[24px] p-5 md:p-6 ${wrapperClass}`}>
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.18),transparent_70%)]" />
       <div className={`text-[11px] font-medium uppercase tracking-[0.18em] ${eyebrowClass}`}>Control operativo</div>
-      <div className="mt-3 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div className="relative mt-3 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <div className="font-heading text-[24px] leading-tight font-semibold md:text-[30px]">
             {tone === 'requiere_accion'
@@ -93,7 +94,7 @@ export function TasksHeroCard({
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="min-w-[132px] rounded-[18px] border border-black/5 bg-white/10 px-4 py-3 backdrop-blur-sm">
+    <div className="min-w-[132px] rounded-[20px] border border-white/15 bg-white/12 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] backdrop-blur-sm">
       <div className="text-[11px] uppercase tracking-[0.14em] opacity-70">{label}</div>
       <div className="mt-2 font-heading text-[22px] leading-none font-semibold">{value}</div>
     </div>

@@ -17,7 +17,7 @@ import {
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead,
   createRoundTemplate, saveRoundSchedule, getRoundOverviewForDashboard, getRoundTimeline,
-  createOperationalTask, createOperationalTaskFromReporte, listOperationalTasks, listOperationalTasksByEmployee, getOperationalTasksOverview,
+  createOperationalTask, createOperationalTaskFromReporte, getOperationalTaskById, listOperationalTasks, listOperationalTasksByEmployee, getOperationalTasksOverview,
   enqueueBotMessage,
   iniciarTrabajoReporte,
   pausarTrabajoReporte,
@@ -329,6 +329,10 @@ export const appRouter = router({
           empleadoWaId: empleado?.waId ?? undefined,
         } as any)
 
+        if (empleado) {
+          await notifyOperationalTaskAssignment(id, empleado)
+        }
+
         return { success: true, id }
       }),
 
@@ -340,9 +344,16 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         try {
+          const empleado = typeof input.empleadoId === 'number'
+            ? await getEmpleadoById(input.empleadoId)
+            : null
+          const result = await createOperationalTaskFromReporte(input)
+          if (empleado) {
+            await notifyOperationalTaskAssignment(result.id, empleado)
+          }
           return {
             success: true,
-            ...(await createOperationalTaskFromReporte(input)),
+            ...result,
           }
         } catch (error: any) {
           if (error?.message === 'Reporte no encontrado') {
@@ -477,6 +488,35 @@ export const appRouter = router({
 })
 
 export type AppRouter = typeof appRouter
+
+async function notifyOperationalTaskAssignment(taskId: number, employee: { nombre: string; waId?: string | null }) {
+  if (!employee.waId) return
+
+  const task = await getOperationalTaskById(taskId)
+  if (!task) return
+
+  const lines = [
+    '*Nueva tarea operativa — Docks del Puerto*',
+    '',
+    `Asignado a: ${employee.nombre}`,
+    `Tarea #${task.id}`,
+    task.titulo ? `Trabajo: ${task.titulo}` : '',
+    task.tipoTrabajo ? `Tipo: ${task.tipoTrabajo}` : '',
+    task.ubicacion ? `Ubicación: ${task.ubicacion}` : '',
+    task.prioridad ? `Prioridad: ${String(task.prioridad).toUpperCase()}` : '',
+    '',
+    task.descripcion ?? '',
+    '',
+    'Respondé con una opción:',
+    '1. Aceptar tarea',
+    '2. No puedo realizarla',
+    '3. Ver cola del día',
+    '',
+    'Cuando la aceptes, el reloj de trabajo queda en marcha y después vas a poder pausar o finalizar desde el bot.',
+  ]
+
+  await enqueueBotMessage(employee.waId, lines.filter(Boolean).join('\n'))
+}
 
 function buildLeadAssignmentMessage({
   lead,

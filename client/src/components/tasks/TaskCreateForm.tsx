@@ -75,9 +75,10 @@ export function TaskCreateForm({
   }
 
   return (
-    <form className="surface-panel rounded-[22px] p-5" onSubmit={handleSubmit}>
+    <form className="surface-panel relative overflow-hidden rounded-[22px] border border-[#E3E8EE] p-5 shadow-sm" onSubmit={handleSubmit}>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[linear-gradient(135deg,rgba(15,108,134,0.08),rgba(245,158,11,0.08),transparent)]" />
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="relative">
           <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Alta operativa</div>
           <h3 className="mt-2 font-heading text-lg font-semibold text-sidebar-bg">Crear tarea bajo demanda</h3>
           <p className="mt-2 text-sm text-slate-500">
@@ -105,7 +106,7 @@ export function TaskCreateForm({
         ) : null}
       </div>
 
-      <div className="mt-5 grid gap-4">
+      <div className="relative mt-5 grid gap-4">
         <Field label="Tipo de trabajo" error={errors.tipoTrabajo}>
           <input
             value={values.tipoTrabajo}
@@ -180,12 +181,12 @@ export function TaskCreateForm({
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
         <p className="text-xs text-slate-500">
-          Si asignás responsable, la tarea queda lista para confirmación por bot.
+          Si asignás responsable, WhatsApp sale en el momento con opciones para aceptar, rechazar y ver su cola.
         </p>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-full bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-full bg-[linear-gradient(135deg,#0F6C86,#155E75)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting ? 'Creando...' : 'Crear tarea'}
         </button>

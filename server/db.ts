@@ -530,11 +530,17 @@ export async function createOperationalTaskFromReporte(input: {
   const reporte = await getReporteById(input.reporteId)
   if (!reporte) throw new Error('Reporte no encontrado')
 
-  const empleado = typeof input.empleadoId === 'number'
-    ? await getEmpleadoById(input.empleadoId)
+  const effectiveEmployeeId = typeof input.empleadoId === 'number'
+    ? input.empleadoId
+    : typeof reporte.asignadoId === 'number'
+      ? reporte.asignadoId
+      : undefined
+
+  const empleado = typeof effectiveEmployeeId === 'number'
+    ? await getEmpleadoById(effectiveEmployeeId)
     : null
 
-  if (typeof input.empleadoId === 'number' && !empleado) {
+  if (typeof effectiveEmployeeId === 'number' && !empleado) {
     throw new Error('Empleado no encontrado')
   }
 
