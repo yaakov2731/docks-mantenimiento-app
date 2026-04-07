@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
+import { RoundsSummaryCard } from '../components/rounds/RoundsSummaryCard'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
 import WorkingTime from '../components/WorkingTime'
@@ -74,6 +75,7 @@ export default function Dashboard() {
   const [assigningTo, setAssigningTo] = useState('')
 
   const { data: stats } = trpc.reportes.estadisticas.useQuery(undefined, { refetchInterval: 30000 })
+  const { data: roundsSummary } = trpc.rondas.resumenHoy.useQuery(undefined, { refetchInterval: 30000 })
   const { data: reportes = [], refetch } = trpc.reportes.listar.useQuery(filters, { refetchInterval: 30000 })
   const { data: reporte } = trpc.reportes.obtener.useQuery({ id: selected! }, { enabled: !!selected, refetchInterval: 15000 })
   const { data: empleados = [] } = trpc.empleados.listar.useQuery()
@@ -88,6 +90,12 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout title="Dashboard">
+      {roundsSummary ? (
+        <div className="mb-4">
+          <RoundsSummaryCard resumen={roundsSummary} />
+        </div>
+      ) : null}
+
       <div className="surface-panel-strong rounded-[24px] p-4 md:p-5 mb-4 overflow-hidden relative">
         <div className="absolute inset-y-0 right-0 w-1/3 bg-[radial-gradient(circle_at_center,rgba(15,108,134,0.07),transparent_72%)] pointer-events-none" />
         <div className="relative flex flex-col lg:flex-row lg:items-center gap-3">
