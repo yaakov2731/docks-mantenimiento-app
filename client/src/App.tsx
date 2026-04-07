@@ -9,6 +9,7 @@ import Empleados from './pages/Empleados'
 import Configuracion from './pages/Configuracion'
 import ImprimirReclamo from './pages/ImprimirReclamo'
 import Leads from './pages/Leads'
+import Operaciones from './pages/Operaciones'
 
 type PanelRole = 'admin' | 'employee' | 'sales'
 
@@ -38,6 +39,7 @@ export default function App() {
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
       <Route path="/dashboard">{() => <ProtectedRoute component={Dashboard} allowedRoles={['admin', 'employee']} />}</Route>
+      <Route path="/operaciones">{() => <ProtectedRoute component={Operaciones} allowedRoles={['admin']} />}</Route>
       <Route path="/tareas">{() => <ProtectedRoute component={Tareas} allowedRoles={['admin', 'employee']} />}</Route>
       <Route path="/historial">{() => <ProtectedRoute component={Historial} allowedRoles={['admin', 'employee']} />}</Route>
       <Route path="/empleados">{() => <ProtectedRoute component={Empleados} allowedRoles={['admin']} />}</Route>
