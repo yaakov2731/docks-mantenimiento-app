@@ -212,6 +212,18 @@ export async function initDb() {
   for (const sql of stmts) {
     await client.execute(sql)
   }
+  const indexStmts = [
+    `CREATE UNIQUE INDEX IF NOT EXISTS tareas_operativas_unica_activa_por_empleado
+      ON tareas_operativas(empleado_id)
+      WHERE estado = 'en_progreso'`,
+  ]
+  for (const sql of indexStmts) {
+    try {
+      await client.execute(sql)
+    } catch (error) {
+      console.warn('[DB] Could not create operational-task unique index', error)
+    }
+  }
   const alterStmts = [
     `ALTER TABLE users ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE users ADD COLUMN wa_id TEXT`,
@@ -523,6 +535,88 @@ export async function listOperationalTasksByEmployee(empleadoId: number) {
 export async function getNextOperationalTaskForEmployee(empleadoId: number, currentTaskId?: number) {
   const rows = await listOperationalTasksByEmployee(empleadoId)
   return rows.find(task => task.estado === 'pendiente_confirmacion' && task.id !== currentTaskId) ?? null
+}
+
+export async function acceptOperationalTask(taskId: number, empleadoId: number) {
+  try {
+    return await db.transaction(async (tx) => {
+      const taskRows = await tx.select().from(schema.tareasOperativas).where(eq(schema.tareasOperativas.id, taskId))
+      const task = taskRows[0] ?? null
+      if (!task) throw new Error('Operational task not found')
+      if (task.empleadoId !== empleadoId) {
+        throw new Error('Operational task does not belong to employee')
+      }
+      if (task.estado !== 'pendiente_confirmacion') {
+        throw new Error('Operational task is not awaiting confirmation')
+      }
+
+      const activeRows = await tx.select().from(schema.tareasOperativas).where(and(
+        eq(schema.tareasOperativas.empleadoId, empleadoId),
+        eq(schema.tareasOperativas.estado, 'en_progreso'),
+      ))
+      const activeTask = activeRows[0] ?? null
+      if (activeTask && activeTask.id !== taskId) {
+        throw new Error('Employee already has an active operational task')
+      }
+
+      const now = new Date()
+      const updates = {
+        estado: 'en_progreso',
+        aceptadoAt: task.aceptadoAt ?? now,
+        trabajoIniciadoAt: now,
+        pausadoAt: null,
+      }
+
+      await tx.update(schema.tareasOperativas)
+        .set({
+          ...updates,
+          updatedAt: now,
+        } as any)
+        .where(eq(schema.tareasOperativas.id, taskId))
+        .run()
+
+      await tx.insert(schema.tareasOperativasEvento).values([
+        {
+          tareaId: taskId,
+          tipo: 'aceptacion',
+          actorTipo: 'employee',
+          actorId: empleadoId,
+          actorNombre: task.empleadoNombre ?? null,
+          descripcion: 'Tarea aceptada por el empleado',
+          metadataJson: null,
+          createdAt: now,
+        },
+        {
+          tareaId: taskId,
+          tipo: 'inicio',
+          actorTipo: 'employee',
+          actorId: empleadoId,
+          actorNombre: task.empleadoNombre ?? null,
+          descripcion: 'Trabajo iniciado',
+          metadataJson: null,
+          createdAt: now,
+        },
+      ]).run()
+
+      return toOperationalTaskRecord({
+        ...task,
+        ...updates,
+        trabajoAcumuladoSegundos: Number(task.trabajoAcumuladoSegundos ?? 0),
+        updatedAt: now,
+      } as any)
+    })
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Employee already has an active operational task') {
+        throw error
+      }
+      const message = error.message.toLowerCase()
+      if (message.includes('unique constraint failed') || message.includes('constraint failed')) {
+        throw new Error('Employee already has an active operational task')
+      }
+    }
+    throw error
+  }
 }
 
 export async function addOperationalTaskEvent(event: {

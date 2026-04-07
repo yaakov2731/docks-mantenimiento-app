@@ -33,51 +33,15 @@ export type OperationalTaskEvent = {
 
 export type OperationalTaskRepository = {
   getTaskById(taskId: number): Promise<OperationalTaskRecord | null>
-  getActiveTaskForEmployee(empleadoId: number): Promise<OperationalTaskRecord | null>
   getNextTaskForEmployee(empleadoId: number, currentTaskId?: number): Promise<OperationalTaskRecord | null>
+  acceptOperationalTask(taskId: number, empleadoId: number): Promise<OperationalTaskRecord>
   persistTaskChange(taskId: number, updates: Partial<OperationalTaskRecord>, events: OperationalTaskEvent[]): Promise<void>
 }
 
 export function createOperationalTasksService(repo: OperationalTaskRepository) {
   return {
     async acceptTask(input: { taskId: number; empleadoId: number }) {
-      const activeTask = await repo.getActiveTaskForEmployee(input.empleadoId)
-      if (activeTask && activeTask.id !== input.taskId) {
-        throw new Error('Employee already has an active operational task')
-      }
-
-      const task = await getOwnedTask(repo, input.taskId, input.empleadoId)
-      if (task.estado !== 'pendiente_confirmacion') {
-        throw new Error('Operational task is not awaiting confirmation')
-      }
-
-      const now = new Date()
-      await repo.persistTaskChange(input.taskId, {
-        estado: 'en_progreso',
-        aceptadoAt: task.aceptadoAt ?? now,
-        trabajoIniciadoAt: now,
-        pausadoAt: null,
-      }, [
-        {
-          tareaId: input.taskId,
-          tipo: 'aceptacion',
-          actorTipo: 'employee',
-          actorId: input.empleadoId,
-          actorNombre: task.empleadoNombre ?? null,
-          descripcion: 'Tarea aceptada por el empleado',
-          createdAt: now,
-        },
-        {
-          tareaId: input.taskId,
-          tipo: 'inicio',
-          actorTipo: 'employee',
-          actorId: input.empleadoId,
-          actorNombre: task.empleadoNombre ?? null,
-          descripcion: 'Trabajo iniciado',
-          createdAt: now,
-        },
-      ])
-      return ensureTask(repo, input.taskId)
+      return repo.acceptOperationalTask(input.taskId, input.empleadoId)
     },
 
     async pauseTask(input: { taskId: number; empleadoId: number }) {

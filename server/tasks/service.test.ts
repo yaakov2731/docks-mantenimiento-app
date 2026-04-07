@@ -70,6 +70,51 @@ function createFakeTasksRepo(initial: { tasks?: FakeTask[] } = {}) {
           left.createdAt!.getTime() - right.createdAt!.getTime()
         )[0] ?? null
     },
+    async acceptOperationalTask(taskId: number, empleadoId: number) {
+      const task = tasks.find((item) => item.id === taskId)
+      if (!task) throw new Error(`Task ${taskId} not found in fake repo`)
+      if (task.empleadoId !== empleadoId) throw new Error('Operational task does not belong to employee')
+      if (task.estado !== 'pendiente_confirmacion') throw new Error('Operational task is not awaiting confirmation')
+
+      const activeTask = tasks.find((item) =>
+        item.empleadoId === empleadoId &&
+        item.estado === 'en_progreso' &&
+        item.id !== taskId
+      )
+      if (activeTask) throw new Error('Employee already has an active operational task')
+
+      const now = new Date()
+      const changes: FakeTaskUpdate = {
+        estado: 'en_progreso',
+        aceptadoAt: task.aceptadoAt ?? now,
+        trabajoIniciadoAt: now,
+        pausadoAt: null,
+      }
+      const snapshot = { ...task, ...changes }
+      Object.assign(task, snapshot)
+      updated.push({ id: taskId, changes, snapshot: { ...task } })
+      events.push(
+        {
+          tareaId: taskId,
+          tipo: 'aceptacion',
+          actorTipo: 'employee',
+          actorId: empleadoId,
+          actorNombre: task.empleadoNombre ?? null,
+          descripcion: 'Tarea aceptada por el empleado',
+          createdAt: now,
+        },
+        {
+          tareaId: taskId,
+          tipo: 'inicio',
+          actorTipo: 'employee',
+          actorId: empleadoId,
+          actorNombre: task.empleadoNombre ?? null,
+          descripcion: 'Trabajo iniciado',
+          createdAt: now,
+        }
+      )
+      return task
+    },
     async updateTask(taskId: number, changes: FakeTaskUpdate) {
       const task = tasks.find((item) => item.id === taskId)
       if (!task) throw new Error(`Task ${taskId} not found in fake repo`)
@@ -107,13 +152,16 @@ describe('operational tasks service', () => {
     vi.useRealTimers()
   })
 
-  it('rejects accepting a second task when the employee already has one in progress', async () => {
+  it('rejects accepting a second task when the atomic repository detects one already in progress', async () => {
     const repo = createFakeTasksRepo({
       tasks: [
         { id: 11, empleadoId: 7, estado: 'en_progreso', trabajoAcumuladoSegundos: 300 },
         { id: 12, empleadoId: 7, estado: 'pendiente_confirmacion', trabajoAcumuladoSegundos: 0 },
       ],
     })
+    repo.getActiveTaskForEmployee = async () => {
+      throw new Error('preflight active-task read should not be used')
+    }
 
     const service = createOperationalTasksService(repo)
 
@@ -122,7 +170,7 @@ describe('operational tasks service', () => {
     )
   })
 
-  it('accepts an assigned task and starts the work timer', async () => {
+  it('accepts an assigned task through the atomic repository path without a preflight active-task read', async () => {
     const repo = createFakeTasksRepo({
       tasks: [
         {
@@ -134,6 +182,12 @@ describe('operational tasks service', () => {
         },
       ],
     })
+    repo.getActiveTaskForEmployee = async () => {
+      throw new Error('preflight active-task read should not be used')
+    }
+    repo.persistTaskChange = async () => {
+      throw new Error('persistTaskChange should not be used for acceptTask')
+    }
 
     const service = createOperationalTasksService(repo)
     const task = await service.acceptTask({ taskId: 12, empleadoId: 7 })
@@ -226,7 +280,7 @@ describe('operational tasks service', () => {
     expect(repo.events.map((event) => event.tipo)).toEqual(['rechazo'])
   })
 
-  it('keeps task state unchanged when the atomic task change fails during acceptance', async () => {
+  it('keeps task state unchanged when the atomic acceptance path fails before persistence', async () => {
     const repo = createFakeTasksRepo({
       tasks: [
         {
@@ -239,13 +293,13 @@ describe('operational tasks service', () => {
       ],
     })
 
-    repo.persistTaskChange = async () => {
-      throw new Error('atomic task change failed')
+    repo.acceptOperationalTask = async () => {
+      throw new Error('atomic task acceptance failed')
     }
 
     const service = createOperationalTasksService(repo)
 
-    await expect(service.acceptTask({ taskId: 41, empleadoId: 8 })).rejects.toThrow('atomic task change failed')
+    await expect(service.acceptTask({ taskId: 41, empleadoId: 8 })).rejects.toThrow('atomic task acceptance failed')
     expect(repo.tasks[0].estado).toBe('pendiente_confirmacion')
     expect(repo.tasks[0].aceptadoAt).toBeNull()
     expect(repo.tasks[0].trabajoIniciadoAt).toBeNull()
