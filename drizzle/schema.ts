@@ -67,6 +67,34 @@ export const empleados = sqliteTable('empleados', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
 
+export const empleadoAsistencia = sqliteTable('empleado_asistencia', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  empleadoId: integer('empleado_id').notNull(),
+  tipo: text('tipo', { enum: ['entrada', 'salida'] }).notNull(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+  canal: text('canal', { enum: ['whatsapp', 'panel', 'manual_admin'] }).notNull(),
+  nota: text('nota'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+export const empleadoAsistenciaAuditoria = sqliteTable('empleado_asistencia_auditoria', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  attendanceEventId: integer('attendance_event_id').notNull(),
+  accion: text('accion', { enum: ['correccion_manual'] }).notNull(),
+  valorAnteriorTipo: text('valor_anterior_tipo'),
+  valorAnteriorTimestamp: integer('valor_anterior_timestamp', { mode: 'timestamp' }),
+  valorAnteriorCanal: text('valor_anterior_canal'),
+  valorAnteriorNota: text('valor_anterior_nota'),
+  valorNuevoTipo: text('valor_nuevo_tipo'),
+  valorNuevoTimestamp: integer('valor_nuevo_timestamp', { mode: 'timestamp' }),
+  valorNuevoCanal: text('valor_nuevo_canal'),
+  valorNuevoNota: text('valor_nuevo_nota'),
+  motivo: text('motivo').notNull(),
+  adminUserId: integer('admin_user_id').notNull(),
+  adminUserName: text('admin_user_name').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
 export const notificaciones = sqliteTable('notificaciones', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   tipo: text('tipo', { enum: ['email', 'telegram'] }).notNull(),
@@ -114,6 +142,8 @@ export type User = typeof users.$inferSelect
 export type Reporte = typeof reportes.$inferSelect
 export type Actualizacion = typeof actualizaciones.$inferSelect
 export type Empleado = typeof empleados.$inferSelect
+export type EmpleadoAsistencia = typeof empleadoAsistencia.$inferSelect
+export type EmpleadoAsistenciaAuditoria = typeof empleadoAsistenciaAuditoria.$inferSelect
 export type Notificacion = typeof notificaciones.$inferSelect
 export type Lead = typeof leads.$inferSelect
 export type BotQueueItem = typeof botQueue.$inferSelect

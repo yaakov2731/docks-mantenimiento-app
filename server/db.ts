@@ -74,6 +74,32 @@ export async function initDb() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    `CREATE TABLE IF NOT EXISTS empleado_asistencia (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      empleado_id INTEGER NOT NULL,
+      tipo TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      canal TEXT NOT NULL,
+      nota TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS empleado_asistencia_auditoria (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      attendance_event_id INTEGER NOT NULL,
+      accion TEXT NOT NULL,
+      valor_anterior_tipo TEXT,
+      valor_anterior_timestamp INTEGER,
+      valor_anterior_canal TEXT,
+      valor_anterior_nota TEXT,
+      valor_nuevo_tipo TEXT,
+      valor_nuevo_timestamp INTEGER,
+      valor_nuevo_canal TEXT,
+      valor_nuevo_nota TEXT,
+      motivo TEXT NOT NULL,
+      admin_user_id INTEGER NOT NULL,
+      admin_user_name TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
     `CREATE TABLE IF NOT EXISTS notificaciones (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tipo TEXT NOT NULL,
@@ -134,6 +160,10 @@ export async function initDb() {
     }
   }
   console.log('[DB] Tables ready')
+}
+
+export async function createManualAttendanceEvent() {
+  throw new Error('not implemented')
 }
 
 // --- USERS ---
