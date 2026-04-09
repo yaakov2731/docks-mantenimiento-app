@@ -10,6 +10,9 @@ export async function resetTestDb() {
     schema.leads,
     schema.botQueue,
     schema.notificaciones,
+    schema.empleadoAsistenciaAuditoria,
+    schema.empleadoAsistencia,
+    schema.empleadoLiquidacionCierre,
     schema.empleados,
     schema.users,
   ]) {
@@ -17,7 +20,7 @@ export async function resetTestDb() {
   }
 
   try {
-    await db.execute(sql`DELETE FROM sqlite_sequence`)
+    await db.run(sql`DELETE FROM sqlite_sequence`)
   } catch {
     // sqlite_sequence is only present after AUTOINCREMENT tables have been used.
   }

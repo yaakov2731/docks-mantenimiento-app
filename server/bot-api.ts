@@ -13,9 +13,11 @@ import {
   markBotMessageSent,
   markBotMessageFailed,
   getEmpleadoById,
+  getEmpleadoAttendanceStatus,
   getNextAssignableReporteForEmpleado,
   getReporteById,
   getReporteTiempoTrabajadoSegundos,
+  registerEmpleadoAttendance,
   iniciarTrabajoReporte,
   pausarTrabajoReporte,
   completarTrabajoReporte,
@@ -48,6 +50,22 @@ function buildTaskPayload(reporte: any, tiempoTrabajadoSegundos?: number) {
     descripcion: reporte.descripcion,
     tiempoTrabajadoSegundos: total,
     tiempoTrabajado: formatDuration(total),
+  }
+}
+
+function buildAttendancePayload(status: any) {
+  return {
+    onShift: !!status?.onShift,
+    lastAction: status?.lastAction ?? null,
+    lastActionAt: status?.lastActionAt ?? null,
+    lastChannel: status?.lastChannel ?? null,
+    lastEntryAt: status?.lastEntryAt ?? null,
+    workedSecondsToday: status?.workedSecondsToday ?? 0,
+    workedTimeToday: formatDuration(status?.workedSecondsToday ?? 0),
+    currentShiftSeconds: status?.currentShiftSeconds ?? 0,
+    currentShiftTime: formatDuration(status?.currentShiftSeconds ?? 0),
+    todayEntries: status?.todayEntries ?? 0,
+    todayExits: status?.todayExits ?? 0,
   }
 }
 
@@ -118,6 +136,66 @@ botRouter.get('/empleado/:id/tareas', authBot, async (req, res) => {
   try {
     const tareas = await getTareasEmpleado(Number(req.params.id))
     return res.json({ tareas: tareas.map(t => buildTaskPayload(t, t.tiempoTrabajadoSegundos ?? 0)) })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/bot/empleado/:id/resumen
+botRouter.get('/empleado/:id/resumen', authBot, async (req, res) => {
+  try {
+    const empleadoId = Number(req.params.id)
+    const [empleado, attendance, tareas] = await Promise.all([
+      getEmpleadoById(empleadoId),
+      getEmpleadoAttendanceStatus(empleadoId),
+      getTareasEmpleado(empleadoId),
+    ])
+    if (!empleado) return res.status(404).json({ error: 'Empleado no encontrado' })
+
+    return res.json({
+      empleado: {
+        id: empleado.id,
+        nombre: empleado.nombre,
+        especialidad: empleado.especialidad,
+      },
+      attendance: buildAttendancePayload(attendance),
+      tareas: tareas.map(t => buildTaskPayload(t, t.tiempoTrabajadoSegundos ?? 0)),
+    })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/bot/empleado/:id/asistencia
+botRouter.post('/empleado/:id/asistencia', authBot, async (req, res) => {
+  try {
+    const empleadoId = Number(req.params.id)
+    const { accion, nota } = req.body as {
+      accion?: 'entrada' | 'salida'
+      nota?: string
+    }
+
+    if (!accion || !['entrada', 'salida'].includes(accion)) {
+      return res.status(400).json({ error: 'accion inválida' })
+    }
+
+    const empleado = await getEmpleadoById(empleadoId)
+    if (!empleado) return res.status(404).json({ error: 'Empleado no encontrado' })
+
+    const result = await registerEmpleadoAttendance(empleadoId, accion, 'whatsapp', nota)
+    if (!result.success) {
+      return res.status(409).json({
+        success: false,
+        code: result.code,
+        attendance: buildAttendancePayload(result.status),
+      })
+    }
+
+    return res.json({
+      success: true,
+      accion,
+      attendance: buildAttendancePayload(result.status),
+    })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
   }

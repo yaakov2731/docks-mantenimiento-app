@@ -1,13 +1,11 @@
-const testDbName = `file::memory:?cache=shared`
+import { beforeEach } from 'vitest'
+
+const testDbName = 'file::memory:?cache=shared'
 
 process.env.TURSO_URL = testDbName
 process.env.TURSO_TOKEN = 'test-token'
 
-if (typeof window === 'undefined') {
-  const { beforeEach } = await import('vitest')
+beforeEach(async () => {
   const { resetTestDb } = await import('./db-factory')
-
-  beforeEach(async () => {
-    await resetTestDb()
-  })
-}
+  await resetTestDb()
+})

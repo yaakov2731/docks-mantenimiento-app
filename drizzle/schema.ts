@@ -95,6 +95,30 @@ export const empleadoAsistenciaAuditoria = sqliteTable('empleado_asistencia_audi
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
 
+export const empleadoLiquidacionCierre = sqliteTable('empleado_liquidacion_cierre', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  empleadoId: integer('empleado_id').notNull(),
+  periodoTipo: text('periodo_tipo', { enum: ['dia', 'semana', 'quincena', 'mes'] }).notNull(),
+  periodoDesde: text('periodo_desde').notNull(),
+  periodoHasta: text('periodo_hasta').notNull(),
+  diasTrabajados: integer('dias_trabajados').default(0).notNull(),
+  segundosTrabajados: integer('segundos_trabajados').default(0).notNull(),
+  promedioSegundosPorDia: integer('promedio_segundos_por_dia').default(0).notNull(),
+  pagoDiario: integer('pago_diario').default(0).notNull(),
+  pagoSemanal: integer('pago_semanal').default(0).notNull(),
+  pagoQuincenal: integer('pago_quincenal').default(0).notNull(),
+  pagoMensual: integer('pago_mensual').default(0).notNull(),
+  tarifaPeriodo: text('tarifa_periodo', { enum: ['dia', 'semana', 'quincena', 'mes'] }).notNull(),
+  tarifaMonto: integer('tarifa_monto').default(0).notNull(),
+  totalPagar: integer('total_pagar').default(0).notNull(),
+  cerradoPorId: integer('cerrado_por_id'),
+  cerradoPorNombre: text('cerrado_por_nombre').notNull(),
+  closedAt: integer('closed_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  pagadoAt: integer('pagado_at', { mode: 'timestamp' }),
+  pagadoPorId: integer('pagado_por_id'),
+  pagadoPorNombre: text('pagado_por_nombre'),
+})
+
 export const notificaciones = sqliteTable('notificaciones', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   tipo: text('tipo', { enum: ['email', 'telegram'] }).notNull(),
@@ -144,6 +168,7 @@ export type Actualizacion = typeof actualizaciones.$inferSelect
 export type Empleado = typeof empleados.$inferSelect
 export type EmpleadoAsistencia = typeof empleadoAsistencia.$inferSelect
 export type EmpleadoAsistenciaAuditoria = typeof empleadoAsistenciaAuditoria.$inferSelect
+export type EmpleadoLiquidacionCierre = typeof empleadoLiquidacionCierre.$inferSelect
 export type Notificacion = typeof notificaciones.$inferSelect
 export type Lead = typeof leads.$inferSelect
 export type BotQueueItem = typeof botQueue.$inferSelect

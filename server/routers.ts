@@ -11,6 +11,8 @@ import {
   crearReporte, getReportes, getReporteById, actualizarReporte, getEstadisticas,
   crearActualizacion, getActualizacionesByReporte,
   getEmpleados, crearEmpleado, actualizarEmpleado, getEmpleadoById,
+  getEmpleadoAttendanceStatus, getEmpleadoAttendanceEvents, registerEmpleadoAttendance,
+  createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead,
   enqueueBotMessage,
@@ -19,6 +21,12 @@ import {
   completarTrabajoReporte,
   limpiarDatosDemo,
 } from './db'
+
+function assertAdmin(user: { role: string }) {
+  if (user.role !== 'admin') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Solo un admin puede gestionar asistencia manual.' })
+  }
+}
 
 export const appRouter = router({
   auth: router({
@@ -338,6 +346,88 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         await actualizarEmpleado(input.id, { activo: false })
         return { success: true }
+      }),
+  }),
+
+  asistencia: router({
+    estadoEmpleado: protectedProcedure
+      .input(z.object({ empleadoId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        const empleado = await getEmpleadoById(input.empleadoId)
+        if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
+        return getEmpleadoAttendanceStatus(input.empleadoId)
+      }),
+    eventosEmpleado: protectedProcedure
+      .input(z.object({ empleadoId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        const empleado = await getEmpleadoById(input.empleadoId)
+        if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
+        return getEmpleadoAttendanceEvents(input.empleadoId)
+      }),
+    auditoriaEmpleado: protectedProcedure
+      .input(z.object({ empleadoId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        const empleado = await getEmpleadoById(input.empleadoId)
+        if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
+        return getAttendanceAuditTrailForEmpleado(input.empleadoId)
+      }),
+    registrar: protectedProcedure
+      .input(z.object({
+        empleadoId: z.number(),
+        accion: z.enum(['entrada', 'salida']),
+        nota: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        const empleado = await getEmpleadoById(input.empleadoId)
+        if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
+
+        const result = await registerEmpleadoAttendance(input.empleadoId, input.accion, 'panel', input.nota)
+        if (!result.success) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: result.code === 'already_on_shift'
+              ? 'El empleado ya tiene una entrada abierta.'
+              : 'El empleado no tiene una entrada abierta para registrar salida.',
+          })
+        }
+
+        return { success: true, status: result.status }
+      }),
+    crearManual: protectedProcedure
+      .input(z.object({
+        empleadoId: z.number(),
+        tipo: z.enum(['entrada', 'salida']),
+        fechaHora: z.coerce.date(),
+        nota: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        const empleado = await getEmpleadoById(input.empleadoId)
+        if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
+
+        return createManualAttendanceEvent(input)
+      }),
+    corregirManual: protectedProcedure
+      .input(z.object({
+        attendanceEventId: z.number(),
+        tipo: z.enum(['entrada', 'salida']),
+        fechaHora: z.coerce.date(),
+        nota: z.string().optional(),
+        motivo: z.string().min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        return correctManualAttendanceEvent({
+          ...input,
+          admin: {
+            id: ctx.user.id,
+            name: ctx.user.name,
+          },
+        })
       }),
   }),
 

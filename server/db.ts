@@ -100,6 +100,29 @@ export async function initDb() {
       admin_user_name TEXT NOT NULL,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    `CREATE TABLE IF NOT EXISTS empleado_liquidacion_cierre (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      empleado_id INTEGER NOT NULL,
+      periodo_tipo TEXT NOT NULL,
+      periodo_desde TEXT NOT NULL,
+      periodo_hasta TEXT NOT NULL,
+      dias_trabajados INTEGER NOT NULL DEFAULT 0,
+      segundos_trabajados INTEGER NOT NULL DEFAULT 0,
+      promedio_segundos_por_dia INTEGER NOT NULL DEFAULT 0,
+      pago_diario INTEGER NOT NULL DEFAULT 0,
+      pago_semanal INTEGER NOT NULL DEFAULT 0,
+      pago_quincenal INTEGER NOT NULL DEFAULT 0,
+      pago_mensual INTEGER NOT NULL DEFAULT 0,
+      tarifa_periodo TEXT NOT NULL,
+      tarifa_monto INTEGER NOT NULL DEFAULT 0,
+      total_pagar INTEGER NOT NULL DEFAULT 0,
+      cerrado_por_id INTEGER,
+      cerrado_por_nombre TEXT NOT NULL,
+      closed_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      pagado_at INTEGER,
+      pagado_por_id INTEGER,
+      pagado_por_nombre TEXT
+    )`,
     `CREATE TABLE IF NOT EXISTS notificaciones (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tipo TEXT NOT NULL,
@@ -162,8 +185,222 @@ export async function initDb() {
   console.log('[DB] Tables ready')
 }
 
-export async function createManualAttendanceEvent() {
-  throw new Error('not implemented')
+function assertNotFutureAttendanceDate(fechaHora: Date) {
+  if (toMs(fechaHora) > Date.now()) {
+    throw new Error('No se permiten marcaciones futuras')
+  }
+}
+
+function getAttendanceEventTime(evento: { timestamp?: Date | number | null; createdAt?: Date | number | null }) {
+  return toMs(evento.timestamp ?? evento.createdAt)
+}
+
+function toBuenosAiresDateKey(value: Date | number) {
+  const offsetMs = 3 * 60 * 60 * 1000
+  const shifted = new Date(toMs(value) - offsetMs)
+  const year = shifted.getUTCFullYear()
+  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(shifted.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function isAttendanceDateInsideClosedPeriod(
+  closures: schema.EmpleadoLiquidacionCierre[],
+  empleadoId: number,
+  fechaHora: Date | number
+) {
+  const eventDayKey = toBuenosAiresDateKey(fechaHora)
+  return closures.some(cierre =>
+    cierre.empleadoId === empleadoId &&
+    eventDayKey >= cierre.periodoDesde &&
+    eventDayKey <= cierre.periodoHasta
+  )
+}
+
+// --- ASISTENCIA EMPLEADOS ---
+export async function getEmpleadoAttendanceEvents(empleadoId: number) {
+  const rows = await db.select().from(schema.empleadoAsistencia).where(eq(schema.empleadoAsistencia.empleadoId, empleadoId))
+  return rows.sort((a, b) => getAttendanceEventTime(a) - getAttendanceEventTime(b))
+}
+
+export async function getEmpleadoAttendanceStatus(empleadoId: number) {
+  const rows = await getEmpleadoAttendanceEvents(empleadoId)
+  const latest = rows[rows.length - 1] ?? null
+  const { start, end } = getBuenosAiresDayRange()
+  const now = Date.now()
+
+  let openShiftAt: number | null = null
+  let workedSecondsToday = 0
+
+  for (const row of rows) {
+    const rowMs = getAttendanceEventTime(row)
+    if (row.tipo === 'entrada') {
+      openShiftAt = rowMs
+      continue
+    }
+
+    if (row.tipo === 'salida' && openShiftAt !== null) {
+      const segmentStart = Math.max(openShiftAt, start)
+      const segmentEnd = Math.min(rowMs, end)
+      if (segmentEnd > segmentStart) {
+        workedSecondsToday += Math.floor((segmentEnd - segmentStart) / 1000)
+      }
+      openShiftAt = null
+    }
+  }
+
+  if (openShiftAt !== null) {
+    const segmentStart = Math.max(openShiftAt, start)
+    const segmentEnd = Math.min(now, end)
+    if (segmentEnd > segmentStart) {
+      workedSecondsToday += Math.floor((segmentEnd - segmentStart) / 1000)
+    }
+  }
+
+  const todayRows = rows.filter(row => isWithinDay(getAttendanceEventTime(row), start, end))
+  const lastEntry = [...rows].reverse().find(row => row.tipo === 'entrada') ?? null
+  const onShift = latest?.tipo === 'entrada'
+  const currentShiftSeconds = onShift && lastEntry
+    ? Math.max(0, Math.floor((now - getAttendanceEventTime(lastEntry)) / 1000))
+    : 0
+
+  return {
+    onShift,
+    lastAction: latest?.tipo ?? null,
+    lastActionAt: latest ? new Date(getAttendanceEventTime(latest)) : null,
+    lastChannel: latest?.canal ?? null,
+    lastEntryAt: lastEntry ? new Date(getAttendanceEventTime(lastEntry)) : null,
+    workedSecondsToday,
+    currentShiftSeconds,
+    todayEntries: todayRows.filter(row => row.tipo === 'entrada').length,
+    todayExits: todayRows.filter(row => row.tipo === 'salida').length,
+  }
+}
+
+export async function registerEmpleadoAttendance(
+  empleadoId: number,
+  tipo: 'entrada' | 'salida',
+  canal: 'whatsapp' | 'panel' | 'manual_admin' = 'panel',
+  nota?: string
+) {
+  const current = await getEmpleadoAttendanceStatus(empleadoId)
+
+  if (tipo === 'entrada' && current.onShift) {
+    return { success: false, code: 'already_on_shift' as const, status: current }
+  }
+
+  if (tipo === 'salida' && !current.onShift) {
+    return { success: false, code: 'not_on_shift' as const, status: current }
+  }
+
+  await db.insert(schema.empleadoAsistencia).values({
+    empleadoId,
+    tipo,
+    timestamp: new Date(),
+    canal,
+    nota,
+  }).run()
+
+  return {
+    success: true,
+    code: 'ok' as const,
+    status: await getEmpleadoAttendanceStatus(empleadoId),
+  }
+}
+
+export async function createManualAttendanceEvent({
+  empleadoId,
+  tipo,
+  fechaHora,
+  nota,
+}: {
+  empleadoId: number
+  tipo: 'entrada' | 'salida'
+  fechaHora: Date
+  nota?: string
+}) {
+  assertNotFutureAttendanceDate(fechaHora)
+
+  await db.insert(schema.empleadoAsistencia).values({
+    empleadoId,
+    tipo,
+    timestamp: fechaHora,
+    canal: 'manual_admin',
+    nota,
+  }).run()
+
+  return { success: true }
+}
+
+export async function getAttendanceAuditTrailForEmpleado(empleadoId: number) {
+  const [eventos, auditoria] = await Promise.all([
+    getEmpleadoAttendanceEvents(empleadoId),
+    db.select().from(schema.empleadoAsistenciaAuditoria),
+  ])
+
+  const ids = new Set(eventos.map(evento => evento.id))
+
+  return auditoria
+    .filter(item => ids.has(item.attendanceEventId))
+    .sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
+}
+
+export async function correctManualAttendanceEvent({
+  attendanceEventId,
+  tipo,
+  fechaHora,
+  nota,
+  motivo,
+  admin,
+}: {
+  attendanceEventId: number
+  tipo: 'entrada' | 'salida'
+  fechaHora: Date
+  nota?: string
+  motivo: string
+  admin: { id: number; name: string }
+}) {
+  assertNotFutureAttendanceDate(fechaHora)
+
+  const currentRows = await db.select().from(schema.empleadoAsistencia).where(eq(schema.empleadoAsistencia.id, attendanceEventId))
+  const current = currentRows[0]
+
+  if (!current) {
+    throw new Error('Marcacion no encontrada')
+  }
+
+  const closures = await db.select().from(schema.empleadoLiquidacionCierre)
+  const isClosed = isAttendanceDateInsideClosedPeriod(closures, current.empleadoId, getAttendanceEventTime(current))
+    || isAttendanceDateInsideClosedPeriod(closures, current.empleadoId, fechaHora)
+
+  if (isClosed) {
+    throw new Error('No se puede corregir una marcacion de un periodo cerrado')
+  }
+
+  await db.insert(schema.empleadoAsistenciaAuditoria).values({
+    attendanceEventId,
+    accion: 'correccion_manual',
+    valorAnteriorTipo: current.tipo,
+    valorAnteriorTimestamp: current.timestamp ?? current.createdAt,
+    valorAnteriorCanal: current.canal,
+    valorAnteriorNota: current.nota,
+    valorNuevoTipo: tipo,
+    valorNuevoTimestamp: fechaHora,
+    valorNuevoCanal: 'manual_admin',
+    valorNuevoNota: nota,
+    motivo,
+    adminUserId: admin.id,
+    adminUserName: admin.name,
+  }).run()
+
+  await db.update(schema.empleadoAsistencia).set({
+    tipo,
+    timestamp: fechaHora,
+    canal: 'manual_admin',
+    nota,
+  } as any).where(eq(schema.empleadoAsistencia.id, attendanceEventId)).run()
+
+  return { success: true }
 }
 
 // --- USERS ---
