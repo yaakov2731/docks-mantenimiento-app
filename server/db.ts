@@ -1,4 +1,4 @@
-import { createClient } from '@libsql/client/web'
+import { createClient } from '@libsql/client'
 import { drizzle } from 'drizzle-orm/libsql'
 import { eq, and, or, like } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
