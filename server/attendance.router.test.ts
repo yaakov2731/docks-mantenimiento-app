@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { TRPCError } from '@trpc/server'
 import { appRouter } from './routers'
-import { crearEmpleado, getEmpleados } from './db'
+import { actualizarEmpleado, crearEmpleado, getEmpleados } from './db'
 import { resetTestDb } from './test/db-factory'
 
 const adminContext = {
@@ -89,5 +89,15 @@ describe('attendance router', () => {
       tipo: 'entrada',
       fechaHora: new Date('2026-04-08T08:00:00.000Z'),
     })).rejects.toBeInstanceOf(TRPCError)
+  })
+
+  it('blocks attendance access for deactivated employees', async () => {
+    const empleadoId = await createEmpleadoId()
+    await actualizarEmpleado(empleadoId, { activo: false } as any)
+    const caller = appRouter.createCaller(adminContext as any)
+
+    await expect(caller.asistencia.estadoEmpleado({ empleadoId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    })
   })
 })

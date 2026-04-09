@@ -12,7 +12,7 @@ import {
   getPendingBotMessages,
   markBotMessageSent,
   markBotMessageFailed,
-  getEmpleadoById,
+  getEmpleadoActivoById,
   getEmpleadoAttendanceStatus,
   getNextAssignableReporteForEmpleado,
   getReporteById,
@@ -146,7 +146,7 @@ botRouter.get('/empleado/:id/resumen', authBot, async (req, res) => {
   try {
     const empleadoId = Number(req.params.id)
     const [empleado, attendance, tareas] = await Promise.all([
-      getEmpleadoById(empleadoId),
+      getEmpleadoActivoById(empleadoId),
       getEmpleadoAttendanceStatus(empleadoId),
       getTareasEmpleado(empleadoId),
     ])
@@ -179,7 +179,7 @@ botRouter.post('/empleado/:id/asistencia', authBot, async (req, res) => {
       return res.status(400).json({ error: 'accion inválida' })
     }
 
-    const empleado = await getEmpleadoById(empleadoId)
+    const empleado = await getEmpleadoActivoById(empleadoId)
     if (!empleado) return res.status(404).json({ error: 'Empleado no encontrado' })
 
     const result = await registerEmpleadoAttendance(empleadoId, accion, 'whatsapp', nota)
@@ -386,7 +386,7 @@ botRouter.post('/reporte/:id/completar', authBot, async (req, res) => {
     if (empleadoId) {
       const tareasRestantes = await getTareasEmpleado(Number(empleadoId))
       if (tareasRestantes.length === 0) {
-        const empleado = await getEmpleadoById(Number(empleadoId))
+        const empleado = await getEmpleadoActivoById(Number(empleadoId))
         const siguiente = await getNextAssignableReporteForEmpleado(Number(empleadoId))
         if (empleado && siguiente) {
           await actualizarReporte(siguiente.id, {

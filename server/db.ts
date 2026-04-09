@@ -174,6 +174,7 @@ export async function initDb() {
     `ALTER TABLE reportes ADD COLUMN asignacion_respondida_at INTEGER`,
     `ALTER TABLE leads ADD COLUMN asignado_a TEXT`,
     `ALTER TABLE leads ADD COLUMN asignado_id INTEGER`,
+    `ALTER TABLE empleado_asistencia ADD COLUMN timestamp INTEGER`,
   ]
   for (const sql of alterStmts) {
     try {
@@ -215,6 +216,13 @@ function isAttendanceDateInsideClosedPeriod(
     eventDayKey >= cierre.periodoDesde &&
     eventDayKey <= cierre.periodoHasta
   )
+}
+
+async function assertAttendancePeriodOpenForEmpleado(empleadoId: number, fechaHora: Date, errorMessage: string) {
+  const closures = await db.select().from(schema.empleadoLiquidacionCierre)
+  if (isAttendanceDateInsideClosedPeriod(closures, empleadoId, fechaHora)) {
+    throw new Error(errorMessage)
+  }
 }
 
 // --- ASISTENCIA EMPLEADOS ---
@@ -320,6 +328,7 @@ export async function createManualAttendanceEvent({
   nota?: string
 }) {
   assertNotFutureAttendanceDate(fechaHora)
+  await assertAttendancePeriodOpenForEmpleado(empleadoId, fechaHora, 'No se puede crear una marcacion en un periodo cerrado')
 
   await db.insert(schema.empleadoAsistencia).values({
     empleadoId,
@@ -598,6 +607,11 @@ export async function actualizarEmpleado(id: number, data: Partial<typeof schema
 export async function getEmpleadoById(id: number) {
   const rows = await db.select().from(schema.empleados).where(eq(schema.empleados.id, id))
   return rows[0] ?? null
+}
+export async function getEmpleadoActivoById(id: number) {
+  const empleado = await getEmpleadoById(id)
+  if (!empleado || empleado.activo === false) return null
+  return empleado
 }
 export async function getEmpleadoByWaId(waNumber: string) {
   const normalized = waNumber.replace(/\D/g, '')

@@ -10,7 +10,7 @@ import {
   getUsers, getSalesUsers, getUserById, createPanelUser, updateUserPassword, deactivateUser, updateUserWhatsapp,
   crearReporte, getReportes, getReporteById, actualizarReporte, getEstadisticas,
   crearActualizacion, getActualizacionesByReporte,
-  getEmpleados, crearEmpleado, actualizarEmpleado, getEmpleadoById,
+  getEmpleados, crearEmpleado, actualizarEmpleado, getEmpleadoById, getEmpleadoActivoById,
   getEmpleadoAttendanceStatus, getEmpleadoAttendanceEvents, registerEmpleadoAttendance,
   createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
@@ -354,7 +354,7 @@ export const appRouter = router({
       .input(z.object({ empleadoId: z.number() }))
       .query(async ({ input, ctx }) => {
         assertAdmin(ctx.user)
-        const empleado = await getEmpleadoById(input.empleadoId)
+        const empleado = await getEmpleadoActivoById(input.empleadoId)
         if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
         return getEmpleadoAttendanceStatus(input.empleadoId)
       }),
@@ -362,7 +362,7 @@ export const appRouter = router({
       .input(z.object({ empleadoId: z.number() }))
       .query(async ({ input, ctx }) => {
         assertAdmin(ctx.user)
-        const empleado = await getEmpleadoById(input.empleadoId)
+        const empleado = await getEmpleadoActivoById(input.empleadoId)
         if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
         return getEmpleadoAttendanceEvents(input.empleadoId)
       }),
@@ -370,7 +370,7 @@ export const appRouter = router({
       .input(z.object({ empleadoId: z.number() }))
       .query(async ({ input, ctx }) => {
         assertAdmin(ctx.user)
-        const empleado = await getEmpleadoById(input.empleadoId)
+        const empleado = await getEmpleadoActivoById(input.empleadoId)
         if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
         return getAttendanceAuditTrailForEmpleado(input.empleadoId)
       }),
@@ -382,7 +382,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         assertAdmin(ctx.user)
-        const empleado = await getEmpleadoById(input.empleadoId)
+        const empleado = await getEmpleadoActivoById(input.empleadoId)
         if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
 
         const result = await registerEmpleadoAttendance(input.empleadoId, input.accion, 'panel', input.nota)
@@ -406,7 +406,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         assertAdmin(ctx.user)
-        const empleado = await getEmpleadoById(input.empleadoId)
+        const empleado = await getEmpleadoActivoById(input.empleadoId)
         if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
 
         return createManualAttendanceEvent(input)

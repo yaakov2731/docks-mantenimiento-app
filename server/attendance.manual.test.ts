@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { db, getEmpleadoAttendanceEvents, createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado, crearEmpleado } from './db'
+import { sql } from 'drizzle-orm'
+import { db, initDb, getEmpleadoAttendanceEvents, createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado, crearEmpleado } from './db'
 import { resetTestDb } from './test/db-factory'
 import * as schema from '../drizzle/schema'
 
@@ -35,6 +36,36 @@ describe('manual attendance support', () => {
       tipo: 'entrada',
       fechaHora: new Date(Date.now() + 60_000),
     })).rejects.toThrow('No se permiten marcaciones futuras')
+  })
+
+  it('blocks manual creation for an event inside a closed payroll period', async () => {
+    await crearEmpleado({ nombre: 'Juan' } as any)
+
+    await db.insert(schema.empleadoLiquidacionCierre).values({
+      empleadoId: 1,
+      periodoTipo: 'dia',
+      periodoDesde: '2026-04-08',
+      periodoHasta: '2026-04-08',
+      diasTrabajados: 1,
+      segundosTrabajados: 0,
+      promedioSegundosPorDia: 0,
+      pagoDiario: 0,
+      pagoSemanal: 0,
+      pagoQuincenal: 0,
+      pagoMensual: 0,
+      tarifaPeriodo: 'dia',
+      tarifaMonto: 0,
+      totalPagar: 0,
+      cerradoPorId: 99,
+      cerradoPorNombre: 'Admin',
+      closedAt: new Date('2026-04-08T18:00:00.000Z'),
+    }).run()
+
+    await expect(createManualAttendanceEvent({
+      empleadoId: 1,
+      tipo: 'entrada',
+      fechaHora: new Date('2026-04-08T08:00:00.000Z'),
+    })).rejects.toThrow('No se puede crear una marcacion en un periodo cerrado')
   })
 
   it('corrects an existing event and stores audit trail', async () => {
@@ -108,5 +139,31 @@ describe('manual attendance support', () => {
       motivo: 'correccion tardia',
       admin: { id: 99, name: 'Admin' },
     })).rejects.toThrow('No se puede corregir una marcacion de un periodo cerrado')
+  })
+
+  it('upgrades legacy attendance tables without timestamp column', async () => {
+    await db.run(sql`DROP TABLE IF EXISTS empleado_asistencia`)
+    await db.run(sql`
+      CREATE TABLE empleado_asistencia (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        empleado_id INTEGER NOT NULL,
+        tipo TEXT NOT NULL,
+        canal TEXT NOT NULL,
+        nota TEXT,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      )
+    `)
+
+    await initDb()
+    await crearEmpleado({ nombre: 'Juan' } as any)
+
+    await expect(createManualAttendanceEvent({
+      empleadoId: 1,
+      tipo: 'entrada',
+      fechaHora: new Date('2026-04-08T08:00:00.000Z'),
+    })).resolves.toEqual({ success: true })
+
+    const rows = await getEmpleadoAttendanceEvents(1)
+    expect(rows).toHaveLength(1)
   })
 })

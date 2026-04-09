@@ -412,7 +412,9 @@ function AttendanceCard({
                 <div key={item.id} className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-950">
                   <div className="font-medium">Modificado por {item.adminUserName}</div>
                   <div className="text-xs mt-1">Antes: {item.valorAnteriorTipo} {formatDateTime(item.valorAnteriorTimestamp)}</div>
+                  <div className="text-xs">Canal anterior: {formatChannel(item.valorAnteriorCanal)}</div>
                   <div className="text-xs">Ahora: {item.valorNuevoTipo} {formatDateTime(item.valorNuevoTimestamp)}</div>
+                  <div className="text-xs">Canal nuevo: {formatChannel(item.valorNuevoCanal)}</div>
                   <div className="text-xs">Motivo: {item.motivo}</div>
                   <div className="text-[11px] text-amber-800 mt-1">{formatDateTime(item.createdAt)}</div>
                 </div>
