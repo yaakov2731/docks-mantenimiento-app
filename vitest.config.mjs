@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     globals: true,
+    passWithNoTests: true,
     environmentMatchGlobs: [
       ['client/src/**/*.test.tsx', 'jsdom'],
       ['client/src/**/*.test.ts', 'jsdom'],
