@@ -161,9 +161,117 @@ export async function initDb() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    `CREATE TABLE IF NOT EXISTS rondas_plantilla (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      tipo TEXT NOT NULL DEFAULT 'ronda_banos',
+      descripcion TEXT,
+      intervalo_horas INTEGER NOT NULL,
+      checklist_objetivo TEXT,
+      activo INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS rondas_programacion (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plantilla_id INTEGER NOT NULL,
+      modo_programacion TEXT NOT NULL,
+      dia_semana INTEGER,
+      fecha_especial TEXT,
+      hora_inicio TEXT NOT NULL,
+      hora_fin TEXT NOT NULL,
+      empleado_id INTEGER NOT NULL,
+      empleado_nombre TEXT NOT NULL,
+      empleado_wa_id TEXT NOT NULL,
+      supervisor_user_id INTEGER,
+      supervisor_nombre TEXT,
+      supervisor_wa_id TEXT,
+      escalacion_habilitada INTEGER NOT NULL DEFAULT 1,
+      activo INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS rondas_ocurrencia (
+      id INTEGER PRIMARY KEY,
+      plantilla_id INTEGER NOT NULL,
+      programacion_id INTEGER NOT NULL,
+      fecha_operativa TEXT NOT NULL,
+      programado_at INTEGER NOT NULL,
+      programado_at_label TEXT,
+      recordatorio_enviado_at INTEGER,
+      confirmado_at INTEGER,
+      empleado_id INTEGER NOT NULL,
+      empleado_nombre TEXT NOT NULL,
+      empleado_wa_id TEXT NOT NULL,
+      supervisor_wa_id TEXT,
+      nombre_ronda TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      canal_confirmacion TEXT NOT NULL DEFAULT 'whatsapp',
+      nota TEXT,
+      escalado_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS rondas_evento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ocurrencia_id INTEGER NOT NULL,
+      tipo TEXT NOT NULL,
+      actor_tipo TEXT NOT NULL DEFAULT 'system',
+      actor_id INTEGER,
+      actor_nombre TEXT,
+      descripcion TEXT NOT NULL,
+      metadata_json TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS tareas_operativas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      origen TEXT NOT NULL,
+      reporte_id INTEGER,
+      tipo_trabajo TEXT NOT NULL,
+      titulo TEXT NOT NULL,
+      descripcion TEXT NOT NULL,
+      ubicacion TEXT NOT NULL,
+      prioridad TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente_asignacion',
+      empleado_id INTEGER,
+      empleado_nombre TEXT,
+      empleado_wa_id TEXT,
+      asignado_at INTEGER,
+      aceptado_at INTEGER,
+      trabajo_iniciado_at INTEGER,
+      trabajo_acumulado_segundos INTEGER NOT NULL DEFAULT 0,
+      pausado_at INTEGER,
+      terminado_at INTEGER,
+      orden_asignacion INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS tareas_operativas_evento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tarea_id INTEGER NOT NULL,
+      tipo TEXT NOT NULL,
+      actor_tipo TEXT NOT NULL DEFAULT 'system',
+      actor_id INTEGER,
+      actor_nombre TEXT,
+      descripcion TEXT NOT NULL,
+      metadata_json TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
   ]
   for (const sql of stmts) {
     await client.execute(sql)
+  }
+  const indexStmts = [
+    `CREATE UNIQUE INDEX IF NOT EXISTS tareas_operativas_unica_activa_por_empleado
+      ON tareas_operativas(empleado_id)
+      WHERE estado = 'en_progreso'`,
+  ]
+  for (const sql of indexStmts) {
+    try {
+      await client.execute(sql)
+    } catch (error) {
+      console.warn('[DB] Could not create operational-task unique index', error)
+    }
   }
   const alterStmts = [
     `ALTER TABLE users ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`,
@@ -653,6 +761,302 @@ export async function getNextAssignableReporteForEmpleado(empleadoId: number) {
   return preferido ?? disponibles[0]
 }
 
+// --- TAREAS OPERATIVAS ---
+export async function getOperationalTaskById(id: number) {
+  const rows = await db.select().from(schema.tareasOperativas).where(eq(schema.tareasOperativas.id, id))
+  const task = rows[0] ?? null
+  return task ? toOperationalTaskRecord(task) : null
+}
+
+export async function getActiveOperationalTaskForEmployee(empleadoId: number) {
+  const rows = await db.select().from(schema.tareasOperativas).where(and(
+    eq(schema.tareasOperativas.empleadoId, empleadoId),
+    eq(schema.tareasOperativas.estado, 'en_progreso'),
+  ))
+  const task = rows[0] ?? null
+  return task ? toOperationalTaskRecord(task) : null
+}
+
+export async function updateOperationalTask(id: number, data: Partial<typeof schema.tareasOperativas.$inferInsert>) {
+  await db.update(schema.tareasOperativas)
+    .set({
+      ...data,
+      empleadoWaId: data.empleadoWaId !== undefined ? normalizeOptionalWaNumber(data.empleadoWaId) : undefined,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(schema.tareasOperativas.id, id))
+    .run()
+}
+
+export async function createOperationalTask(data: typeof schema.tareasOperativas.$inferInsert): Promise<number> {
+  const assigned = Boolean(data.empleadoId)
+  const now = new Date()
+  const rows = await db.insert(schema.tareasOperativas).values({
+    ...data,
+    empleadoWaId: normalizeOptionalWaNumber(data.empleadoWaId),
+    estado: data.estado ?? (assigned ? 'pendiente_confirmacion' : 'pendiente_asignacion'),
+    asignadoAt: data.asignadoAt ?? (assigned ? now : null),
+    trabajoAcumuladoSegundos: Number(data.trabajoAcumuladoSegundos ?? 0),
+    ordenAsignacion: Number(data.ordenAsignacion ?? 0),
+    updatedAt: data.updatedAt ?? now,
+  }).returning({ id: schema.tareasOperativas.id })
+  return rows[0].id
+}
+
+export async function createOperationalTaskFromReporte(input: {
+  reporteId: number
+  tipoTrabajo: string
+  empleadoId?: number
+}) {
+  const reporte = await getReporteById(input.reporteId)
+  if (!reporte) throw new Error('Reporte no encontrado')
+
+  const effectiveEmployeeId = typeof input.empleadoId === 'number'
+    ? input.empleadoId
+    : typeof reporte.asignadoId === 'number'
+      ? reporte.asignadoId
+      : undefined
+
+  const empleado = typeof effectiveEmployeeId === 'number'
+    ? await getEmpleadoById(effectiveEmployeeId)
+    : null
+
+  if (typeof effectiveEmployeeId === 'number' && !empleado) {
+    throw new Error('Empleado no encontrado')
+  }
+
+  const ubicacion = typeof reporte.local === 'string' && reporte.local.trim().toLowerCase().startsWith('local')
+    ? reporte.local.trim()
+    : `Local ${reporte.local}`.trim()
+
+  const id = await createOperationalTask({
+    origen: 'reclamo',
+    reporteId: reporte.id,
+    tipoTrabajo: input.tipoTrabajo,
+    titulo: reporte.titulo,
+    descripcion: reporte.descripcion,
+    ubicacion,
+    prioridad: reporte.prioridad as any,
+    empleadoId: empleado?.id,
+    empleadoNombre: empleado?.nombre ?? undefined,
+    empleadoWaId: empleado?.waId ?? undefined,
+  } as any)
+
+  return { id }
+}
+
+export async function listOperationalTasks() {
+  const rows = await db.select().from(schema.tareasOperativas)
+  return rows.map(toOperationalTaskRecord).sort(compareOperationalTasks)
+}
+
+export async function listOperationalTasksByEmployee(empleadoId: number) {
+  const rows = await db.select().from(schema.tareasOperativas).where(eq(schema.tareasOperativas.empleadoId, empleadoId))
+  return rows.map(toOperationalTaskRecord).sort(compareOperationalTasks)
+}
+
+export async function getNextOperationalTaskForEmployee(empleadoId: number, currentTaskId?: number) {
+  const rows = await listOperationalTasksByEmployee(empleadoId)
+  return rows.find(task => task.estado === 'pendiente_confirmacion' && task.id !== currentTaskId) ?? null
+}
+
+export async function acceptOperationalTask(taskId: number, empleadoId: number) {
+  try {
+    return await db.transaction(async (tx) => {
+      const taskRows = await tx.select().from(schema.tareasOperativas).where(eq(schema.tareasOperativas.id, taskId))
+      const task = taskRows[0] ?? null
+      if (!task) throw new Error('Operational task not found')
+      if (task.empleadoId !== empleadoId) {
+        throw new Error('Operational task does not belong to employee')
+      }
+      if (task.estado !== 'pendiente_confirmacion') {
+        throw new Error('Operational task is not awaiting confirmation')
+      }
+
+      const activeRows = await tx.select().from(schema.tareasOperativas).where(and(
+        eq(schema.tareasOperativas.empleadoId, empleadoId),
+        eq(schema.tareasOperativas.estado, 'en_progreso'),
+      ))
+      const activeTask = activeRows[0] ?? null
+      if (activeTask && activeTask.id !== taskId) {
+        throw new Error('Employee already has an active operational task')
+      }
+
+      const now = new Date()
+      const updates = {
+        estado: 'en_progreso',
+        aceptadoAt: task.aceptadoAt ?? now,
+        trabajoIniciadoAt: now,
+        pausadoAt: null,
+      }
+
+      await tx.update(schema.tareasOperativas)
+        .set({
+          ...updates,
+          updatedAt: now,
+        } as any)
+        .where(eq(schema.tareasOperativas.id, taskId))
+        .run()
+
+      await tx.insert(schema.tareasOperativasEvento).values([
+        {
+          tareaId: taskId,
+          tipo: 'aceptacion',
+          actorTipo: 'employee',
+          actorId: empleadoId,
+          actorNombre: task.empleadoNombre ?? null,
+          descripcion: 'Tarea aceptada por el empleado',
+          metadataJson: null,
+          createdAt: now,
+        },
+        {
+          tareaId: taskId,
+          tipo: 'inicio',
+          actorTipo: 'employee',
+          actorId: empleadoId,
+          actorNombre: task.empleadoNombre ?? null,
+          descripcion: 'Trabajo iniciado',
+          metadataJson: null,
+          createdAt: now,
+        },
+      ]).run()
+
+      return toOperationalTaskRecord({
+        ...task,
+        ...updates,
+        trabajoAcumuladoSegundos: Number(task.trabajoAcumuladoSegundos ?? 0),
+        updatedAt: now,
+      } as any)
+    })
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Employee already has an active operational task') {
+        throw error
+      }
+      const message = error.message.toLowerCase()
+      if (message.includes('unique constraint failed') || message.includes('constraint failed')) {
+        throw new Error('Employee already has an active operational task')
+      }
+    }
+    throw error
+  }
+}
+
+export async function addOperationalTaskEvent(event: {
+  tareaId: number
+  tipo: 'asignacion' | 'aceptacion' | 'rechazo' | 'inicio' | 'pausa' | 'reanudar' | 'terminacion' | 'cancelacion' | 'reasignacion' | 'admin_update'
+  actorTipo?: 'system' | 'employee' | 'admin'
+  actorId?: number | null
+  actorNombre?: string | null
+  descripcion: string
+  metadata?: Record<string, unknown> | null
+  createdAt?: Date
+}) {
+  await db.insert(schema.tareasOperativasEvento).values({
+    tareaId: event.tareaId,
+    tipo: event.tipo,
+    actorTipo: event.actorTipo ?? 'system',
+    actorId: event.actorId ?? null,
+    actorNombre: event.actorNombre ?? null,
+    descripcion: event.descripcion,
+    metadataJson: event.metadata ? JSON.stringify(event.metadata) : null,
+    createdAt: event.createdAt ?? new Date(),
+  }).run()
+}
+
+export async function persistOperationalTaskChange(
+  taskId: number,
+  data: Partial<typeof schema.tareasOperativas.$inferInsert>,
+  events: Array<{
+    tareaId: number
+    tipo: 'asignacion' | 'aceptacion' | 'rechazo' | 'inicio' | 'pausa' | 'reanudar' | 'terminacion' | 'cancelacion' | 'reasignacion' | 'admin_update'
+    actorTipo?: 'system' | 'employee' | 'admin'
+    actorId?: number | null
+    actorNombre?: string | null
+    descripcion: string
+    metadata?: Record<string, unknown> | null
+    createdAt?: Date
+  }>
+) {
+  await db.transaction(async (tx) => {
+    await tx.update(schema.tareasOperativas)
+      .set({
+        ...data,
+        empleadoWaId: data.empleadoWaId !== undefined ? normalizeOptionalWaNumber(data.empleadoWaId) : undefined,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(schema.tareasOperativas.id, taskId))
+      .run()
+
+    if (events.length === 0) return
+
+    await tx.insert(schema.tareasOperativasEvento).values(events.map((event) => ({
+      tareaId: event.tareaId,
+      tipo: event.tipo,
+      actorTipo: event.actorTipo ?? 'system',
+      actorId: event.actorId ?? null,
+      actorNombre: event.actorNombre ?? null,
+      descripcion: event.descripcion,
+      metadataJson: event.metadata ? JSON.stringify(event.metadata) : null,
+      createdAt: event.createdAt ?? new Date(),
+    }))).run()
+  })
+}
+
+export async function getOperationalTasksOverview() {
+  const [rows, events] = await Promise.all([
+    listOperationalTasks(),
+    db.select().from(schema.tareasOperativasEvento),
+  ])
+  const { start, end } = getBuenosAiresDayRange()
+  const employeeMap = new Map<number, {
+    empleadoId: number
+    empleadoNombre: string
+    activas: number
+    pausadas: number
+    pendientes: number
+    terminadasHoy: number
+    tiempoActivoSegundos: number
+  }>()
+
+  for (const task of rows) {
+    if (!task.empleadoId) continue
+    const bucket = employeeMap.get(task.empleadoId) ?? {
+      empleadoId: task.empleadoId,
+      empleadoNombre: task.empleadoNombre ?? `Empleado ${task.empleadoId}`,
+      activas: 0,
+      pausadas: 0,
+      pendientes: 0,
+      terminadasHoy: 0,
+      tiempoActivoSegundos: 0,
+    }
+    if (task.estado === 'en_progreso') bucket.activas += 1
+    if (task.estado === 'pausada') bucket.pausadas += 1
+    if (task.estado === 'pendiente_confirmacion') bucket.pendientes += 1
+    if (isWithinDay(task.terminadoAt, start, end)) bucket.terminadasHoy += 1
+    bucket.tiempoActivoSegundos += Number(task.tiempoTrabajadoSegundos ?? 0)
+    employeeMap.set(task.empleadoId, bucket)
+  }
+
+  return {
+    total: rows.length,
+    activas: rows.filter(task => task.estado === 'en_progreso').length,
+    pausadas: rows.filter(task => task.estado === 'pausada').length,
+    pendientesAsignacion: rows.filter(task => task.estado === 'pendiente_asignacion').length,
+    pendientesConfirmacion: rows.filter(task => task.estado === 'pendiente_confirmacion').length,
+    terminadasHoy: rows.filter(task => isWithinDay(task.terminadoAt, start, end)).length,
+    rechazadasHoy: events.filter(event => event.tipo === 'rechazo' && isWithinDay(event.createdAt, start, end)).length,
+    derivadasDesdeReportes: rows.filter(task => task.origen === 'reclamo').length,
+    empleadosConColaAlta: [...employeeMap.values()].filter(item => item.pendientes >= 3).length,
+    porEmpleado: [...employeeMap.values()].sort((a, b) =>
+      b.activas - a.activas ||
+      b.pendientes - a.pendientes ||
+      b.tiempoActivoSegundos - a.tiempoActivoSegundos ||
+      a.empleadoNombre.localeCompare(b.empleadoNombre)
+    ),
+  }
+}
+
 // --- NOTIFICACIONES ---
 export async function getNotificaciones() {
   return db.select().from(schema.notificaciones)
@@ -679,6 +1083,344 @@ export async function markBotMessageSent(id: number) {
 }
 export async function markBotMessageFailed(id: number) {
   await db.update(schema.botQueue).set({ status: 'failed' }).where(eq(schema.botQueue.id, id)).run()
+}
+
+// --- RONDAS ---
+export async function listActiveTemplates() {
+  const rows = await db.select().from(schema.rondasPlantilla).where(eq(schema.rondasPlantilla.activo, true))
+  return rows
+    .filter((template) => template.intervaloHoras > 0)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+    .map((template) => ({
+      id: template.id,
+      intervaloHoras: template.intervaloHoras,
+    }))
+}
+
+export async function createRoundTemplate(data: {
+  nombre: string
+  descripcion?: string
+  intervaloHoras: number
+  checklistObjetivo?: string
+}) {
+  const rows = await db.insert(schema.rondasPlantilla).values({
+    nombre: data.nombre.trim(),
+    descripcion: data.descripcion?.trim() || null,
+    intervaloHoras: data.intervaloHoras,
+    checklistObjetivo: data.checklistObjetivo?.trim() || null,
+    activo: true,
+    updatedAt: new Date(),
+  }).returning({ id: schema.rondasPlantilla.id })
+
+  return { id: rows[0].id }
+}
+
+export async function listSchedulesForTemplate(templateId: number) {
+  const rows = await db.select().from(schema.rondasProgramacion).where(eq(schema.rondasProgramacion.plantillaId, templateId))
+  return rows
+    .filter((schedule) => schedule.activo !== false)
+    .sort((a, b) => {
+      if ((a.fechaEspecial ?? '') !== (b.fechaEspecial ?? '')) {
+        return (a.fechaEspecial ?? '').localeCompare(b.fechaEspecial ?? '')
+      }
+      if ((a.diaSemana ?? -1) !== (b.diaSemana ?? -1)) {
+        return (a.diaSemana ?? -1) - (b.diaSemana ?? -1)
+      }
+      return a.horaInicio.localeCompare(b.horaInicio)
+    })
+    .map((schedule) => ({
+      id: schedule.id,
+      plantillaId: schedule.plantillaId,
+      modoProgramacion: schedule.modoProgramacion,
+      diaSemana: schedule.diaSemana ?? undefined,
+      fechaEspecial: schedule.fechaEspecial ?? undefined,
+      horaInicio: schedule.horaInicio,
+      horaFin: schedule.horaFin,
+      empleadoId: schedule.empleadoId,
+      empleadoNombre: schedule.empleadoNombre,
+      empleadoWaId: schedule.empleadoWaId,
+      supervisorWaId: schedule.supervisorWaId ?? undefined,
+    }))
+}
+
+export async function saveRoundSchedule(input: {
+  plantillaId: number
+  modoProgramacion: 'semanal' | 'fecha_especial'
+  diaSemana?: number
+  fechaEspecial?: string
+  horaInicio: string
+  horaFin: string
+  empleadoId: number
+  supervisorUserId?: number
+  escalacionHabilitada?: boolean
+}) {
+  const empleado = await getEmpleadoById(input.empleadoId)
+  if (!empleado) throw new Error('Empleado no encontrado')
+
+  const empleadoWaId = normalizeOptionalWaNumber(empleado.waId)
+  if (!empleadoWaId) throw new Error('El empleado debe tener WhatsApp cargado para asignar una ronda')
+
+  const supervisor = input.supervisorUserId ? await getUserById(input.supervisorUserId) : null
+
+  const rows = await db.insert(schema.rondasProgramacion).values({
+    plantillaId: input.plantillaId,
+    modoProgramacion: input.modoProgramacion,
+    diaSemana: input.modoProgramacion === 'semanal' ? input.diaSemana ?? null : null,
+    fechaEspecial: input.modoProgramacion === 'fecha_especial' ? input.fechaEspecial ?? null : null,
+    horaInicio: input.horaInicio,
+    horaFin: input.horaFin,
+    empleadoId: empleado.id,
+    empleadoNombre: empleado.nombre,
+    empleadoWaId,
+    supervisorUserId: supervisor?.id ?? null,
+    supervisorNombre: supervisor?.name ?? null,
+    supervisorWaId: normalizeOptionalWaNumber(supervisor?.waId),
+    escalacionHabilitada: input.escalacionHabilitada ?? true,
+    activo: true,
+    updatedAt: new Date(),
+  }).returning({ id: schema.rondasProgramacion.id })
+
+  return { id: rows[0].id }
+}
+
+export async function getRoundOverviewForDashboard(dateKey = toBuenosAiresDateKey(new Date())) {
+  const rows = await db.select().from(schema.rondasOcurrencia).where(eq(schema.rondasOcurrencia.fechaOperativa, dateKey))
+  const ordered = rows.sort((a, b) => toMs(a.programadoAt) - toMs(b.programadoAt))
+  const nextPending = ordered.find((occurrence) => occurrence.estado === 'pendiente')
+  const latestConfirmed = [...ordered]
+    .filter((occurrence) => occurrence.confirmadoAt)
+    .sort((a, b) => toMs(b.confirmadoAt) - toMs(a.confirmadoAt))[0]
+  const overdue = ordered.filter((occurrence) => occurrence.estado === 'vencido').length
+  const pending = ordered.filter((occurrence) => occurrence.estado === 'pendiente').length
+
+  return {
+    fechaOperativa: dateKey,
+    total: ordered.length,
+    pendientes: pending,
+    cumplidos: ordered.filter((occurrence) => occurrence.estado === 'cumplido').length,
+    cumplidosConObservacion: ordered.filter((occurrence) => occurrence.estado === 'cumplido_con_observacion').length,
+    vencidos: overdue,
+    estadoGeneral: overdue > 0 ? 'atrasado' : pending > 0 ? 'pendiente' : 'estable',
+    ultimaConfirmacion: latestConfirmed?.confirmadoAt ? formatTimeLabel(latestConfirmed.confirmadoAt) : null,
+    proximoControl: nextPending
+      ? {
+          id: nextPending.id,
+          hora: nextPending.programadoAtLabel ?? formatTimeLabel(nextPending.programadoAt),
+          responsable: nextPending.empleadoNombre,
+        }
+      : null,
+  }
+}
+
+export async function getRoundTimeline(dateKey: string) {
+  const rows = await db.select().from(schema.rondasOcurrencia).where(eq(schema.rondasOcurrencia.fechaOperativa, dateKey))
+  return rows
+    .sort((a, b) => toMs(a.programadoAt) - toMs(b.programadoAt))
+    .map((occurrence) => ({
+      ...toRoundOccurrenceRecord(occurrence),
+      estado: occurrence.estado,
+      canalConfirmacion: occurrence.canalConfirmacion,
+      nota: occurrence.nota,
+    }))
+}
+
+export async function listOccurrencesForDate(templateId: number, dateKey: string) {
+  const rows = await db.select().from(schema.rondasOcurrencia).where(and(
+    eq(schema.rondasOcurrencia.plantillaId, templateId),
+    eq(schema.rondasOcurrencia.fechaOperativa, dateKey),
+  ))
+  return rows
+    .sort((a, b) => toMs(a.programadoAt) - toMs(b.programadoAt))
+    .map(toRoundOccurrenceRecord)
+}
+
+export async function createOccurrences(rows: Array<{
+  id: number
+  plantillaId: number
+  programacionId: number
+  fechaOperativa: string
+  programadoAt: Date
+  programadoAtLabel?: string
+  estado: 'pendiente' | 'vencido'
+  recordatorioEnviadoAt: Date | null
+  confirmadoAt: Date | null
+  escaladoAt: Date | null
+  empleadoId: number
+  empleadoNombre: string
+  empleadoWaId: string
+  supervisorWaId?: string | null
+  nombreRonda: string
+}>) {
+  if (rows.length === 0) return
+  await db.insert(schema.rondasOcurrencia).values(rows.map((row) => ({
+    id: row.id,
+    plantillaId: row.plantillaId,
+    programacionId: row.programacionId,
+    fechaOperativa: row.fechaOperativa,
+    programadoAt: row.programadoAt,
+    programadoAtLabel: row.programadoAtLabel ?? null,
+    estado: row.estado,
+    recordatorioEnviadoAt: row.recordatorioEnviadoAt,
+    confirmadoAt: row.confirmadoAt,
+    escaladoAt: row.escaladoAt,
+    empleadoId: row.empleadoId,
+    empleadoNombre: row.empleadoNombre,
+    empleadoWaId: normalizeWaNumber(row.empleadoWaId),
+    supervisorWaId: normalizeOptionalWaNumber(row.supervisorWaId),
+    nombreRonda: row.nombreRonda,
+  }))).onConflictDoNothing().run()
+}
+
+export async function listReminderCandidates(now: Date) {
+  const rows = await db.select().from(schema.rondasOcurrencia).where(eq(schema.rondasOcurrencia.estado, 'pendiente'))
+  return rows
+    .filter((occurrence) => {
+      if (occurrence.confirmadoAt) return false
+      return toMs(occurrence.programadoAt) <= now.getTime()
+    })
+    .sort((a, b) => toMs(a.programadoAt) - toMs(b.programadoAt))
+    .map(toRoundOccurrenceRecord)
+}
+
+export async function getRoundOccurrenceById(id: number) {
+  const rows = await db.select().from(schema.rondasOcurrencia).where(eq(schema.rondasOcurrencia.id, id))
+  const occurrence = rows[0]
+  if (!occurrence) return null
+  return {
+    ...toRoundOccurrenceRecord(occurrence),
+    estado: occurrence.estado,
+    canalConfirmacion: occurrence.canalConfirmacion,
+    nota: occurrence.nota,
+  }
+}
+
+export async function getOccurrenceById(id: number) {
+  return getRoundOccurrenceById(id)
+}
+
+export async function updateRoundOccurrenceStatus(
+  id: number,
+  data: {
+    estado: 'pendiente' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
+    confirmadoAt?: Date | null
+    canalConfirmacion?: 'whatsapp' | 'panel' | 'system'
+    nota?: string | null
+    escaladoAt?: Date | null
+  }
+) {
+  const updates: Record<string, unknown> = {
+    estado: data.estado,
+    updatedAt: new Date(),
+  }
+  if (data.confirmadoAt !== undefined) updates.confirmadoAt = data.confirmadoAt
+  if (data.canalConfirmacion !== undefined) updates.canalConfirmacion = data.canalConfirmacion
+  if (data.nota !== undefined) updates.nota = data.nota
+  if (data.escaladoAt !== undefined) updates.escaladoAt = data.escaladoAt
+  await db.update(schema.rondasOcurrencia).set(updates as any).where(eq(schema.rondasOcurrencia.id, id)).run()
+}
+
+export async function markOccurrenceReply(
+  id: number,
+  estado: 'cumplido' | 'cumplido_con_observacion' | 'vencido',
+  nota?: string | null
+) {
+  await updateRoundOccurrenceStatus(id, {
+    estado,
+    nota: nota ?? null,
+    confirmadoAt: new Date(),
+    canalConfirmacion: 'whatsapp',
+  })
+}
+
+export async function markReminderSent(id: number, at: Date) {
+  await db.update(schema.rondasOcurrencia).set({
+    recordatorioEnviadoAt: at,
+    updatedAt: at,
+  } as any).where(eq(schema.rondasOcurrencia.id, id)).run()
+}
+
+export async function markOccurrenceOverdue(id: number) {
+  await db.update(schema.rondasOcurrencia).set({
+    estado: 'vencido',
+    updatedAt: new Date(),
+  } as any).where(eq(schema.rondasOcurrencia.id, id)).run()
+}
+
+export async function createRoundEvent(event: {
+  occurrenceId: number
+  type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update'
+  at?: Date
+  actorType?: 'system' | 'employee' | 'admin'
+  actorId?: number | null
+  actorName?: string | null
+  description?: string
+  metadata?: Record<string, unknown> | null
+}) {
+  await db.insert(schema.rondasEvento).values({
+    ocurrenciaId: event.occurrenceId,
+    tipo: event.type,
+    actorTipo: event.actorType ?? 'system',
+    actorId: event.actorId ?? null,
+    actorNombre: event.actorName ?? null,
+    descripcion: event.description ?? describeRoundEvent(event.type),
+    metadataJson: event.metadata ? JSON.stringify(event.metadata) : null,
+    createdAt: event.at ?? new Date(),
+  }).run()
+}
+
+export async function addOccurrenceEvent(event: {
+  occurrenceId: number
+  type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update'
+  at: Date
+  actorType?: 'system' | 'employee' | 'admin'
+  actorId?: number | null
+  actorName?: string | null
+  description?: string
+  metadata?: Record<string, unknown> | null
+}) {
+  await createRoundEvent({
+    occurrenceId: event.occurrenceId,
+    type: event.type,
+    at: event.at,
+    actorType: event.actorType ?? 'system',
+    actorId: event.actorId ?? null,
+    actorName: event.actorName ?? null,
+    description: event.description,
+    metadata: event.metadata ?? { source: 'rounds-service' },
+  })
+}
+
+export async function notifySupervisor(item: {
+  id: number
+  supervisorWaId?: string
+  nombreRonda?: string
+  empleadoNombre?: string
+  fechaOperativa?: string
+  programadoAtLabel?: string
+}) {
+  const waIds = await getRoundEscalationTargets(item.supervisorWaId)
+  if (waIds.length === 0) return
+
+  const message = [
+    `Alerta supervisor: ${item.nombreRonda ?? 'Control de banos'}`,
+    `Control ${item.id} vencido${item.programadoAtLabel ? ` a las ${item.programadoAtLabel}` : ''}.`,
+    item.empleadoNombre ? `Responsable: ${item.empleadoNombre}.` : null,
+    item.fechaOperativa ? `Fecha operativa: ${item.fechaOperativa}.` : null,
+  ].filter(Boolean).join('\n')
+
+  for (const waId of waIds) {
+    await enqueueBotMessage(waId, message)
+  }
+  await db.update(schema.rondasOcurrencia).set({
+    escaladoAt: new Date(),
+    updatedAt: new Date(),
+  } as any).where(eq(schema.rondasOcurrencia.id, item.id)).run()
+  await createRoundEvent({
+    occurrenceId: item.id,
+    type: 'escalacion',
+    actorType: 'system',
+    metadata: { source: 'notifySupervisor' },
+  })
 }
 
 // --- LEADS ---
@@ -746,6 +1488,41 @@ export async function limpiarDatosDemo() {
     leads: leadsDemo.length,
     colaBot: queueDemo.length,
     total: reportesDemo.length + leadsDemo.length + queueDemo.length,
+  }
+}
+
+function getOperationalTaskTiempoTrabajadoSegundos(task: any) {
+  const acumulado = Number(task.trabajoAcumuladoSegundos ?? 0)
+  if (!task.trabajoIniciadoAt) return acumulado
+  const iniciadoAt = new Date(task.trabajoIniciadoAt).getTime()
+  const adicional = Math.max(0, Math.floor((Date.now() - iniciadoAt) / 1000))
+  return acumulado + adicional
+}
+
+function toOperationalTaskRecord(task: schema.TareaOperativa) {
+  return {
+    ...task,
+    tiempoTrabajadoSegundos: getOperationalTaskTiempoTrabajadoSegundos(task),
+  }
+}
+
+function compareOperationalTasks(left: any, right: any) {
+  return operationalTaskStateRank(left.estado) - operationalTaskStateRank(right.estado) ||
+    priorityRank(right.prioridad) - priorityRank(left.prioridad) ||
+    Number(left.ordenAsignacion ?? 0) - Number(right.ordenAsignacion ?? 0) ||
+    toMs(left.createdAt) - toMs(right.createdAt)
+}
+
+function operationalTaskStateRank(estado: string) {
+  switch (estado) {
+    case 'en_progreso': return 0
+    case 'pausada': return 1
+    case 'pendiente_confirmacion': return 2
+    case 'pendiente_asignacion': return 3
+    case 'rechazada': return 4
+    case 'terminada': return 5
+    case 'cancelada': return 6
+    default: return 7
   }
 }
 
@@ -953,4 +1730,76 @@ function isDemoRecord(values: any[]) {
 function normalizeWaNumber(value?: string | null) {
   if (!value) return ''
   return value.replace(/\D/g, '')
+}
+
+function normalizeOptionalWaNumber(value?: string | null) {
+  const normalized = normalizeWaNumber(value)
+  return normalized || null
+}
+
+function toBuenosAiresDateKey(value: Date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(value)
+}
+
+function formatTimeLabel(value: Date | string | number) {
+  return toDate(value).toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+async function getRoundEscalationTargets(supervisorWaId?: string | null) {
+  const directTarget = normalizeOptionalWaNumber(supervisorWaId)
+  if (directTarget) return [directTarget]
+
+  const rows = await db.select().from(schema.users)
+  const fallbackTargets = rows
+    .filter((user) => user.activo !== false && user.role === 'admin')
+    .map((user) => normalizeOptionalWaNumber(user.waId))
+    .filter((value): value is string => Boolean(value))
+
+  return [...new Set(fallbackTargets)]
+}
+
+function toRoundOccurrenceRecord(occurrence: schema.RondaOcurrencia) {
+  return {
+    id: occurrence.id,
+    plantillaId: occurrence.plantillaId,
+    programacionId: occurrence.programacionId,
+    fechaOperativa: occurrence.fechaOperativa,
+    programadoAt: toDate(occurrence.programadoAt),
+    programadoAtLabel: occurrence.programadoAtLabel ?? undefined,
+    estado: occurrence.estado === 'vencido' ? 'vencido' : 'pendiente',
+    recordatorioEnviadoAt: toNullableDate(occurrence.recordatorioEnviadoAt),
+    confirmadoAt: toNullableDate(occurrence.confirmadoAt),
+    escaladoAt: toNullableDate(occurrence.escaladoAt),
+    empleadoId: occurrence.empleadoId,
+    empleadoNombre: occurrence.empleadoNombre,
+    empleadoWaId: occurrence.empleadoWaId,
+    supervisorWaId: occurrence.supervisorWaId ?? undefined,
+    nombreRonda: occurrence.nombreRonda,
+  }
+}
+
+function toDate(value: Date | string | number) {
+  return value instanceof Date ? value : new Date(value)
+}
+
+function toNullableDate(value: Date | string | number | null) {
+  return value ? toDate(value) : null
+}
+
+function describeRoundEvent(type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update') {
+  switch (type) {
+    case 'recordatorio': return 'Recordatorio enviado'
+    case 'confirmacion': return 'Control confirmado'
+    case 'observacion': return 'Control confirmado con observacion'
+    case 'vencimiento': return 'Control vencido por falta de respuesta'
+    case 'escalacion': return 'Incidente escalado a supervisor'
+    case 'admin_update': return 'Actualizacion administrativa'
+    default: return 'Evento de ronda'
+  }
 }

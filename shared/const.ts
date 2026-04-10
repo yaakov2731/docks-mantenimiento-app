@@ -49,3 +49,21 @@ export const ESTADOS = [
   { value: 'completado', label: 'Completado', color: '#22C55E' },
   { value: 'cancelado', label: 'Cancelado', color: '#EF4444' },
 ] as const
+
+export const RONDAS_DIAS_SEMANA = [
+  { value: 1, label: 'Lunes' },
+  { value: 2, label: 'Martes' },
+  { value: 3, label: 'Miércoles' },
+  { value: 4, label: 'Jueves' },
+  { value: 5, label: 'Viernes' },
+  { value: 6, label: 'Sábado' },
+  { value: 0, label: 'Domingo' },
+] as const
+
+export const RONDAS_ESTADOS = [
+  { value: 'programado', label: 'Programado', color: '#64748B' },
+  { value: 'pendiente', label: 'Pendiente', color: '#D97706' },
+  { value: 'cumplido', label: 'Cumplido', color: '#16A34A' },
+  { value: 'cumplido_con_observacion', label: 'Con observación', color: '#92400E' },
+  { value: 'vencido', label: 'Vencido', color: '#DC2626' },
+] as const

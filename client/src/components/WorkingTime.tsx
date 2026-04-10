@@ -11,14 +11,24 @@ function formatDuration(seconds?: number) {
   return `${remainingSeconds}s`
 }
 
+function formatClock(seconds?: number) {
+  const safe = Math.max(0, Math.floor(seconds ?? 0))
+  const hours = String(Math.floor(safe / 3600)).padStart(2, '0')
+  const minutes = String(Math.floor((safe % 3600) / 60)).padStart(2, '0')
+  const remainingSeconds = String(safe % 60).padStart(2, '0')
+  return `${hours}:${minutes}:${remainingSeconds}`
+}
+
 export default function WorkingTime({
   seconds = 0,
   isRunning = false,
   className = '',
+  variant = 'compact',
 }: {
   seconds?: number
   isRunning?: boolean
   className?: string
+  variant?: 'compact' | 'clock'
 }) {
   const [displaySeconds, setDisplaySeconds] = useState(Math.max(0, Math.floor(seconds)))
 
@@ -34,5 +44,5 @@ export default function WorkingTime({
     return () => window.clearInterval(interval)
   }, [isRunning])
 
-  return <span className={className}>{formatDuration(displaySeconds)}</span>
+  return <span className={className}>{variant === 'clock' ? formatClock(displaySeconds) : formatDuration(displaySeconds)}</span>
 }

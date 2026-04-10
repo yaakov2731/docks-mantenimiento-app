@@ -5,6 +5,9 @@ import jwt from 'jsonwebtoken'
 import { router, publicProcedure, protectedProcedure, JWT_COOKIE } from './_core/trpc'
 import { notifyOwner, notifyCompleted } from './_core/notification'
 import { readEnv } from './_core/env'
+import * as database from './db'
+import { createRoundsService } from './rounds/service'
+import { saveRoundScheduleAndSyncToday } from './rounds/schedule'
 import {
   getUserByUsername,
   getUsers, getSalesUsers, getUserById, createPanelUser, updateUserPassword, deactivateUser, updateUserWhatsapp,
@@ -15,6 +18,8 @@ import {
   createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead,
+  createRoundTemplate, saveRoundSchedule, getRoundOverviewForDashboard, getRoundTimeline,
+  createOperationalTask, createOperationalTaskFromReporte, getOperationalTaskById, listOperationalTasks, listOperationalTasksByEmployee, getOperationalTasksOverview,
   enqueueBotMessage,
   iniciarTrabajoReporte,
   pausarTrabajoReporte,
@@ -22,11 +27,14 @@ import {
   limpiarDatosDemo,
 } from './db'
 
+const roundsService = createRoundsService(database as any)
+
 function assertAdmin(user: { role: string }) {
   if (user.role !== 'admin') {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Solo un admin puede gestionar asistencia manual.' })
   }
 }
+
 
 export const appRouter = router({
   auth: router({
@@ -263,6 +271,120 @@ export const appRouter = router({
       }),
   }),
 
+  rondas: router({
+    crearPlantilla: protectedProcedure
+      .input(z.object({
+        nombre: z.string().min(3),
+        descripcion: z.string().optional(),
+        intervaloHoras: z.number().min(1).max(12),
+        checklistObjetivo: z.string().optional(),
+      }))
+      .mutation(({ input }) => createRoundTemplate(input)),
+
+    guardarProgramacion: protectedProcedure
+      .input(z.object({
+        plantillaId: z.number(),
+        modoProgramacion: z.enum(['semanal', 'fecha_especial']),
+        diaSemana: z.number().min(0).max(6).optional(),
+        fechaEspecial: z.string().optional(),
+        horaInicio: z.string(),
+        horaFin: z.string(),
+        empleadoId: z.number(),
+        supervisorUserId: z.number().optional(),
+        escalacionHabilitada: z.boolean().default(true),
+      }))
+      .mutation(({ input }) =>
+        saveRoundScheduleAndSyncToday(
+          {
+            saveRoundSchedule,
+            createDailyOccurrences: (dateKey) => roundsService.createDailyOccurrences(dateKey),
+          },
+          input
+        )
+      ),
+
+    resumenHoy: protectedProcedure.query(() => getRoundOverviewForDashboard()),
+
+    timeline: protectedProcedure
+      .input(z.object({ fechaOperativa: z.string() }))
+      .query(({ input }) => getRoundTimeline(input.fechaOperativa)),
+  }),
+
+  tareasOperativas: router({
+    crear: protectedProcedure
+      .input(z.object({
+        tipoTrabajo: z.string().min(2),
+        titulo: z.string().min(3),
+        descripcion: z.string().min(3),
+        ubicacion: z.string().min(2),
+        prioridad: z.enum(['baja', 'media', 'alta', 'urgente']),
+        empleadoId: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        let empleado = null
+        if (typeof input.empleadoId === 'number') {
+          empleado = await getEmpleadoById(input.empleadoId)
+          if (!empleado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
+        }
+
+        const id = await createOperationalTask({
+          origen: 'manual',
+          tipoTrabajo: input.tipoTrabajo,
+          titulo: input.titulo,
+          descripcion: input.descripcion,
+          ubicacion: input.ubicacion,
+          prioridad: input.prioridad,
+          empleadoId: input.empleadoId,
+          empleadoNombre: empleado?.nombre ?? undefined,
+          empleadoWaId: empleado?.waId ?? undefined,
+        } as any)
+
+        if (empleado) {
+          await notifyOperationalTaskAssignment(id, empleado)
+        }
+
+        return { success: true, id }
+      }),
+
+    crearDesdeReclamo: protectedProcedure
+      .input(z.object({
+        reporteId: z.number(),
+        tipoTrabajo: z.string().min(2),
+        empleadoId: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const empleado = typeof input.empleadoId === 'number'
+            ? await getEmpleadoById(input.empleadoId)
+            : null
+          const result = await createOperationalTaskFromReporte(input)
+          if (empleado) {
+            await notifyOperationalTaskAssignment(result.id, empleado)
+          }
+          return {
+            success: true,
+            ...result,
+          }
+        } catch (error: any) {
+          if (error?.message === 'Reporte no encontrado') {
+            throw new TRPCError({ code: 'NOT_FOUND', message: error.message })
+          }
+          if (error?.message === 'Empleado no encontrado') {
+            throw new TRPCError({ code: 'NOT_FOUND', message: error.message })
+          }
+          throw error
+        }
+      }),
+
+    listar: protectedProcedure.query(() => listOperationalTasks()),
+
+    listarPorEmpleado: protectedProcedure
+      .input(z.object({ empleadoId: z.number() }))
+      .query(({ input }) => listOperationalTasksByEmployee(input.empleadoId)),
+
+    resumenHoy: protectedProcedure.query(() => getOperationalTasksOverview()),
+  }),
+
   usuarios: router({
     listar: protectedProcedure.query(() => getUsers()),
     listarComerciales: protectedProcedure.query(() => getSalesUsers()),
@@ -458,6 +580,35 @@ export const appRouter = router({
 })
 
 export type AppRouter = typeof appRouter
+
+async function notifyOperationalTaskAssignment(taskId: number, employee: { nombre: string; waId?: string | null }) {
+  if (!employee.waId) return
+
+  const task = await getOperationalTaskById(taskId)
+  if (!task) return
+
+  const lines = [
+    '*Nueva tarea operativa — Docks del Puerto*',
+    '',
+    `Asignado a: ${employee.nombre}`,
+    `Tarea #${task.id}`,
+    task.titulo ? `Trabajo: ${task.titulo}` : '',
+    task.tipoTrabajo ? `Tipo: ${task.tipoTrabajo}` : '',
+    task.ubicacion ? `Ubicación: ${task.ubicacion}` : '',
+    task.prioridad ? `Prioridad: ${String(task.prioridad).toUpperCase()}` : '',
+    '',
+    task.descripcion ?? '',
+    '',
+    'Respondé con una opción:',
+    '1. Aceptar tarea',
+    '2. No puedo realizarla',
+    '3. Ver cola del día',
+    '',
+    'Cuando la aceptes, el reloj de trabajo queda en marcha y después vas a poder pausar o finalizar desde el bot.',
+  ]
+
+  await enqueueBotMessage(employee.waId, lines.filter(Boolean).join('\n'))
+}
 
 function buildLeadAssignmentMessage({
   lead,

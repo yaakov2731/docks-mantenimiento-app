@@ -3,6 +3,7 @@
  * Autenticación: header X-Bot-Api-Key
  */
 import { Router } from 'express'
+import * as roundDb from './db'
 import {
   crearReporte,
   crearLead,
@@ -25,8 +26,12 @@ import {
 } from './db'
 import { notifyOwner } from './_core/notification'
 import { readEnv } from './_core/env'
+import { createRoundsService } from './rounds/service'
+import { createOperationalTasksService } from './tasks/service'
 
 const botRouter = Router()
+const roundsService = createRoundsService(roundDb as any)
+const tasksService = createOperationalTasksService(roundDb as any)
 
 function formatDuration(seconds: number) {
   const safe = Math.max(0, Math.floor(seconds))
@@ -76,6 +81,107 @@ function authBot(req: any, res: any, next: any) {
   }
   next()
 }
+
+function mapOperationalTaskError(res: any, error: any) {
+  const message = error?.message ?? 'No se pudo actualizar la tarea operativa'
+  if (message.includes('already has active') || message.includes('already has an active')) {
+    return res.status(409).json({ error: message })
+  }
+  if (message.includes('not found')) return res.status(404).json({ error: message })
+  return res.status(400).json({ error: message })
+}
+
+botRouter.post('/rondas/ocurrencia/:id/responder', authBot, async (req, res) => {
+  try {
+    const occurrenceId = Number(req.params.id)
+    const { empleadoId, opcion, nota } = req.body
+
+    if (!Number.isFinite(occurrenceId) || !Number.isFinite(Number(empleadoId))) {
+      return res.status(400).json({ error: 'occurrenceId y empleadoId son requeridos' })
+    }
+    if (!['1', '2', '3'].includes(opcion)) {
+      return res.status(400).json({ error: 'opcion inválida' })
+    }
+
+    const occurrence = await roundsService.registerWhatsappReply({
+      occurrenceId,
+      empleadoId: Number(empleadoId),
+      option: opcion,
+      note: typeof nota === 'string' ? nota : undefined,
+    })
+
+    return res.json({ success: true, occurrence })
+  } catch (e: any) {
+    const message = e?.message ?? 'No se pudo registrar la respuesta'
+    if (message.includes('not found')) return res.status(404).json({ error: message })
+    if (message.includes('does not belong') || message.includes('no longer pending') || message.includes('Unsupported')) {
+      return res.status(400).json({ error: message })
+    }
+    return res.status(500).json({ error: message })
+  }
+})
+
+botRouter.post('/tarea-operativa/:id/aceptar', authBot, async (req, res) => {
+  try {
+    const taskId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    if (!Number.isFinite(taskId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'taskId y empleadoId son requeridos' })
+    }
+
+    const task = await tasksService.acceptTask({ taskId, empleadoId })
+    return res.json({ success: true, task })
+  } catch (error: any) {
+    return mapOperationalTaskError(res, error)
+  }
+})
+
+botRouter.post('/tarea-operativa/:id/pausar', authBot, async (req, res) => {
+  try {
+    const taskId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    if (!Number.isFinite(taskId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'taskId y empleadoId son requeridos' })
+    }
+
+    const task = await tasksService.pauseTask({ taskId, empleadoId })
+    return res.json({ success: true, task })
+  } catch (error: any) {
+    return mapOperationalTaskError(res, error)
+  }
+})
+
+botRouter.post('/tarea-operativa/:id/terminar', authBot, async (req, res) => {
+  try {
+    const taskId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    const nota = typeof req.body.nota === 'string' ? req.body.nota : undefined
+    if (!Number.isFinite(taskId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'taskId y empleadoId son requeridos' })
+    }
+
+    const result = await tasksService.finishTask({ taskId, empleadoId, note: nota })
+    return res.json({ success: true, task: result.task, nextTask: result.nextTask })
+  } catch (error: any) {
+    return mapOperationalTaskError(res, error)
+  }
+})
+
+botRouter.post('/tarea-operativa/:id/rechazar', authBot, async (req, res) => {
+  try {
+    const taskId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    const nota = typeof req.body.nota === 'string' ? req.body.nota : undefined
+    if (!Number.isFinite(taskId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'taskId y empleadoId son requeridos' })
+    }
+
+    const task = await tasksService.rejectTask({ taskId, empleadoId, note: nota })
+    return res.json({ success: true, task })
+  } catch (error: any) {
+    return mapOperationalTaskError(res, error)
+  }
+})
 
 // POST /api/bot/reporte
 botRouter.post('/reporte', authBot, async (req, res) => {
