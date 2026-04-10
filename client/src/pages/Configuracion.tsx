@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useConfirm } from '../components/ui/confirm-dialog'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
@@ -8,6 +9,7 @@ const emptyForm = { tipo: 'email' as 'email'|'telegram', nombre: '', destino: ''
 const emptyUserForm = { name: '', username: '', password: '', role: 'admin' as 'admin' | 'sales', waId: '' }
 
 export default function Configuracion() {
+  const confirmDialog = useConfirm()
   const [form, setForm] = useState(emptyForm)
   const [showForm, setShowForm] = useState(false)
   const [showTgHelp, setShowTgHelp] = useState(false)
@@ -65,8 +67,14 @@ export default function Configuracion() {
             <Button
               variant="destructive"
               loading={limpiarDemo.isLoading}
-              onClick={() => {
-                if (!confirm('Se van a borrar reclamos, leads y mensajes de prueba. ¿Continuar?')) return
+              onClick={async () => {
+                const ok = await confirmDialog({
+                  title: 'Limpiar datos demo',
+                  message: 'Se van a borrar reclamos, leads y mensajes de prueba. ¿Continuar?',
+                  confirmLabel: 'Limpiar datos',
+                  variant: 'danger',
+                })
+                if (!ok) return
                 limpiarDemo.mutate()
               }}
             >
@@ -190,8 +198,14 @@ export default function Configuracion() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => {
-                          if (!confirm(`¿Desactivar el usuario ${usuario.username}?`)) return
+                        onClick={async () => {
+                          const ok = await confirmDialog({
+                            title: 'Desactivar usuario',
+                            message: `¿Desactivar el usuario ${usuario.username}? No podrá iniciar sesión.`,
+                            confirmLabel: 'Desactivar',
+                            variant: 'danger',
+                          })
+                          if (!ok) return
                           desactivarUsuario.mutate({ id: usuario.id })
                         }}
                       >
@@ -299,7 +313,10 @@ export default function Configuracion() {
                   className={`relative w-10 h-5 rounded-full transition-colors ${n.activo ? 'bg-primary' : 'bg-gray-300'}`}>
                   <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${n.activo ? 'translate-x-5' : 'translate-x-0.5'}`} />
                 </button>
-                <button onClick={() => { if (confirm('¿Eliminar?')) eliminar.mutate({ id: n.id }) }}
+                <button onClick={async () => {
+                  const ok = await confirmDialog({ title: 'Eliminar contacto', message: '¿Eliminar este contacto de notificaciones?', confirmLabel: 'Eliminar', variant: 'danger' })
+                  if (ok) eliminar.mutate({ id: n.id })
+                }}
                   className="text-gray-300 hover:text-danger transition-colors">
                   <Trash2 size={16} />
                 </button>

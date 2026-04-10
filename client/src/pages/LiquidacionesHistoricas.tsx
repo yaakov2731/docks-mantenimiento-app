@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { useConfirm } from '../components/ui/confirm-dialog'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
@@ -74,6 +76,7 @@ function periodLabel(value?: string | null) {
 }
 
 export default function LiquidacionesHistoricas() {
+  const confirmDialog = useConfirm()
   const [empleadoId, setEmpleadoId] = useState('')
   const [periodoTipo, setPeriodoTipo] = useState<PeriodoTipo>('')
   const [estado, setEstado] = useState<EstadoFiltro>('todos')
@@ -90,7 +93,7 @@ export default function LiquidacionesHistoricas() {
       await historial.refetch()
     },
     onError: (error) => {
-      alert(error.message)
+      toast.error(error.message)
     },
   })
 
@@ -235,8 +238,14 @@ export default function LiquidacionesHistoricas() {
                         size="sm"
                         variant="secondary"
                         loading={marcarPagada.isLoading && marcarPagada.variables?.closureId === row.id}
-                        onClick={() => {
-                          if (!window.confirm(`¿Marcar como pagada la liquidación de ${row.empleadoNombre}?`)) return
+                        onClick={async () => {
+                          const ok = await confirmDialog({
+                            title: 'Marcar como pagada',
+                            message: `¿Marcar como pagada la liquidación de ${row.empleadoNombre}?`,
+                            confirmLabel: 'Marcar pagada',
+                            variant: 'warning',
+                          })
+                          if (!ok) return
                           marcarPagada.mutate({ closureId: row.id })
                         }}
                       >

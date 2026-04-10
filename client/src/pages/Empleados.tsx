@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
+import { useConfirm } from '../components/ui/confirm-dialog'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
+import { Skeleton } from '../components/ui/skeleton'
 import { Button } from '../components/ui/button'
 import {
   UserPlus,
@@ -106,7 +109,7 @@ function AttendanceCard({
       await refreshAttendance()
     },
     onError: error => {
-      window.alert(error.message)
+      toast.error(error.message)
     },
   })
 
@@ -116,7 +119,7 @@ function AttendanceCard({
       await refreshAttendance()
     },
     onError: error => {
-      window.alert(error.message)
+      toast.error(error.message)
     },
   })
 
@@ -133,7 +136,7 @@ function AttendanceCard({
       await refreshAttendance()
     },
     onError: error => {
-      window.alert(error.message)
+      toast.error(error.message)
     },
   })
 
@@ -292,7 +295,7 @@ function AttendanceCard({
             <h4 className="text-sm font-semibold text-gray-900 mb-3">Historial reciente</h4>
             <div className="space-y-3">
               {attendanceEvents.isLoading ? (
-                <p className="text-sm text-gray-500">Cargando movimientos...</p>
+                <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 rounded-lg" />)}</div>
               ) : eventos.length === 0 ? (
                 <p className="text-sm text-gray-500">Todavía no hay movimientos de asistencia.</p>
               ) : eventos.slice().reverse().map(evento => {
@@ -405,7 +408,7 @@ function AttendanceCard({
             <h4 className="text-sm font-semibold text-gray-900 mb-3">Auditoría</h4>
             <div className="space-y-3">
               {attendanceAudit.isLoading ? (
-                <p className="text-sm text-gray-500">Cargando auditoría...</p>
+                <div className="space-y-2">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-10 rounded-lg" />)}</div>
               ) : auditoria.length === 0 ? (
                 <p className="text-sm text-gray-500">Aún no hay correcciones auditadas.</p>
               ) : auditoria.slice(0, 5).map(item => (
@@ -428,6 +431,7 @@ function AttendanceCard({
 }
 
 export default function Empleados() {
+  const confirmDialog = useConfirm()
   const [form, setForm] = useState(empty)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -525,10 +529,14 @@ export default function Empleados() {
             key={empleado.id}
             empleado={empleado}
             onEdit={openEditForm}
-            onDeactivate={(empleadoId) => {
-              if (confirm('¿Desactivar este empleado?')) {
-                desactivar.mutate({ id: empleadoId })
-              }
+            onDeactivate={async (empleadoId) => {
+              const ok = await confirmDialog({
+                title: 'Desactivar empleado',
+                message: '¿Desactivar este empleado? No podrá registrar asistencia.',
+                confirmLabel: 'Desactivar',
+                variant: 'danger',
+              })
+              if (ok) desactivar.mutate({ id: empleadoId })
             }}
           />
         ))}

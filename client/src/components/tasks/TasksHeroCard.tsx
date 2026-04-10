@@ -16,10 +16,8 @@ export function TasksHeroCard({
     return (
       <div className="surface-panel-strong rounded-[24px] p-5 md:p-6">
         <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Control operativo</div>
-        <div className="mt-3 font-heading text-[26px] font-semibold text-sidebar-bg">Cargando tablero de tareas</div>
-        <p className="mt-2 max-w-2xl text-sm text-slate-500">
-          Estamos reuniendo la carga actual, las colas pendientes y los cierres del día.
-        </p>
+        <div className="mt-3 h-8 w-64 animate-shimmer bg-slate-200 rounded-lg" />
+        <div className="mt-3 h-4 w-96 max-w-full animate-shimmer bg-slate-200 rounded-lg" />
       </div>
     )
   }

@@ -11,7 +11,7 @@ export default function ImprimirReclamo() {
   const { data: reporte, isLoading } = trpc.reportes.obtener.useQuery({ id }, { enabled: !!id })
 
   if (!id) return <div className="p-8 text-center text-gray-500">ID no especificado. Usá /imprimir?id=1</div>
-  if (isLoading) return <div className="p-8 text-center text-gray-500">Cargando...</div>
+  if (isLoading) return <div className="p-8 flex justify-center"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>
   if (!reporte) return <div className="p-8 text-center text-gray-500">Reclamo no encontrado</div>
 
   const prioridad = PRIORIDADES.find(p => p.value === reporte.prioridad)

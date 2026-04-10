@@ -36,13 +36,22 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 ;(async () => {
+  const isProduction = process.env.NODE_ENV === 'production'
+
   await initDb()
   if (await countUsers() === 0) {
     const username = readEnv('ADMIN_USERNAME') ?? 'admin'
     const password = readEnv('ADMIN_PASSWORD') ?? 'admin123'
-    if (!readEnv('ADMIN_USERNAME') || !readEnv('ADMIN_PASSWORD')) {
-      console.warn('[Server] ⚠️  ADVERTENCIA: Usando credenciales de admin por defecto. Configura ADMIN_USERNAME y ADMIN_PASSWORD en producción.')
+
+    if (isProduction && (!readEnv('ADMIN_USERNAME') || !readEnv('ADMIN_PASSWORD'))) {
+      console.error('[Server] FATAL: ADMIN_USERNAME y ADMIN_PASSWORD son obligatorios en producción.')
+      process.exit(1)
     }
+
+    if (!readEnv('ADMIN_USERNAME') || !readEnv('ADMIN_PASSWORD')) {
+      console.warn('[Server] ⚠️  Usando credenciales de admin por defecto (admin/admin123). Configura ADMIN_USERNAME y ADMIN_PASSWORD en producción.')
+    }
+
     const hash = await bcrypt.hash(password, 10)
     await createUser({ username, password: hash, name: 'Administrador', role: 'admin' })
     console.log(`[Server] Admin creado: ${username}`)

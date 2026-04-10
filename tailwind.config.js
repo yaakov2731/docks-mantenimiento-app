@@ -17,6 +17,31 @@ module.exports = {
         heading: ['Poppins', 'sans-serif'],
         body: ['Inter', 'sans-serif'],
       },
+      keyframes: {
+        shimmer: {
+          '0%': { opacity: '0.5' },
+          '50%': { opacity: '1' },
+          '100%': { opacity: '0.5' },
+        },
+        fadeIn: {
+          from: { opacity: '0', transform: 'translateY(4px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(16px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideInLeft: {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(0)' },
+        },
+      },
+      animation: {
+        shimmer: 'shimmer 1.5s ease-in-out infinite',
+        fadeIn: 'fadeIn 0.3s ease-out',
+        slideUp: 'slideUp 0.3s ease-out',
+        slideInLeft: 'slideInLeft 0.25s ease-out',
+      },
     },
   },
   plugins: [],

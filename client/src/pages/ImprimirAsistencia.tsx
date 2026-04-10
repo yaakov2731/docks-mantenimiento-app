@@ -43,7 +43,7 @@ export default function ImprimirAsistencia() {
   const empleadoId = empleadoIdParam ? Number(empleadoIdParam) : undefined
   const { data, isLoading } = trpc.asistencia.resumen.useQuery({ periodo, empleadoId })
 
-  if (isLoading) return <div className="p-8 text-center text-gray-500">Cargando liquidación...</div>
+  if (isLoading) return <div className="p-8 flex justify-center"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>
   if (!data) return <div className="p-8 text-center text-gray-500">No se pudo cargar la liquidación.</div>
 
   const empleados = data.empleados ?? []

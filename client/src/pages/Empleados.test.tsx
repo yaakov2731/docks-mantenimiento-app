@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { ConfirmProvider } from '../components/ui/confirm-dialog'
 import Empleados from './Empleados'
 
 vi.mock('../components/DashboardLayout', () => ({
@@ -52,7 +53,7 @@ vi.mock('../lib/trpc', () => ({
 
 describe('Empleados', () => {
   it('shows manual attendance controls inside the employee card', async () => {
-    render(<Empleados />)
+    render(<ConfirmProvider><Empleados /></ConfirmProvider>)
 
     await userEvent.click(screen.getByRole('button', { name: /asistencia/i }))
 

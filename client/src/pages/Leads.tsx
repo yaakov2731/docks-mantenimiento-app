@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
@@ -27,8 +28,6 @@ export default function Leads() {
   const [selected, setSelected] = useState<number | null>(null)
   const [turnoForm, setTurnoForm] = useState({ fecha: '', hora: '', notas: '' })
   const [asignadoId, setAsignadoId] = useState('')
-  const [feedback, setFeedback] = useState('')
-
   const { data: leads = [], refetch } = trpc.leads.listar.useQuery({ estado: filterEstado || undefined })
   const { data: lead } = trpc.leads.obtener.useQuery({ id: selected! }, { enabled: !!selected })
   const { data: comerciales = [] } = trpc.usuarios.listarComerciales.useQuery()
@@ -36,11 +35,9 @@ export default function Leads() {
     onSuccess: (result) => {
       refetch()
       if (result.notificationWarning) {
-        setFeedback(result.notificationWarning)
+        toast.warning(result.notificationWarning)
       } else if (result.notificationSent) {
-        setFeedback('Lead asignado y notificación enviada por WhatsApp.')
-      } else {
-        setFeedback('')
+        toast.success('Lead asignado y notificación enviada por WhatsApp.')
       }
     },
   })
@@ -125,11 +122,6 @@ export default function Leads() {
             </div>
 
             <div className="p-5 space-y-4">
-              {feedback && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  {feedback}
-                </div>
-              )}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {lead.telefono && <div><span className="text-gray-400">Teléfono:</span> {lead.telefono}</div>}
                 {lead.email && <div><span className="text-gray-400">Email:</span> {lead.email}</div>}
@@ -160,7 +152,6 @@ export default function Leads() {
                     size="sm"
                     disabled={!asignadoId && !(lead as any).asignadoId}
                     onClick={() => {
-                      setFeedback('')
                       const selectedId = Number(asignadoId || (lead as any).asignadoId)
                       const comercial = comerciales.find((usuario: any) => usuario.id === selectedId)
                       if (!comercial) return

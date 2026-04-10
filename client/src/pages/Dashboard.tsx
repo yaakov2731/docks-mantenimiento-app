@@ -1,8 +1,10 @@
 import { Suspense, lazy, useState, type ReactNode } from 'react'
+import { toast } from 'sonner'
 import DashboardLayout from '../components/DashboardLayout'
 import { RoundsSummaryCard } from '../components/rounds/RoundsSummaryCard'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
+import { Skeleton, SkeletonCard, SkeletonTable } from '../components/ui/skeleton'
 import WorkingTime from '../components/WorkingTime'
 import { ESTADOS, PRIORIDADES } from '@shared/const'
 import { AlertCircle, Clock, CheckCircle2, TrendingUp, X, Building2, PauseCircle } from 'lucide-react'
@@ -81,7 +83,7 @@ export default function Dashboard() {
   const { data: empleados = [] } = trpc.empleados.listar.useQuery()
   const cambiarEstado = trpc.reportes.actualizarEstado.useMutation({
     onSuccess: () => { refetch(); setSelected(null) },
-    onError: (err) => alert(err.message),
+    onError: (err) => toast.error(err.message),
   })
   const asignar = trpc.reportes.asignar.useMutation({ onSuccess: () => { refetch(); setAssigningTo('') } })
   const agregarNota = trpc.reportes.agregarNota.useMutation({ onSuccess: () => { refetch(); setNota(''); setShowNota(false) } })
@@ -199,8 +201,12 @@ export default function Dashboard() {
       {stats && stats.abiertos > 0 && (
         <Suspense
           fallback={
-            <div className="surface-panel rounded-[22px] p-5 mb-4 text-sm text-slate-500">
-              Cargando gráficos operativos...
+            <div className="surface-panel rounded-[22px] p-5 mb-4">
+              <Skeleton className="h-5 w-40 mb-4" />
+              <div className="grid md:grid-cols-2 gap-4">
+                <Skeleton className="h-48 rounded-xl" />
+                <Skeleton className="h-48 rounded-xl" />
+              </div>
             </div>
           }
         >

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { useConfirm } from '../components/ui/confirm-dialog'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
@@ -150,6 +152,7 @@ function DayChip({ day }: { day: any }) {
 }
 
 export default function Asistencia() {
+  const confirm = useConfirm()
   const [periodo, setPeriodo] = useState<Periodo>('dia')
   const [empleadoId, setEmpleadoId] = useState('')
   const [now, setNow] = useState(() => new Date())
@@ -168,25 +171,25 @@ export default function Asistencia() {
       await resumen.refetch()
     },
     onError: (error) => {
-      alert(error.message)
+      toast.error(error.message)
     },
   })
   const cerrarLiquidacion = trpc.asistencia.cerrarLiquidacion.useMutation({
     onSuccess: async () => {
       await resumen.refetch()
-      alert('Liquidación cerrada y congelada correctamente.')
+      toast.success('Liquidación cerrada y congelada correctamente.')
     },
     onError: (error) => {
-      alert(error.message)
+      toast.error(error.message)
     },
   })
   const marcarPagado = trpc.asistencia.marcarPagado.useMutation({
     onSuccess: async () => {
       await resumen.refetch()
-      alert('Liquidación marcada como pagada.')
+      toast.success('Liquidación marcada como pagada.')
     },
     onError: (error) => {
-      alert(error.message)
+      toast.error(error.message)
     },
   })
 
@@ -287,9 +290,15 @@ export default function Asistencia() {
                 variant="success"
                 disabled={!canExport || cerrarLiquidacion.isLoading}
                 loading={cerrarLiquidacion.isLoading}
-                onClick={() => {
+                onClick={async () => {
                   const scope = selectedEmpleadoId ? 'este empleado' : 'todo el equipo'
-                  if (!window.confirm(`¿Cerrar la liquidación de ${scope} para ${periodoInfo?.label?.toLowerCase() ?? 'este período'}?`)) return
+                  const ok = await confirm({
+                    title: 'Cerrar liquidación',
+                    message: `¿Cerrar la liquidación de ${scope} para ${periodoInfo?.label?.toLowerCase() ?? 'este período'}?`,
+                    confirmLabel: 'Cerrar liquidación',
+                    variant: 'warning',
+                  })
+                  if (!ok) return
                   cerrarLiquidacion.mutate({ periodo, empleadoId: selectedEmpleadoId })
                 }}
               >
@@ -300,9 +309,15 @@ export default function Asistencia() {
                 variant="secondary"
                 disabled={!cierre?.cerrado || cierre?.pagado || marcarPagado.isLoading}
                 loading={marcarPagado.isLoading}
-                onClick={() => {
+                onClick={async () => {
                   const scope = selectedEmpleadoId ? 'este empleado' : 'todo el equipo'
-                  if (!window.confirm(`¿Marcar como pagada la liquidación de ${scope}?`)) return
+                  const ok = await confirm({
+                    title: 'Marcar como pagada',
+                    message: `¿Marcar como pagada la liquidación de ${scope}?`,
+                    confirmLabel: 'Marcar pagada',
+                    variant: 'warning',
+                  })
+                  if (!ok) return
                   marcarPagado.mutate({ periodo, empleadoId: selectedEmpleadoId })
                 }}
               >
