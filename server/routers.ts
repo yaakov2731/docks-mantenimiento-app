@@ -14,7 +14,7 @@ import {
   crearReporte, getReportes, getReporteById, actualizarReporte, getEstadisticas,
   crearActualizacion, getActualizacionesByReporte,
   getEmpleados, crearEmpleado, actualizarEmpleado, getEmpleadoById, getEmpleadoActivoById,
-  getEmpleadoAttendanceStatus, getEmpleadoAttendanceEvents, registerEmpleadoAttendance,
+  ATTENDANCE_ACTIONS, getEmpleadoAttendanceStatus, getEmpleadoAttendanceEvents, registerEmpleadoAttendance,
   createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead,
@@ -28,6 +28,7 @@ import {
 } from './db'
 
 const roundsService = createRoundsService(database as any)
+const attendanceActionEnum = z.enum(ATTENDANCE_ACTIONS)
 
 function assertAdmin(user: { role: string }) {
   if (user.role !== 'admin') {
@@ -499,7 +500,7 @@ export const appRouter = router({
     registrar: protectedProcedure
       .input(z.object({
         empleadoId: z.number(),
-        accion: z.enum(['entrada', 'salida']),
+        accion: attendanceActionEnum,
         nota: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -509,11 +510,22 @@ export const appRouter = router({
 
         const result = await registerEmpleadoAttendance(input.empleadoId, input.accion, 'panel', input.nota)
         if (!result.success) {
+          const messageByCode = {
+            already_on_shift: 'El empleado ya tiene una jornada abierta.',
+            not_on_shift: 'El empleado no tiene una entrada abierta.',
+            already_on_lunch: 'El empleado ya está en almuerzo.',
+            not_on_lunch: 'El empleado no tiene un almuerzo abierto.',
+            on_lunch: 'Primero cerrá el almuerzo para registrar la salida.',
+          } as const
+          if (result.code === 'ok') {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Estado de asistencia inconsistente.',
+            })
+          }
           throw new TRPCError({
             code: 'CONFLICT',
-            message: result.code === 'already_on_shift'
-              ? 'El empleado ya tiene una entrada abierta.'
-              : 'El empleado no tiene una entrada abierta para registrar salida.',
+            message: messageByCode[result.code],
           })
         }
 
@@ -522,7 +534,7 @@ export const appRouter = router({
     crearManual: protectedProcedure
       .input(z.object({
         empleadoId: z.number(),
-        tipo: z.enum(['entrada', 'salida']),
+        tipo: attendanceActionEnum,
         fechaHora: z.coerce.date(),
         nota: z.string().optional(),
       }))
@@ -536,7 +548,7 @@ export const appRouter = router({
     corregirManual: protectedProcedure
       .input(z.object({
         attendanceEventId: z.number(),
-        tipo: z.enum(['entrada', 'salida']),
+        tipo: attendanceActionEnum,
         fechaHora: z.coerce.date(),
         nota: z.string().optional(),
         motivo: z.string().min(1),

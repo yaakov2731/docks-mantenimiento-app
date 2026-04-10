@@ -70,7 +70,7 @@ export const empleados = sqliteTable('empleados', {
 export const empleadoAsistencia = sqliteTable('empleado_asistencia', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   empleadoId: integer('empleado_id').notNull(),
-  tipo: text('tipo', { enum: ['entrada', 'salida'] }).notNull(),
+  tipo: text('tipo', { enum: ['entrada', 'inicio_almuerzo', 'fin_almuerzo', 'salida'] }).notNull(),
   timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
   canal: text('canal', { enum: ['whatsapp', 'panel', 'manual_admin'] }).notNull(),
   nota: text('nota'),

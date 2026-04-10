@@ -1,12 +1,18 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { db, initDb, getEmpleadoAttendanceEvents, createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado, crearEmpleado } from './db'
+import { db, initDb, getEmpleadoAttendanceEvents, createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado, getEmpleadoAttendanceStatus, crearEmpleado } from './db'
 import { resetTestDb } from './test/db-factory'
 import * as schema from '../drizzle/schema'
 
 describe('manual attendance support', () => {
   beforeEach(async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-10T19:00:00.000Z'))
     await resetTestDb()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('creates a past manual admin entry', async () => {
@@ -26,6 +32,47 @@ describe('manual attendance support', () => {
     expect(rows[0].tipo).toBe('entrada')
     expect(rows[0].canal).toBe('manual_admin')
     expect(rows[0].nota).toBe('cargada por admin')
+  })
+
+  it('supports lunch events and discounts them from worked time', async () => {
+    await crearEmpleado({ nombre: 'Juan' } as any)
+
+    await createManualAttendanceEvent({
+      empleadoId: 1,
+      tipo: 'entrada',
+      fechaHora: new Date('2026-04-10T12:00:00.000Z'),
+    })
+    await createManualAttendanceEvent({
+      empleadoId: 1,
+      tipo: 'inicio_almuerzo',
+      fechaHora: new Date('2026-04-10T14:00:00.000Z'),
+    })
+    await createManualAttendanceEvent({
+      empleadoId: 1,
+      tipo: 'fin_almuerzo',
+      fechaHora: new Date('2026-04-10T14:45:00.000Z'),
+    })
+    await createManualAttendanceEvent({
+      empleadoId: 1,
+      tipo: 'salida',
+      fechaHora: new Date('2026-04-10T18:00:00.000Z'),
+    })
+
+    const rows = await getEmpleadoAttendanceEvents(1)
+    const status = await getEmpleadoAttendanceStatus(1)
+
+    expect(rows.map(row => row.tipo)).toEqual(['entrada', 'inicio_almuerzo', 'fin_almuerzo', 'salida'])
+    expect(status.onShift).toBe(false)
+    expect(status.onLunch).toBe(false)
+    expect(status.grossWorkedSecondsToday).toBe(21600)
+    expect(status.todayLunchSeconds).toBe(2700)
+    expect(status.workedSecondsToday).toBe(18900)
+    expect(status.todayEntries).toBe(1)
+    expect(status.todayLunchStarts).toBe(1)
+    expect(status.todayLunchEnds).toBe(1)
+    expect(status.todayExits).toBe(1)
+    expect(status.lastLunchStartAt).toEqual(new Date('2026-04-10T14:00:00.000Z'))
+    expect(status.lastLunchEndAt).toEqual(new Date('2026-04-10T14:45:00.000Z'))
   })
 
   it('rejects a future manual event', async () => {

@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { attendanceChannelLabel, getAttendanceEventDateTime } from './attendancePresentation'
 
 function formatCurrency(value?: number | null) {
   return new Intl.NumberFormat('es-AR', {
@@ -87,7 +88,7 @@ export function exportarAsistenciaExcel({
       'Ingreso de hoy': formatDateTime(empleado.hoy?.primerIngresoAt),
       'Salida de hoy': formatDateTime(empleado.hoy?.ultimaSalidaAt),
       'Última acción': empleado.attendance?.lastAction ?? '',
-      'Último canal': empleado.attendance?.lastChannel ?? '',
+      'Último canal': attendanceChannelLabel(empleado.attendance?.lastChannel),
       'Horas período': formatSeconds(empleado.liquidacion?.segundosTrabajados ?? 0),
       'Días liquidados': empleado.liquidacion?.diasTrabajados ?? 0,
       'Total a pagar': Number(empleado.liquidacion?.totalPagar ?? 0),
@@ -124,8 +125,8 @@ export function exportarAsistenciaExcel({
     eventos.map((evento: any) => ({
       Empleado: evento.empleadoNombre,
       Tipo: evento.tipo,
-      Canal: evento.canal,
-      Fecha: formatDateTime(evento.createdAt),
+      Canal: attendanceChannelLabel(evento.canal),
+      Fecha: formatDateTime(getAttendanceEventDateTime(evento)?.toString() ?? ''),
       Especialidad: evento.especialidad ?? '',
       Nota: evento.nota ?? '',
     }))

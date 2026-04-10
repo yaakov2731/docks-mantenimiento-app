@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TRPCError } from '@trpc/server'
 import { appRouter } from './routers'
 import { actualizarEmpleado, crearEmpleado, getEmpleados } from './db'
@@ -18,7 +18,13 @@ const employeeContext = {
 
 describe('attendance router', () => {
   beforeEach(async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'))
     await resetTestDb()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   async function createEmpleadoId() {
@@ -46,6 +52,64 @@ describe('attendance router', () => {
     expect(status.onShift).toBe(true)
     expect(status.lastChannel).toBe('panel')
     expect(status.todayEntries).toBe(1)
+  })
+
+  it('tracks lunch state and blocks exit while lunch is open', async () => {
+    const empleadoId = await createEmpleadoId()
+    const caller = appRouter.createCaller(adminContext as any)
+
+    await caller.asistencia.registrar({
+      empleadoId,
+      accion: 'entrada',
+    })
+
+    vi.setSystemTime(new Date('2026-04-10T13:00:00.000Z'))
+    const lunchStart = await caller.asistencia.registrar({
+      empleadoId,
+      accion: 'inicio_almuerzo',
+    })
+
+    expect(lunchStart.success).toBe(true)
+    expect(lunchStart.status.onShift).toBe(true)
+    expect(lunchStart.status.onLunch).toBe(true)
+    expect(lunchStart.status.lastAction).toBe('inicio_almuerzo')
+    expect(lunchStart.status.lastLunchStartAt).toEqual(new Date('2026-04-10T13:00:00.000Z'))
+
+    await expect(caller.asistencia.registrar({
+      empleadoId,
+      accion: 'salida',
+    })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Primero cerrá el almuerzo para registrar la salida.',
+    })
+
+    vi.setSystemTime(new Date('2026-04-10T13:30:00.000Z'))
+    const lunchEnd = await caller.asistencia.registrar({
+      empleadoId,
+      accion: 'fin_almuerzo',
+    })
+
+    expect(lunchEnd.success).toBe(true)
+    expect(lunchEnd.status.onShift).toBe(true)
+    expect(lunchEnd.status.onLunch).toBe(false)
+    expect(lunchEnd.status.todayLunchSeconds).toBe(1800)
+    expect(lunchEnd.status.todayLunchStarts).toBe(1)
+    expect(lunchEnd.status.todayLunchEnds).toBe(1)
+
+    vi.setSystemTime(new Date('2026-04-10T16:00:00.000Z'))
+    const exit = await caller.asistencia.registrar({
+      empleadoId,
+      accion: 'salida',
+    })
+
+    expect(exit.success).toBe(true)
+    expect(exit.status.onShift).toBe(false)
+    expect(exit.status.onLunch).toBe(false)
+    expect(exit.status.grossWorkedSecondsToday).toBe(14400)
+    expect(exit.status.todayLunchSeconds).toBe(1800)
+    expect(exit.status.workedSecondsToday).toBe(12600)
+    expect(exit.status.todayExits).toBe(1)
+    expect(exit.status.lastAction).toBe('salida')
   })
 
   it('lets an admin create and correct manual attendance with audit trail', async () => {

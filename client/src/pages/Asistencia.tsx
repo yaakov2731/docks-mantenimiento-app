@@ -3,6 +3,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
 import WorkingTime from '../components/WorkingTime'
+import { attendanceChannelLabel, getAttendanceEventDateTime } from '../lib/attendancePresentation'
 import { exportarAsistenciaExcel } from '../lib/exportAttendanceExcel'
 import {
   Activity,
@@ -69,12 +70,6 @@ function formatCurrency(value?: number | null) {
     currency: 'ARS',
     maximumFractionDigits: 0,
   }).format(Number(value ?? 0))
-}
-
-function channelLabel(value?: string | null) {
-  if (value === 'whatsapp') return 'WhatsApp'
-  if (value === 'panel') return 'Panel'
-  return 'Manual'
 }
 
 function ratePeriodLabel(value?: string | null) {
@@ -515,7 +510,7 @@ export default function Asistencia() {
                           <span className="rounded-full bg-white/8 px-2.5 py-1">
                             Salida: {onShift ? 'Turno abierto' : formatTime(hoy?.ultimaSalidaAt)}
                           </span>
-                          <span className="rounded-full bg-white/8 px-2.5 py-1">Última vía: {channelLabel(attendance.lastChannel)}</span>
+                          <span className="rounded-full bg-white/8 px-2.5 py-1">Última vía: {attendanceChannelLabel(attendance.lastChannel)}</span>
                         </div>
                       </div>
 
@@ -674,13 +669,13 @@ export default function Asistencia() {
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600">
                           <MonitorSmartphone size={11} />
-                          {channelLabel(evento.canal)}
+                          {attendanceChannelLabel(evento.canal)}
                         </span>
                       </div>
                     </div>
                     <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
                       <Clock3 size={12} />
-                      {formatDateTime(evento.createdAt)}
+                      {formatDateTime(getAttendanceEventDateTime(evento)?.toString() ?? null)}
                     </div>
                     {evento.nota && <div className="mt-2 text-sm text-slate-600">{evento.nota}</div>}
                   </div>

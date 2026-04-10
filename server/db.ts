@@ -312,6 +312,9 @@ function assertNotFutureAttendanceDate(fechaHora: Date) {
   }
 }
 
+export const ATTENDANCE_ACTIONS = ['entrada', 'inicio_almuerzo', 'fin_almuerzo', 'salida'] as const
+export type AttendanceAction = typeof ATTENDANCE_ACTIONS[number]
+
 function getAttendanceEventTime(evento: { timestamp?: Date | number | null; createdAt?: Date | number | null }) {
   return toMs(evento.timestamp ?? evento.createdAt)
 }
@@ -357,57 +360,92 @@ export async function getEmpleadoAttendanceStatus(empleadoId: number) {
   const { start, end } = getBuenosAiresDayRange()
   const now = Date.now()
 
-  let openShiftAt: number | null = null
-  let workedSecondsToday = 0
+  let shiftStartedAt: number | null = null
+  let lunchStartedAt: number | null = null
+  let grossWorkedSecondsToday = 0
+  let todayLunchSeconds = 0
+
+  const sumSegmentWithinToday = (segmentStart: number | null, segmentEnd: number) => {
+    if (segmentStart === null) return 0
+    const boundedStart = Math.max(segmentStart, start)
+    const boundedEnd = Math.min(segmentEnd, end)
+    if (boundedEnd <= boundedStart) return 0
+    return Math.floor((boundedEnd - boundedStart) / 1000)
+  }
 
   for (const row of rows) {
     const rowMs = getAttendanceEventTime(row)
     if (row.tipo === 'entrada') {
-      openShiftAt = rowMs
+      shiftStartedAt = rowMs
+      lunchStartedAt = null
       continue
     }
 
-    if (row.tipo === 'salida' && openShiftAt !== null) {
-      const segmentStart = Math.max(openShiftAt, start)
-      const segmentEnd = Math.min(rowMs, end)
-      if (segmentEnd > segmentStart) {
-        workedSecondsToday += Math.floor((segmentEnd - segmentStart) / 1000)
+    if (row.tipo === 'inicio_almuerzo' && shiftStartedAt !== null && lunchStartedAt === null) {
+      lunchStartedAt = rowMs
+      continue
+    }
+
+    if (row.tipo === 'fin_almuerzo' && shiftStartedAt !== null && lunchStartedAt !== null) {
+      todayLunchSeconds += sumSegmentWithinToday(lunchStartedAt, rowMs)
+      lunchStartedAt = null
+      continue
+    }
+
+    if (row.tipo === 'salida' && shiftStartedAt !== null) {
+      grossWorkedSecondsToday += sumSegmentWithinToday(shiftStartedAt, rowMs)
+      if (lunchStartedAt !== null) {
+        todayLunchSeconds += sumSegmentWithinToday(lunchStartedAt, rowMs)
       }
-      openShiftAt = null
+      shiftStartedAt = null
+      lunchStartedAt = null
     }
   }
 
-  if (openShiftAt !== null) {
-    const segmentStart = Math.max(openShiftAt, start)
-    const segmentEnd = Math.min(now, end)
-    if (segmentEnd > segmentStart) {
-      workedSecondsToday += Math.floor((segmentEnd - segmentStart) / 1000)
+  if (shiftStartedAt !== null) {
+    grossWorkedSecondsToday += sumSegmentWithinToday(shiftStartedAt, now)
+    if (lunchStartedAt !== null) {
+      todayLunchSeconds += sumSegmentWithinToday(lunchStartedAt, now)
     }
   }
 
+  const workedSecondsToday = Math.max(0, grossWorkedSecondsToday - todayLunchSeconds)
   const todayRows = rows.filter(row => isWithinDay(getAttendanceEventTime(row), start, end))
   const lastEntry = [...rows].reverse().find(row => row.tipo === 'entrada') ?? null
-  const onShift = latest?.tipo === 'entrada'
-  const currentShiftSeconds = onShift && lastEntry
-    ? Math.max(0, Math.floor((now - getAttendanceEventTime(lastEntry)) / 1000))
-    : 0
+  const lastExit = [...rows].reverse().find(row => row.tipo === 'salida') ?? null
+  const lastLunchStart = [...rows].reverse().find(row => row.tipo === 'inicio_almuerzo') ?? null
+  const lastLunchEnd = [...rows].reverse().find(row => row.tipo === 'fin_almuerzo') ?? null
+  const onShift = shiftStartedAt !== null
+  const onLunch = lunchStartedAt !== null
+  const currentShiftSeconds = onShift ? workedSecondsToday : 0
+  const currentLunchSeconds = onLunch ? sumSegmentWithinToday(lunchStartedAt, now) : 0
 
   return {
     onShift,
+    onLunch,
     lastAction: latest?.tipo ?? null,
     lastActionAt: latest ? new Date(getAttendanceEventTime(latest)) : null,
     lastChannel: latest?.canal ?? null,
     lastEntryAt: lastEntry ? new Date(getAttendanceEventTime(lastEntry)) : null,
+    lastExitAt: lastExit ? new Date(getAttendanceEventTime(lastExit)) : null,
+    lunchStartedAt: lunchStartedAt ? new Date(lunchStartedAt) : null,
+    lastLunchStartAt: lastLunchStart ? new Date(getAttendanceEventTime(lastLunchStart)) : null,
+    lastLunchEndAt: lastLunchEnd ? new Date(getAttendanceEventTime(lastLunchEnd)) : null,
     workedSecondsToday,
+    grossWorkedSecondsToday,
+    todayLunchSeconds,
     currentShiftSeconds,
+    currentLunchSeconds,
     todayEntries: todayRows.filter(row => row.tipo === 'entrada').length,
+    todayLunchStarts: todayRows.filter(row => row.tipo === 'inicio_almuerzo').length,
+    todayLunchEnds: todayRows.filter(row => row.tipo === 'fin_almuerzo').length,
     todayExits: todayRows.filter(row => row.tipo === 'salida').length,
   }
 }
 
 export async function registerEmpleadoAttendance(
   empleadoId: number,
-  tipo: 'entrada' | 'salida',
+  tipo: AttendanceAction,
   canal: 'whatsapp' | 'panel' | 'manual_admin' = 'panel',
   nota?: string
 ) {
@@ -417,8 +455,26 @@ export async function registerEmpleadoAttendance(
     return { success: false, code: 'already_on_shift' as const, status: current }
   }
 
-  if (tipo === 'salida' && !current.onShift) {
-    return { success: false, code: 'not_on_shift' as const, status: current }
+  if (tipo === 'inicio_almuerzo') {
+    if (!current.onShift) {
+      return { success: false, code: 'not_on_shift' as const, status: current }
+    }
+    if (current.onLunch) {
+      return { success: false, code: 'already_on_lunch' as const, status: current }
+    }
+  }
+
+  if (tipo === 'fin_almuerzo' && !current.onLunch) {
+    return { success: false, code: 'not_on_lunch' as const, status: current }
+  }
+
+  if (tipo === 'salida') {
+    if (!current.onShift) {
+      return { success: false, code: 'not_on_shift' as const, status: current }
+    }
+    if (current.onLunch) {
+      return { success: false, code: 'on_lunch' as const, status: current }
+    }
   }
 
   await db.insert(schema.empleadoAsistencia).values({
@@ -443,7 +499,7 @@ export async function createManualAttendanceEvent({
   nota,
 }: {
   empleadoId: number
-  tipo: 'entrada' | 'salida'
+  tipo: AttendanceAction
   fechaHora: Date
   nota?: string
 }) {
@@ -483,7 +539,7 @@ export async function correctManualAttendanceEvent({
   admin,
 }: {
   attendanceEventId: number
-  tipo: 'entrada' | 'salida'
+  tipo: AttendanceAction
   fechaHora: Date
   nota?: string
   motivo: string

@@ -2,6 +2,7 @@ import { useSearch } from 'wouter'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
 import WorkingTime from '../components/WorkingTime'
+import { attendanceChannelLabel, getAttendanceEventDateTime } from '../lib/attendancePresentation'
 import { Printer } from 'lucide-react'
 
 type Periodo = 'dia' | 'semana' | 'quincena' | 'mes'
@@ -25,12 +26,6 @@ function formatDateTime(value?: string | null) {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function channelLabel(value?: string | null) {
-  if (value === 'whatsapp') return 'WhatsApp'
-  if (value === 'panel') return 'Panel'
-  return 'Manual'
 }
 
 function ratePeriodLabel(value?: string | null) {
@@ -152,8 +147,8 @@ export default function ImprimirAsistencia() {
                   <tr key={evento.id} className="border-b border-gray-100">
                     <td className="px-3 py-2">{evento.empleadoNombre}</td>
                     <td className="px-3 py-2 capitalize">{evento.tipo}</td>
-                    <td className="px-3 py-2">{channelLabel(evento.canal)}</td>
-                    <td className="px-3 py-2">{formatDateTime(evento.createdAt)}</td>
+                    <td className="px-3 py-2">{attendanceChannelLabel(evento.canal)}</td>
+                    <td className="px-3 py-2">{formatDateTime(getAttendanceEventDateTime(evento)?.toString() ?? null)}</td>
                     <td className="px-3 py-2">{evento.nota || '—'}</td>
                   </tr>
                 ))}

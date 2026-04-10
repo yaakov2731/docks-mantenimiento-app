@@ -5,6 +5,7 @@
 import { Router } from 'express'
 import * as roundDb from './db'
 import {
+  ATTENDANCE_ACTIONS,
   crearReporte,
   crearLead,
   getEmpleadoByWaId,
@@ -27,6 +28,10 @@ import {
   pausarTrabajoReporte,
   completarTrabajoReporte,
   actualizarReporte,
+  listOperationalTasksByEmployee,
+  getOperationalTaskById,
+  persistOperationalTaskChange,
+  addOperationalTaskEvent,
 } from './db'
 import { notifyOwner } from './_core/notification'
 import { readEnv } from './_core/env'
@@ -59,9 +64,14 @@ function formatDateTime(value?: Date | string | number | null) {
 }
 
 function buildTaskPayload(reporte: any, tiempoTrabajadoSegundos?: number) {
+  if (isOperationalTaskRecord(reporte)) {
+    return buildOperationalTaskPayload(reporte, tiempoTrabajadoSegundos)
+  }
+
   const total = tiempoTrabajadoSegundos ?? getReporteTiempoTrabajadoSegundos(reporte)
   return {
     id: reporte.id,
+    origen: 'reclamo',
     titulo: reporte.titulo,
     local: reporte.local,
     planta: reporte.planta,
@@ -74,18 +84,91 @@ function buildTaskPayload(reporte: any, tiempoTrabajadoSegundos?: number) {
   }
 }
 
+function isOperationalTaskRecord(task: any) {
+  return Boolean(
+    task &&
+    (
+      typeof task?.ubicacion === 'string' ||
+      typeof task?.tipoTrabajo === 'string' ||
+      ['pendiente_asignacion', 'pendiente_confirmacion', 'pausada', 'terminada', 'rechazada'].includes(task?.estado)
+    )
+  )
+}
+
+function normalizeOperationalTaskState(estado?: string) {
+  switch (estado) {
+    case 'pendiente_asignacion':
+    case 'pendiente_confirmacion':
+      return 'pendiente'
+    case 'pausada':
+      return 'pausado'
+    case 'terminada':
+      return 'completado'
+    case 'rechazada':
+    case 'cancelada':
+      return 'cancelado'
+    default:
+      return estado ?? 'pendiente'
+  }
+}
+
+function deriveOperationalAssignmentState(task: any) {
+  if (task?.estado === 'pendiente_confirmacion') return 'pendiente_confirmacion'
+  if (task?.estado === 'rechazada') return 'rechazada'
+  if (task?.estado === 'cancelada') return 'cancelada'
+  if (task?.estado === 'pendiente_asignacion') return 'pendiente'
+  return 'aceptada'
+}
+
+function buildOperationalTaskPayload(task: any, tiempoTrabajadoSegundos?: number) {
+  const total = Number(tiempoTrabajadoSegundos ?? task?.tiempoTrabajadoSegundos ?? task?.trabajoAcumuladoSegundos ?? 0)
+  const nextReview = formatDateTime(task?.proximaRevisionAt)
+  return {
+    id: task.id,
+    origen: 'operacion',
+    titulo: task.titulo,
+    local: task.ubicacion ?? task.local ?? 'Tarea operativa',
+    planta: task.planta ?? '',
+    prioridad: task.prioridad,
+    estado: normalizeOperationalTaskState(task.estado),
+    asignacionEstado: deriveOperationalAssignmentState(task),
+    descripcion: task.descripcion,
+    orden: Number(task?.ordenAsignacion ?? task?.orden ?? 0),
+    checklistObjetivo: task?.checklistObjetivo ?? null,
+    recurrenteCadaHoras: task?.recurrenteCadaHoras ?? null,
+    proximaRevisionAt: nextReview,
+    ultimaRevisionAt: formatDateTime(task?.ultimaRevisionAt),
+    dueNow: nextReview ? new Date(nextReview).getTime() <= Date.now() : true,
+    tiempoTrabajadoSegundos: total,
+    tiempoTrabajado: formatDuration(total),
+  }
+}
+
 function buildAttendancePayload(status: any) {
   return {
     onShift: !!status?.onShift,
+    onLunch: !!status?.onLunch,
     lastAction: status?.lastAction ?? null,
     lastActionAt: status?.lastActionAt ?? null,
     lastChannel: status?.lastChannel ?? null,
     lastEntryAt: status?.lastEntryAt ?? null,
+    lastExitAt: status?.lastExitAt ?? null,
+    lunchStartedAt: status?.lunchStartedAt ?? null,
+    lastLunchStartAt: status?.lastLunchStartAt ?? null,
+    lastLunchEndAt: status?.lastLunchEndAt ?? null,
     workedSecondsToday: status?.workedSecondsToday ?? 0,
     workedTimeToday: formatDuration(status?.workedSecondsToday ?? 0),
+    grossWorkedSecondsToday: status?.grossWorkedSecondsToday ?? 0,
+    grossWorkedTimeToday: formatDuration(status?.grossWorkedSecondsToday ?? 0),
+    todayLunchSeconds: status?.todayLunchSeconds ?? 0,
+    todayLunchTime: formatDuration(status?.todayLunchSeconds ?? 0),
     currentShiftSeconds: status?.currentShiftSeconds ?? 0,
     currentShiftTime: formatDuration(status?.currentShiftSeconds ?? 0),
+    currentLunchSeconds: status?.currentLunchSeconds ?? 0,
+    currentLunchTime: formatDuration(status?.currentLunchSeconds ?? 0),
     todayEntries: status?.todayEntries ?? 0,
+    todayLunchStarts: status?.todayLunchStarts ?? 0,
+    todayLunchEnds: status?.todayLunchEnds ?? 0,
     todayExits: status?.todayExits ?? 0,
   }
 }
@@ -144,7 +227,103 @@ function mapOperationalTaskError(res: any, error: any) {
     return res.status(409).json({ error: message })
   }
   if (message.includes('not found')) return res.status(404).json({ error: message })
+  if (message.includes('does not belong') || message.includes('awaiting confirmation') || message.includes('cannot be finished')) {
+    return res.status(400).json({ error: message })
+  }
   return res.status(400).json({ error: message })
+}
+
+function botPriorityRank(prioridad?: string) {
+  switch (prioridad) {
+    case 'urgente': return 4
+    case 'alta': return 3
+    case 'media': return 2
+    case 'baja': return 1
+    default: return 0
+  }
+}
+
+function botTaskRank(task: any) {
+  if (task.asignacionEstado === 'pendiente_confirmacion') return 0
+  switch (task.estado) {
+    case 'en_progreso': return 1
+    case 'pausado': return 2
+    case 'pendiente': return 3
+    default: return 4
+  }
+}
+
+function sortBotTasks(left: any, right: any) {
+  return (
+    botTaskRank(left) - botTaskRank(right) ||
+    botPriorityRank(right.prioridad) - botPriorityRank(left.prioridad) ||
+    Number(left.orden ?? 0) - Number(right.orden ?? 0) ||
+    Number(left.id ?? 0) - Number(right.id ?? 0)
+  )
+}
+
+function buildEmpleadoCounters(tareas: any[]) {
+  const activas = tareas.filter(task => !['completado', 'cancelado'].includes(task.estado))
+  const reclamos = activas.filter(task => task.origen !== 'operacion')
+  const operaciones = activas.filter(task => task.origen === 'operacion')
+  return {
+    pendientesConfirmacion: activas.filter(task => task.asignacionEstado === 'pendiente_confirmacion').length,
+    enCurso: activas.filter(task => task.estado === 'en_progreso').length,
+    pausadas: activas.filter(task => task.estado === 'pausado').length,
+    pendientes: activas.filter(task => task.estado === 'pendiente').length,
+    activas: activas.length,
+    reclamosActivos: reclamos.length,
+    operacionesActivas: operaciones.length,
+    reclamosPendientesConfirmacion: reclamos.filter(task => task.asignacionEstado === 'pendiente_confirmacion').length,
+    operacionesPendientesConfirmacion: operaciones.filter(task => task.asignacionEstado === 'pendiente_confirmacion').length,
+  }
+}
+
+async function resolveOperationalTaskAssignment(taskId: number, empleadoId?: number | null) {
+  const task = await getOperationalTaskById(taskId)
+  if (!task) throw new Error('Operational task not found')
+  const effectiveEmployeeId = Number.isFinite(Number(empleadoId)) && Number(empleadoId) > 0
+    ? Number(empleadoId)
+    : Number(task.empleadoId)
+  if (!Number.isFinite(effectiveEmployeeId) || effectiveEmployeeId <= 0) {
+    throw new Error('Operational task has no assigned employee')
+  }
+  return { task, empleadoId: effectiveEmployeeId }
+}
+
+async function startOperationalTaskCompatibility(params: {
+  taskId: number
+  empleadoId?: number | null
+  empleadoNombre?: string
+}) {
+  const { task, empleadoId } = await resolveOperationalTaskAssignment(params.taskId, params.empleadoId)
+  if (task.empleadoId !== empleadoId) {
+    throw new Error('Operational task does not belong to employee')
+  }
+
+  if (task.estado === 'pendiente_confirmacion') {
+    return tasksService.acceptTask({ taskId: params.taskId, empleadoId })
+  }
+
+  if (task.estado === 'pausada') {
+    const now = new Date()
+    await persistOperationalTaskChange(params.taskId, {
+      estado: 'en_progreso',
+      trabajoIniciadoAt: now,
+      pausadoAt: null,
+    } as any, [{
+      tareaId: params.taskId,
+      tipo: 'reanudar',
+      actorTipo: 'employee',
+      actorId: empleadoId,
+      actorNombre: params.empleadoNombre ?? task.empleadoNombre ?? 'Empleado',
+      descripcion: 'Trabajo reanudado vía WhatsApp',
+      metadata: { source: 'whatsapp_start' },
+      createdAt: now,
+    }])
+  }
+
+  return getOperationalTaskById(params.taskId)
 }
 
 botRouter.post('/rondas/ocurrencia/:id/responder', authBot, async (req, res) => {
@@ -234,6 +413,136 @@ botRouter.post('/tarea-operativa/:id/rechazar', authBot, async (req, res) => {
 
     const task = await tasksService.rejectTask({ taskId, empleadoId, note: nota })
     return res.json({ success: true, task })
+  } catch (error: any) {
+    return mapOperationalTaskError(res, error)
+  }
+})
+
+// Legacy compatibility for the currently deployed WhatsApp bot.
+botRouter.post('/operacion/:id/respuesta', authBot, async (req, res) => {
+  try {
+    const taskId = parseId(req.params.id)
+    if (!taskId) return res.status(400).json({ error: 'id de tarea inválido' })
+
+    const respuesta = normalizeText(req.body?.respuesta).toLowerCase() as RespuestaEmpleado
+    const empleadoNombre = normalizeOptionalText(req.body?.empleadoNombre)
+    const { empleadoId } = await resolveOperationalTaskAssignment(taskId, req.body?.empleadoId)
+
+    if (!respuesta || !RESPUESTAS_EMPLEADO.includes(respuesta)) {
+      return res.status(400).json({ error: 'respuesta inválida' })
+    }
+
+    if (respuesta === 'recibida') {
+      const task = await tasksService.acceptTask({ taskId, empleadoId })
+      return res.json({ success: true, respuesta, task: buildTaskPayload(task) })
+    }
+
+    const note = normalizeOptionalText(req.body?.nota) ?? buildRechazoDescription(respuesta as Exclude<RespuestaEmpleado, 'recibida'>)
+    const task = await tasksService.rejectTask({ taskId, empleadoId, note })
+    return res.json({ success: true, respuesta, task: buildTaskPayload(task) })
+  } catch (error: any) {
+    return mapOperationalTaskError(res, error)
+  }
+})
+
+botRouter.post('/operacion/:id/iniciar', authBot, async (req, res) => {
+  try {
+    const taskId = parseId(req.params.id)
+    if (!taskId) return res.status(400).json({ error: 'id de tarea inválido' })
+
+    const task = await startOperationalTaskCompatibility({
+      taskId,
+      empleadoId: parseOptionalBodyId(req.body?.empleadoId),
+      empleadoNombre: normalizeOptionalText(req.body?.empleadoNombre),
+    })
+    if (!task) return res.status(404).json({ error: 'Operational task not found' })
+
+    const payload = buildTaskPayload(task)
+    return res.json({
+      success: true,
+      estado: payload.estado,
+      tiempoTrabajadoSegundos: payload.tiempoTrabajadoSegundos,
+      tiempoTrabajado: payload.tiempoTrabajado,
+      task: payload,
+    })
+  } catch (error: any) {
+    return mapOperationalTaskError(res, error)
+  }
+})
+
+botRouter.post('/operacion/:id/progreso', authBot, async (req, res) => {
+  try {
+    const taskId = parseId(req.params.id)
+    if (!taskId) return res.status(400).json({ error: 'id de tarea inválido' })
+
+    const nota = normalizeOptionalText(req.body?.nota)
+    if (!nota) return res.status(400).json({ error: 'nota es requerida' })
+
+    const { empleadoId } = await resolveOperationalTaskAssignment(taskId, req.body?.empleadoId)
+    const empleadoNombre = normalizeOptionalText(req.body?.empleadoNombre)
+    await startOperationalTaskCompatibility({ taskId, empleadoId, empleadoNombre })
+    await addOperationalTaskEvent({
+      tareaId: taskId,
+      tipo: 'admin_update',
+      actorTipo: 'employee',
+      actorId: empleadoId,
+      actorNombre: empleadoNombre ?? 'Empleado',
+      descripcion: nota,
+      metadata: { source: 'whatsapp_progress' },
+    })
+
+    const task = await getOperationalTaskById(taskId)
+    const payload = task ? buildTaskPayload(task) : null
+    return res.json({
+      success: true,
+      tiempoTrabajadoSegundos: payload?.tiempoTrabajadoSegundos ?? 0,
+      tiempoTrabajado: payload?.tiempoTrabajado ?? formatDuration(0),
+      task: payload,
+    })
+  } catch (error: any) {
+    return mapOperationalTaskError(res, error)
+  }
+})
+
+botRouter.post('/operacion/:id/pausar', authBot, async (req, res) => {
+  try {
+    const taskId = parseId(req.params.id)
+    if (!taskId) return res.status(400).json({ error: 'id de tarea inválido' })
+
+    const { empleadoId } = await resolveOperationalTaskAssignment(taskId, req.body?.empleadoId)
+    const task = await tasksService.pauseTask({
+      taskId,
+      empleadoId,
+    })
+    const payload = buildTaskPayload(task)
+    return res.json({
+      success: true,
+      estado: payload.estado,
+      tiempoTrabajadoSegundos: payload.tiempoTrabajadoSegundos,
+      tiempoTrabajado: payload.tiempoTrabajado,
+      task: payload,
+    })
+  } catch (error: any) {
+    return mapOperationalTaskError(res, error)
+  }
+})
+
+botRouter.post('/operacion/:id/completar', authBot, async (req, res) => {
+  try {
+    const taskId = parseId(req.params.id)
+    if (!taskId) return res.status(400).json({ error: 'id de tarea inválido' })
+
+    const { empleadoId } = await resolveOperationalTaskAssignment(taskId, req.body?.empleadoId)
+    const nota = normalizeOptionalText(req.body?.nota)
+    const result = await tasksService.finishTask({ taskId, empleadoId, note: nota })
+    const payload = buildTaskPayload(result.task)
+    return res.json({
+      success: true,
+      tiempoTrabajadoSegundos: payload.tiempoTrabajadoSegundos,
+      tiempoTrabajado: payload.tiempoTrabajado,
+      nextTask: result.nextTask ? buildTaskPayload(result.nextTask) : null,
+      task: payload,
+    })
   } catch (error: any) {
     return mapOperationalTaskError(res, error)
   }
@@ -405,12 +714,19 @@ botRouter.get('/empleado/:id/tareas', authBot, async (req, res) => {
 botRouter.get('/empleado/:id/resumen', authBot, async (req, res) => {
   try {
     const empleadoId = Number(req.params.id)
-    const [empleado, attendance, tareas] = await Promise.all([
+    const [empleado, attendance, reclamosRaw, tareasInternasRaw] = await Promise.all([
       getEmpleadoActivoById(empleadoId),
       getEmpleadoAttendanceStatus(empleadoId),
       getTareasEmpleado(empleadoId),
+      listOperationalTasksByEmployee(empleadoId),
     ])
     if (!empleado) return res.status(404).json({ error: 'Empleado no encontrado' })
+
+    const reclamos = reclamosRaw.map(t => buildTaskPayload(t, t.tiempoTrabajadoSegundos ?? 0))
+    const tareasInternas = tareasInternasRaw
+      .filter(task => !['terminada', 'cancelada', 'rechazada'].includes(task.estado))
+      .map(task => buildTaskPayload(task, task.tiempoTrabajadoSegundos ?? task.trabajoAcumuladoSegundos ?? 0))
+    const tareas = [...reclamos, ...tareasInternas].sort(sortBotTasks)
 
     return res.json({
       empleado: {
@@ -419,7 +735,10 @@ botRouter.get('/empleado/:id/resumen', authBot, async (req, res) => {
         especialidad: empleado.especialidad,
       },
       attendance: buildAttendancePayload(attendance),
-      tareas: tareas.map(t => buildTaskPayload(t, t.tiempoTrabajadoSegundos ?? 0)),
+      counters: buildEmpleadoCounters(tareas),
+      tareas,
+      reclamos,
+      tareasInternas,
     })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
@@ -431,11 +750,11 @@ botRouter.post('/empleado/:id/asistencia', authBot, async (req, res) => {
   try {
     const empleadoId = Number(req.params.id)
     const { accion, nota } = req.body as {
-      accion?: 'entrada' | 'salida'
+      accion?: typeof ATTENDANCE_ACTIONS[number]
       nota?: string
     }
 
-    if (!accion || !['entrada', 'salida'].includes(accion)) {
+    if (!accion || !ATTENDANCE_ACTIONS.includes(accion)) {
       return res.status(400).json({ error: 'accion inválida' })
     }
 
