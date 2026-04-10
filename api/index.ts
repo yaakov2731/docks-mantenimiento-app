@@ -1,15 +1,20 @@
 import 'dotenv/config'
 import express, { Request, Response, NextFunction } from 'express'
+import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import { createExpressMiddleware } from '@trpc/server/adapters/express'
 import { appRouter } from '../server/routers'
 import { createContext } from '../server/_core/trpc'
 import botRouter from '../server/bot-api'
+import roundsHttpRouter from '../server/rounds/http'
 import { initDb, countUsers, createUser } from '../server/db'
 import { readEnv } from '../server/_core/env'
 import bcrypt from 'bcryptjs'
 
+const allowedOrigin = readEnv('CLIENT_URL') ?? '*'
+
 const app = express()
+app.use(cors({ origin: allowedOrigin, credentials: true }))
 app.use(express.json({ limit: '10mb' }))
 app.use(cookieParser())
 
@@ -48,6 +53,7 @@ app.use(async (_req, _res, next) => {
 
 app.use('/trpc', createExpressMiddleware({ router: appRouter, createContext }))
 app.use('/api/bot', botRouter)
+app.use('/api', roundsHttpRouter)
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
 // Global error handler — returns JSON so client can parse it

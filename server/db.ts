@@ -1737,12 +1737,6 @@ function normalizeOptionalWaNumber(value?: string | null) {
   return normalized || null
 }
 
-function toBuenosAiresDateKey(value: Date) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Argentina/Buenos_Aires',
-  }).format(value)
-}
-
 function formatTimeLabel(value: Date | string | number) {
   return toDate(value).toLocaleTimeString('es-AR', {
     hour: '2-digit',
