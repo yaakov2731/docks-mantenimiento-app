@@ -119,6 +119,19 @@ export const empleadoLiquidacionCierre = sqliteTable('empleado_liquidacion_cierr
   pagadoPorNombre: text('pagado_por_nombre'),
 })
 
+export const marcacionesEmpleados = sqliteTable('marcaciones_empleados', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  empleadoId: integer('empleado_id').notNull(),
+  entradaAt: integer('entrada_at', { mode: 'timestamp' }).notNull(),
+  salidaAt: integer('salida_at', { mode: 'timestamp' }),
+  duracionSegundos: integer('duracion_segundos'),
+  fuente: text('fuente', { enum: ['whatsapp', 'panel', 'otro'] }).default('whatsapp').notNull(),
+  notaEntrada: text('nota_entrada'),
+  notaSalida: text('nota_salida'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
 export const notificaciones = sqliteTable('notificaciones', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   tipo: text('tipo', { enum: ['email', 'telegram'] }).notNull(),
@@ -279,6 +292,7 @@ export type Empleado = typeof empleados.$inferSelect
 export type EmpleadoAsistencia = typeof empleadoAsistencia.$inferSelect
 export type EmpleadoAsistenciaAuditoria = typeof empleadoAsistenciaAuditoria.$inferSelect
 export type EmpleadoLiquidacionCierre = typeof empleadoLiquidacionCierre.$inferSelect
+export type MarcacionEmpleado = typeof marcacionesEmpleados.$inferSelect
 export type Notificacion = typeof notificaciones.$inferSelect
 export type Lead = typeof leads.$inferSelect
 export type BotQueueItem = typeof botQueue.$inferSelect

@@ -123,6 +123,18 @@ export async function initDb() {
       pagado_por_id INTEGER,
       pagado_por_nombre TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS marcaciones_empleados (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      empleado_id INTEGER NOT NULL,
+      entrada_at INTEGER NOT NULL,
+      salida_at INTEGER,
+      duracion_segundos INTEGER,
+      fuente TEXT NOT NULL DEFAULT 'whatsapp',
+      nota_entrada TEXT,
+      nota_salida TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
     `CREATE TABLE IF NOT EXISTS notificaciones (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tipo TEXT NOT NULL,
@@ -523,13 +535,13 @@ export async function correctManualAttendanceEvent({
 // --- USERS ---
 export async function getUserByUsername(username: string) {
   const rows = await db.select().from(schema.users).where(eq(schema.users.username, username))
-  const active = rows.find(user => user.activo !== false)
+  const active = rows.find(user => user.activo === true)
   return active ?? null
 }
 export async function getUsers() {
   const rows = await db.select().from(schema.users)
   return rows
-    .filter(user => user.activo !== false)
+    .filter(user => user.activo === true)
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 export async function getSalesUsers() {
@@ -550,7 +562,7 @@ export async function createPanelUser(data: { username: string; password: string
     password: hash,
     name: data.name,
     role: data.role,
-    waId: normalizeWaNumber(data.waId),
+    waId: normalizeWaNumber(data.waId) || null,
     activo: true,
   }).run()
 }
@@ -707,10 +719,17 @@ export async function getEmpleados() {
   return db.select().from(schema.empleados).where(eq(schema.empleados.activo, true))
 }
 export async function crearEmpleado(data: typeof schema.empleados.$inferInsert) {
-  await db.insert(schema.empleados).values(data).run()
+  await db.insert(schema.empleados).values({
+    ...data,
+    waId: normalizeWaNumber(data.waId ?? undefined) || null,
+  }).run()
 }
 export async function actualizarEmpleado(id: number, data: Partial<typeof schema.empleados.$inferInsert>) {
-  await db.update(schema.empleados).set(data as any).where(eq(schema.empleados.id, id)).run()
+  const normalized = { ...data }
+  if ('waId' in normalized) {
+    normalized.waId = normalizeWaNumber(normalized.waId ?? undefined) || null
+  }
+  await db.update(schema.empleados).set(normalized as any).where(eq(schema.empleados.id, id)).run()
 }
 export async function getEmpleadoById(id: number) {
   const rows = await db.select().from(schema.empleados).where(eq(schema.empleados.id, id))
@@ -730,6 +749,38 @@ export async function getEmpleadoByWaId(waNumber: string) {
     // Match exact OR if incoming number ends with stored (handles missing country code)
     return normalized === stored || normalized.endsWith(stored)
   }) ?? null
+}
+export async function getJornadaActivaEmpleado(empleadoId: number) {
+  const rows = await db.select().from(schema.marcacionesEmpleados).where(eq(schema.marcacionesEmpleados.empleadoId, empleadoId))
+  return rows
+    .filter(row => !row.salidaAt)
+    .sort((a, b) => new Date(b.entradaAt as any).getTime() - new Date(a.entradaAt as any).getTime())[0] ?? null
+}
+export async function registrarEntradaEmpleado(empleadoId: number, opts?: { fuente?: 'whatsapp' | 'panel' | 'otro'; nota?: string }) {
+  const jornadaActiva = await getJornadaActivaEmpleado(empleadoId)
+  if (jornadaActiva) return { marcacion: jornadaActiva, alreadyOpen: true as const }
+  const inserted = await db.insert(schema.marcacionesEmpleados).values({
+    empleadoId,
+    entradaAt: new Date(),
+    fuente: opts?.fuente ?? 'whatsapp',
+    notaEntrada: opts?.nota?.trim() || null,
+  } as any).returning()
+  return { marcacion: inserted[0], alreadyOpen: false as const }
+}
+export async function registrarSalidaEmpleado(empleadoId: number, opts?: { nota?: string }) {
+  const jornadaActiva = await getJornadaActivaEmpleado(empleadoId)
+  if (!jornadaActiva) return null
+  const now = new Date()
+  const entradaMs = new Date(jornadaActiva.entradaAt as any).getTime()
+  const duracionSegundos = Math.max(0, Math.floor((now.getTime() - entradaMs) / 1000))
+  await db.update(schema.marcacionesEmpleados).set({
+    salidaAt: now,
+    duracionSegundos,
+    notaSalida: opts?.nota?.trim() || null,
+    updatedAt: now,
+  } as any).where(eq(schema.marcacionesEmpleados.id, jornadaActiva.id)).run()
+  const rows = await db.select().from(schema.marcacionesEmpleados).where(eq(schema.marcacionesEmpleados.id, jornadaActiva.id))
+  return rows[0] ?? null
 }
 export async function getTareasEmpleado(empleadoId: number) {
   const rows = await db.select().from(schema.reportes).where(eq(schema.reportes.asignadoId, empleadoId))
@@ -1073,7 +1124,9 @@ export async function eliminarNotificacion(id: number) {
 
 // --- BOT QUEUE ---
 export async function enqueueBotMessage(waNumber: string, message: string) {
-  await db.insert(schema.botQueue).values({ waNumber, message }).run()
+  const normalized = normalizeWaNumber(waNumber)
+  if (!normalized) return
+  await db.insert(schema.botQueue).values({ waNumber: normalized, message }).run()
 }
 export async function getPendingBotMessages() {
   return db.select().from(schema.botQueue).where(eq(schema.botQueue.status, 'pending'))
@@ -1676,7 +1729,11 @@ function estimateWorkedSecondsToday(reporte: any, actualizaciones: any[], daySta
 
 function isStartTimerEvent(evento: any) {
   const text = normalizeText(`${evento.tipo} ${evento.descripcion}`)
-  return evento.tipo === 'timer' && (text.includes('iniciada') || text.includes('confirmo recepcion') || text.includes('confirmo recepcion'))
+  return evento.tipo === 'timer' && (
+    text.includes('iniciada') ||
+    text.includes('acepto la tarea') ||
+    text.includes('confirmo recepcion')
+  )
 }
 
 function isStopTimerEvent(evento: any) {
@@ -1700,7 +1757,11 @@ function isAssignmentAcceptedEvent(evento: any) {
 
 function isAssignmentRejectedEvent(evento: any) {
   const text = normalizeText(`${evento.tipo} ${evento.descripcion}`)
-  return text.includes('no puede tomar la tarea')
+  return (
+    text.includes('no puede tomar la tarea') ||
+    text.includes('esta de franco') ||
+    text.includes('esta ocupado')
+  )
 }
 
 function getBuenosAiresDayRange(reference = Date.now()) {

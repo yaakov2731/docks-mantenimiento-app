@@ -8,6 +8,10 @@ import {
   crearReporte,
   crearLead,
   getEmpleadoByWaId,
+  getEmpleadoById,
+  getJornadaActivaEmpleado,
+  registrarEntradaEmpleado,
+  registrarSalidaEmpleado,
   getTareasEmpleado,
   crearActualizacion,
   getPendingBotMessages,
@@ -33,6 +37,12 @@ const botRouter = Router()
 const roundsService = createRoundsService(roundDb as any)
 const tasksService = createOperationalTasksService(roundDb as any)
 
+const RESPUESTAS_EMPLEADO = ['recibida', 'no_puede', 'ocupado', 'franco'] as const
+type RespuestaEmpleado = typeof RESPUESTAS_EMPLEADO[number]
+const PRIORIDADES = ['baja', 'media', 'alta', 'urgente'] as const
+const CATEGORIAS = ['electrico', 'plomeria', 'estructura', 'limpieza', 'seguridad', 'climatizacion', 'otro'] as const
+const PLANTAS = ['baja', 'alta'] as const
+
 function formatDuration(seconds: number) {
   const safe = Math.max(0, Math.floor(seconds))
   const hours = Math.floor(safe / 3600)
@@ -40,6 +50,12 @@ function formatDuration(seconds: number) {
   if (hours > 0) return `${hours}h ${minutes}m`
   if (minutes > 0) return `${minutes}m`
   return `${safe}s`
+}
+
+function formatDateTime(value?: Date | string | number | null) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 function buildTaskPayload(reporte: any, tiempoTrabajadoSegundos?: number) {
@@ -80,6 +96,46 @@ function authBot(req: any, res: any, next: any) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
   next()
+}
+
+function parseId(value: string) {
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) return null
+  return parsed
+}
+
+function normalizeText(value?: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeOptionalText(value?: unknown) {
+  const normalized = normalizeText(value)
+  return normalized.length > 0 ? normalized : undefined
+}
+
+function isValidPrioridad(value: string): value is typeof PRIORIDADES[number] {
+  return (PRIORIDADES as readonly string[]).includes(value)
+}
+
+function isValidCategoria(value: string): value is typeof CATEGORIAS[number] {
+  return (CATEGORIAS as readonly string[]).includes(value)
+}
+
+function isValidPlanta(value: string): value is typeof PLANTAS[number] {
+  return (PLANTAS as readonly string[]).includes(value)
+}
+
+function parseOptionalBodyId(value: unknown) {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) return null
+  return parsed
+}
+
+function buildRechazoDescription(respuesta: Exclude<RespuestaEmpleado, 'recibida'>) {
+  if (respuesta === 'franco') return 'Empleado indicó que está de franco. Tarea liberada para reasignación.'
+  if (respuesta === 'ocupado') return 'Empleado indicó que está ocupado. Tarea liberada para reasignación.'
+  return 'Empleado indicó que no puede tomar la tarea. Tarea liberada para reasignación.'
 }
 
 function mapOperationalTaskError(res: any, error: any) {
@@ -186,9 +242,25 @@ botRouter.post('/tarea-operativa/:id/rechazar', authBot, async (req, res) => {
 // POST /api/bot/reporte
 botRouter.post('/reporte', authBot, async (req, res) => {
   try {
-    const { locatario, local, planta, contacto, categoria, prioridad, titulo, descripcion } = req.body
+    const locatario = normalizeText(req.body?.locatario)
+    const local = normalizeText(req.body?.local)
+    const planta = normalizeText(req.body?.planta)
+    const contacto = normalizeOptionalText(req.body?.contacto)
+    const categoria = normalizeText(req.body?.categoria).toLowerCase()
+    const prioridad = normalizeText(req.body?.prioridad).toLowerCase()
+    const titulo = normalizeText(req.body?.titulo)
+    const descripcion = normalizeText(req.body?.descripcion)
     if (!locatario || !local || !planta || !categoria || !prioridad || !titulo || !descripcion) {
       return res.status(400).json({ error: 'Faltan campos requeridos' })
+    }
+    if (!isValidPlanta(planta)) {
+      return res.status(400).json({ error: `planta inválida. Debe ser una de: ${PLANTAS.join(', ')}` })
+    }
+    if (!isValidCategoria(categoria)) {
+      return res.status(400).json({ error: `categoria inválida. Debe ser una de: ${CATEGORIAS.join(', ')}` })
+    }
+    if (!isValidPrioridad(prioridad)) {
+      return res.status(400).json({ error: `prioridad inválida. Debe ser una de: ${PRIORIDADES.join(', ')}` })
     }
     const id = await crearReporte({ locatario, local, planta, contacto, categoria, prioridad, titulo, descripcion } as any)
     notifyOwner({
@@ -205,12 +277,18 @@ botRouter.post('/reporte', authBot, async (req, res) => {
 // POST /api/bot/lead
 botRouter.post('/lead', authBot, async (req, res) => {
   try {
-    const { nombre, telefono, email, waId, rubro, tipoLocal, mensaje } = req.body
+    const nombre = normalizeText(req.body?.nombre)
+    const telefono = normalizeOptionalText(req.body?.telefono)
+    const email = normalizeOptionalText(req.body?.email)
+    const waId = normalizeOptionalText(req.body?.waId)
+    const rubro = normalizeOptionalText(req.body?.rubro)
+    const tipoLocal = normalizeOptionalText(req.body?.tipoLocal)
+    const mensaje = normalizeOptionalText(req.body?.mensaje)
     if (!nombre) return res.status(400).json({ error: 'nombre es requerido' })
     const id = await crearLead({ nombre, telefono, email, waId, rubro, tipoLocal, mensaje, fuente: 'whatsapp' } as any)
     notifyOwner({
       title: `Nuevo lead WhatsApp`,
-      content: `${nombre} (${telefono ?? waId ?? 'sin contacto'}) — ${rubro ?? 'sin rubro'}`,
+      content: `${nombre} (${telefono || waId || 'sin contacto'}) — ${rubro || 'sin rubro'}`,
     }).catch(console.error)
     return res.json({ success: true, id })
   } catch (e: any) {
@@ -237,10 +315,86 @@ botRouter.get('/empleado/identificar/:waNumber', authBot, async (req, res) => {
   }
 })
 
+// POST /api/bot/empleado/:id/entrada
+botRouter.post('/empleado/:id/entrada', authBot, async (req, res) => {
+  try {
+    const empleadoId = parseId(req.params.id)
+    if (!empleadoId) return res.status(400).json({ error: 'id de empleado inválido' })
+    const empleado = await getEmpleadoById(empleadoId)
+    if (!empleado || empleado.activo === false) return res.status(404).json({ error: 'Empleado no encontrado' })
+    const nota = normalizeOptionalText(req.body?.nota)
+    const { marcacion, alreadyOpen } = await registrarEntradaEmpleado(empleadoId, { fuente: 'whatsapp', nota })
+    return res.json({
+      success: true,
+      alreadyOpen,
+      empleado: { id: empleado.id, nombre: empleado.nombre },
+      jornada: {
+        id: marcacion.id,
+        entradaAt: formatDateTime(marcacion.entradaAt),
+        salidaAt: formatDateTime(marcacion.salidaAt),
+      },
+      message: alreadyOpen ? 'La jornada ya estaba iniciada.' : 'Entrada registrada correctamente.',
+    })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/bot/empleado/:id/salida
+botRouter.post('/empleado/:id/salida', authBot, async (req, res) => {
+  try {
+    const empleadoId = parseId(req.params.id)
+    if (!empleadoId) return res.status(400).json({ error: 'id de empleado inválido' })
+    const empleado = await getEmpleadoById(empleadoId)
+    if (!empleado || empleado.activo === false) return res.status(404).json({ error: 'Empleado no encontrado' })
+    const nota = normalizeOptionalText(req.body?.nota)
+    const marcacion = await registrarSalidaEmpleado(empleadoId, { nota })
+    if (!marcacion) {
+      return res.status(409).json({ error: 'No hay una jornada activa para registrar salida.' })
+    }
+    return res.json({
+      success: true,
+      empleado: { id: empleado.id, nombre: empleado.nombre },
+      jornada: {
+        id: marcacion.id,
+        entradaAt: formatDateTime(marcacion.entradaAt),
+        salidaAt: formatDateTime(marcacion.salidaAt),
+        duracionSegundos: marcacion.duracionSegundos ?? 0,
+        duracion: formatDuration(marcacion.duracionSegundos ?? 0),
+      },
+      message: 'Salida registrada correctamente.',
+    })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/bot/empleado/:id/jornada
+botRouter.get('/empleado/:id/jornada', authBot, async (req, res) => {
+  try {
+    const empleadoId = parseId(req.params.id)
+    if (!empleadoId) return res.status(400).json({ error: 'id de empleado inválido' })
+    const jornada = await getJornadaActivaEmpleado(empleadoId)
+    if (!jornada) return res.json({ active: false, jornada: null })
+    return res.json({
+      active: true,
+      jornada: {
+        id: jornada.id,
+        entradaAt: formatDateTime(jornada.entradaAt),
+        salidaAt: formatDateTime(jornada.salidaAt),
+      },
+    })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
 // GET /api/bot/empleado/:id/tareas
 botRouter.get('/empleado/:id/tareas', authBot, async (req, res) => {
   try {
-    const tareas = await getTareasEmpleado(Number(req.params.id))
+    const empleadoId = parseId(req.params.id)
+    if (!empleadoId) return res.status(400).json({ error: 'id de empleado inválido' })
+    const tareas = await getTareasEmpleado(empleadoId)
     return res.json({ tareas: tareas.map(t => buildTaskPayload(t, t.tiempoTrabajadoSegundos ?? 0)) })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
@@ -310,14 +464,15 @@ botRouter.post('/empleado/:id/asistencia', authBot, async (req, res) => {
 // POST /api/bot/reporte/:id/respuesta
 botRouter.post('/reporte/:id/respuesta', authBot, async (req, res) => {
   try {
-    const reporteId = Number(req.params.id)
+    const reporteId = parseId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id de reclamo inválido' })
     const { respuesta, empleadoNombre } = req.body as {
-      respuesta?: 'recibida' | 'no_puede' | 'ocupado' | 'franco'
+      respuesta?: RespuestaEmpleado
       empleadoNombre?: string
     }
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
-    if (!respuesta || !['recibida', 'no_puede', 'ocupado', 'franco'].includes(respuesta)) {
+    if (!respuesta || !RESPUESTAS_EMPLEADO.includes(respuesta)) {
       return res.status(400).json({ error: 'respuesta inválida' })
     }
 
@@ -354,18 +509,18 @@ botRouter.post('/reporte/:id/respuesta', authBot, async (req, res) => {
       reporteId,
       usuarioNombre: empleadoNombre ?? 'Empleado',
       tipo: 'asignacion',
-      descripcion: 'Empleado indicó que no puede tomar la tarea. Tarea liberada para reasignación.',
+      descripcion: buildRechazoDescription(respuesta),
       estadoAnterior: reporte.estado,
       estadoNuevo: 'pendiente',
     } as any)
     notifyOwner({
       title: `Tarea rechazada — Reclamo #${reporteId}`,
-      content: `${empleadoNombre ?? 'Empleado'} indicó que no puede tomar la tarea. Quedó disponible para reasignar.`,
+      content: `${empleadoNombre ?? 'Empleado'} respondió "${respuesta}". Quedó disponible para reasignar.`,
     }).catch(console.error)
     const updated = await getReporteById(reporteId)
     return res.json({
       success: true,
-      respuesta: 'no_puede',
+      respuesta,
       task: updated ? buildTaskPayload(updated) : null,
     })
   } catch (e: any) {
@@ -376,7 +531,8 @@ botRouter.post('/reporte/:id/respuesta', authBot, async (req, res) => {
 // POST /api/bot/reporte/:id/iniciar
 botRouter.post('/reporte/:id/iniciar', authBot, async (req, res) => {
   try {
-    const reporteId = Number(req.params.id)
+    const reporteId = parseId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id de reclamo inválido' })
     const { empleadoNombre } = req.body
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
@@ -407,7 +563,8 @@ botRouter.post('/reporte/:id/iniciar', authBot, async (req, res) => {
 // POST /api/bot/reporte/:id/pausar
 botRouter.post('/reporte/:id/pausar', authBot, async (req, res) => {
   try {
-    const reporteId = Number(req.params.id)
+    const reporteId = parseId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id de reclamo inválido' })
     const { nota, empleadoNombre } = req.body
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
@@ -434,9 +591,14 @@ botRouter.post('/reporte/:id/pausar', authBot, async (req, res) => {
 // POST /api/bot/reporte/:id/progreso
 botRouter.post('/reporte/:id/progreso', authBot, async (req, res) => {
   try {
-    const reporteId = Number(req.params.id)
-    const { nota, empleadoId, empleadoNombre } = req.body
+    const reporteId = parseId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id de reclamo inválido' })
+    const { nota, empleadoNombre } = req.body
+    const empleadoId = parseOptionalBodyId(req.body?.empleadoId)
     if (!nota) return res.status(400).json({ error: 'nota es requerida' })
+    if (req.body?.empleadoId !== undefined && empleadoId === null) {
+      return res.status(400).json({ error: 'empleadoId inválido' })
+    }
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
     // Only start timer if employee already accepted — don't auto-start on progress note
@@ -469,8 +631,13 @@ botRouter.post('/reporte/:id/progreso', authBot, async (req, res) => {
 // POST /api/bot/reporte/:id/completar
 botRouter.post('/reporte/:id/completar', authBot, async (req, res) => {
   try {
-    const reporteId = Number(req.params.id)
-    const { nota, empleadoId, empleadoNombre } = req.body
+    const reporteId = parseId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id de reclamo inválido' })
+    const { nota, empleadoNombre } = req.body
+    const empleadoId = parseOptionalBodyId(req.body?.empleadoId)
+    if (req.body?.empleadoId !== undefined && empleadoId === null) {
+      return res.status(400).json({ error: 'empleadoId inválido' })
+    }
     const reporte = await getReporteById(reporteId)
     if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
     const updated = await completarTrabajoReporte(reporteId)
@@ -490,7 +657,7 @@ botRouter.post('/reporte/:id/completar', authBot, async (req, res) => {
 
     let nextTask = null
     if (empleadoId) {
-      const tareasRestantes = await getTareasEmpleado(Number(empleadoId))
+      const tareasRestantes = await getTareasEmpleado(empleadoId)
       if (tareasRestantes.length === 0) {
         const empleado = await getEmpleadoActivoById(Number(empleadoId))
         const siguiente = await getNextAssignableReporteForEmpleado(Number(empleadoId))
@@ -549,7 +716,9 @@ botRouter.get('/queue', authBot, async (_req, res) => {
 // POST /api/bot/queue/:id/sent
 botRouter.post('/queue/:id/sent', authBot, async (req, res) => {
   try {
-    await markBotMessageSent(Number(req.params.id))
+    const id = parseId(req.params.id)
+    if (!id) return res.status(400).json({ error: 'id de mensaje inválido' })
+    await markBotMessageSent(id)
     return res.json({ success: true })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
@@ -559,7 +728,9 @@ botRouter.post('/queue/:id/sent', authBot, async (req, res) => {
 // POST /api/bot/queue/:id/failed
 botRouter.post('/queue/:id/failed', authBot, async (req, res) => {
   try {
-    await markBotMessageFailed(Number(req.params.id))
+    const id = parseId(req.params.id)
+    if (!id) return res.status(400).json({ error: 'id de mensaje inválido' })
+    await markBotMessageFailed(id)
     return res.json({ success: true })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
