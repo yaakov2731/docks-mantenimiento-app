@@ -28,21 +28,42 @@ type FakeOccurrence = {
   fechaOperativa: string
   programadoAt: Date
   programadoAtLabel?: string
-  estado: 'pendiente' | 'vencido'
+  estado: 'pendiente' | 'en_progreso' | 'pausada' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
   recordatorioEnviadoAt: Date | null
   confirmadoAt: Date | null
   escaladoAt: Date | null
+  inicioRealAt?: Date | null
+  pausadoAt?: Date | null
+  finRealAt?: Date | null
+  tiempoAcumuladoSegundos?: number
+  nota?: string | null
+  canalConfirmacion?: 'whatsapp' | 'panel' | 'system'
   empleadoId: number
   empleadoNombre: string
   empleadoWaId: string
   supervisorWaId: string
   nombreRonda: string
+  responsableProgramadoId?: number
+  responsableProgramadoNombre?: string
+  responsableProgramadoWaId?: string
+  responsableActualId?: number | null
+  responsableActualNombre?: string | null
+  responsableActualWaId?: string | null
+  asignacionEstado?: 'sin_asignar' | 'asignada' | 'en_progreso' | 'completada' | 'vencida'
 }
 
 function createFakeRepo(initial: { templates?: FakeTemplate[]; schedules?: FakeSchedule[]; occurrences?: FakeOccurrence[] } = {}) {
   const templates = [...(initial.templates ?? [])]
   const schedules = [...(initial.schedules ?? [])]
-  const occurrences = [...(initial.occurrences ?? [])]
+  const occurrences = (initial.occurrences ?? []).map((occurrence) => ({
+    inicioRealAt: null,
+    pausadoAt: null,
+    finRealAt: null,
+    tiempoAcumuladoSegundos: 0,
+    nota: null,
+    canalConfirmacion: 'whatsapp' as const,
+    ...occurrence,
+  }))
   const createdBatches: FakeOccurrence[][] = []
   const reminderMarks: Array<{ id: number; at: Date }> = []
   const overdueMarks: Array<{ id: number }> = []
@@ -70,8 +91,17 @@ function createFakeRepo(initial: { templates?: FakeTemplate[]; schedules?: FakeS
       return occurrences.filter((occurrence) => occurrence.plantillaId === templateId && occurrence.fechaOperativa === dateKey)
     },
     async createOccurrences(rows: FakeOccurrence[]) {
-      createdBatches.push(rows.map((row) => ({ ...row })))
-      occurrences.push(...rows.map((row) => ({ ...row })))
+      const normalizedRows = rows.map((row) => ({
+        inicioRealAt: null,
+        pausadoAt: null,
+        finRealAt: null,
+        tiempoAcumuladoSegundos: 0,
+        nota: null,
+        canalConfirmacion: 'whatsapp' as const,
+        ...row,
+      }))
+      createdBatches.push(normalizedRows.map((row) => ({ ...row })))
+      occurrences.push(...normalizedRows.map((row) => ({ ...row })))
     },
     async listReminderCandidates(_now: Date) {
       return occurrences.filter((occurrence) => occurrence.estado === 'pendiente')
@@ -94,6 +124,31 @@ function createFakeRepo(initial: { templates?: FakeTemplate[]; schedules?: FakeS
     },
     async notifySupervisor(item: any) {
       supervisorMessages.push(item)
+    },
+    async getOccurrenceById(id: number) {
+      return occurrences.find((item) => item.id === id) ?? null
+    },
+    async markOccurrenceReply(
+      id: number,
+      estado: 'cumplido' | 'cumplido_con_observacion' | 'vencido',
+      nota?: string | null
+    ) {
+      const occurrence = occurrences.find((item) => item.id === id)
+      if (!occurrence) return
+      occurrence.estado = estado
+      occurrence.nota = nota ?? null
+      occurrence.confirmadoAt = new Date()
+      occurrence.canalConfirmacion = 'whatsapp'
+    },
+    async updateOccurrenceLifecycle(id: number, updates: Partial<FakeOccurrence>) {
+      const occurrence = occurrences.find((item) => item.id === id)
+      if (!occurrence) throw new Error('Round occurrence not found in fake repo')
+      Object.assign(occurrence, updates)
+    },
+    async updateOccurrenceAssignment(id: number, updates: Partial<FakeOccurrence>) {
+      const occurrence = occurrences.find((item) => item.id === id)
+      if (!occurrence) throw new Error('Round occurrence not found in fake repo')
+      Object.assign(occurrence, updates)
     },
   }
 }
@@ -199,6 +254,35 @@ describe('rounds orchestration service', () => {
     expect(repo.occurrences).toHaveLength(2)
   })
 
+  it('creates round occurrences with both programmed and current assignees', async () => {
+    const repo = createFakeRepo({
+      templates: [{ id: 10, intervaloHoras: 2 }],
+      schedules: [
+        {
+          id: 10,
+          plantillaId: 10,
+          modoProgramacion: 'fecha_especial',
+          fechaEspecial: '2026-04-11',
+          horaInicio: '10:00',
+          horaFin: '12:00',
+          empleadoId: 7,
+          empleadoNombre: 'Ana',
+          empleadoWaId: '5491111111111',
+          supervisorWaId: '5491100000000',
+        },
+      ],
+    })
+
+    const service = createRoundsService(repo as any)
+    const [occurrence] = await service.createDailyOccurrences('2026-04-11')
+
+    expect(occurrence.responsableProgramadoId).toBe(7)
+    expect(occurrence.responsableProgramadoNombre).toBe('Ana')
+    expect(occurrence.responsableActualId).toBe(7)
+    expect(occurrence.responsableActualNombre).toBe('Ana')
+    expect(occurrence.asignacionEstado).toBe('asignada')
+  })
+
   it('skips reminder duplicates for already-reminded pending occurrences', async () => {
     const repo = createFakeRepo({
       occurrences: [
@@ -298,5 +382,132 @@ describe('rounds orchestration service', () => {
       { occurrenceId: 21, type: 'recordatorio', at: new Date('2026-04-06T10:20:00-03:00') },
       { occurrenceId: 22, type: 'vencimiento', at: new Date('2026-04-06T10:20:00-03:00') },
     ])
+  })
+
+  it('reassigns a paused round without losing accumulated time', async () => {
+    const repo = createFakeRepo({
+      occurrences: [
+        {
+          id: 55,
+          plantillaId: 10,
+          programacionId: 10,
+          fechaOperativa: '2026-04-11',
+          programadoAt: new Date('2026-04-11T10:00:00-03:00'),
+          programadoAtLabel: '10:00',
+          estado: 'pausada',
+          recordatorioEnviadoAt: new Date('2026-04-11T10:00:00-03:00'),
+          confirmadoAt: null,
+          escaladoAt: null,
+          tiempoAcumuladoSegundos: 540,
+          responsableProgramadoId: 7,
+          responsableProgramadoNombre: 'Ana',
+          responsableProgramadoWaId: '5491111111111',
+          responsableActualId: 7,
+          responsableActualNombre: 'Ana',
+          responsableActualWaId: '5491111111111',
+          asignacionEstado: 'en_progreso',
+          empleadoId: 7,
+          empleadoNombre: 'Ana',
+          empleadoWaId: '5491111111111',
+          supervisorWaId: '5491100000000',
+          nombreRonda: 'Control de banos',
+        },
+      ],
+    })
+
+    const service = createRoundsService(repo as any)
+    const updated = await service.reassignOccurrence({
+      occurrenceId: 55,
+      adminUserId: 1,
+      adminUserName: 'Supervisor',
+      empleadoId: 9,
+      empleadoNombre: 'Beto',
+      empleadoWaId: '5491222222222',
+    })
+
+    expect(updated.responsableActualId).toBe(9)
+    expect(updated.responsableActualNombre).toBe('Beto')
+    expect(updated.tiempoAcumuladoSegundos).toBe(540)
+    expect(updated.asignacionEstado).toBe('en_progreso')
+  })
+
+  it('releases an open round back to the unassigned queue', async () => {
+    const repo = createFakeRepo({
+      occurrences: [
+        {
+          id: 56,
+          plantillaId: 10,
+          programacionId: 10,
+          fechaOperativa: '2026-04-11',
+          programadoAt: new Date('2026-04-11T12:00:00-03:00'),
+          programadoAtLabel: '12:00',
+          estado: 'pendiente',
+          recordatorioEnviadoAt: null,
+          confirmadoAt: null,
+          escaladoAt: null,
+          tiempoAcumuladoSegundos: 0,
+          responsableProgramadoId: 7,
+          responsableProgramadoNombre: 'Ana',
+          responsableProgramadoWaId: '5491111111111',
+          responsableActualId: 7,
+          responsableActualNombre: 'Ana',
+          responsableActualWaId: '5491111111111',
+          asignacionEstado: 'asignada',
+          empleadoId: 7,
+          empleadoNombre: 'Ana',
+          empleadoWaId: '5491111111111',
+          supervisorWaId: '5491100000000',
+          nombreRonda: 'Control de banos',
+        },
+      ],
+    })
+
+    const service = createRoundsService(repo as any)
+    const updated = await service.releaseOccurrence({
+      occurrenceId: 56,
+      adminUserId: 1,
+      adminUserName: 'Supervisor',
+    })
+
+    expect(updated.responsableActualId).toBeNull()
+    expect(updated.responsableActualNombre).toBeNull()
+    expect(updated.asignacionEstado).toBe('sin_asignar')
+  })
+
+  it('blocks the previous assignee from starting a reassigned round', async () => {
+    const repo = createFakeRepo({
+      occurrences: [
+        {
+          id: 57,
+          plantillaId: 10,
+          programacionId: 10,
+          fechaOperativa: '2026-04-11',
+          programadoAt: new Date('2026-04-11T14:00:00-03:00'),
+          programadoAtLabel: '14:00',
+          estado: 'pendiente',
+          recordatorioEnviadoAt: null,
+          confirmadoAt: null,
+          escaladoAt: null,
+          tiempoAcumuladoSegundos: 0,
+          responsableProgramadoId: 7,
+          responsableProgramadoNombre: 'Ana',
+          responsableProgramadoWaId: '5491111111111',
+          responsableActualId: 9,
+          responsableActualNombre: 'Beto',
+          responsableActualWaId: '5491222222222',
+          asignacionEstado: 'asignada',
+          empleadoId: 7,
+          empleadoNombre: 'Ana',
+          empleadoWaId: '5491111111111',
+          supervisorWaId: '5491100000000',
+          nombreRonda: 'Control de banos',
+        },
+      ],
+    })
+
+    const service = createRoundsService(repo as any)
+
+    await expect(service.startOccurrence({ occurrenceId: 57, empleadoId: 7 }))
+      .rejects.toThrow('Round occurrence does not belong to current employee')
   })
 })

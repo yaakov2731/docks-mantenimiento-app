@@ -212,6 +212,17 @@ export async function initDb() {
       programado_at_label TEXT,
       recordatorio_enviado_at INTEGER,
       confirmado_at INTEGER,
+      inicio_real_at INTEGER,
+      pausado_at INTEGER,
+      fin_real_at INTEGER,
+      tiempo_acumulado_segundos INTEGER NOT NULL DEFAULT 0,
+      responsable_programado_id INTEGER,
+      responsable_programado_nombre TEXT,
+      responsable_programado_wa_id TEXT,
+      responsable_actual_id INTEGER,
+      responsable_actual_nombre TEXT,
+      responsable_actual_wa_id TEXT,
+      asignacion_estado TEXT NOT NULL DEFAULT 'asignada',
       empleado_id INTEGER NOT NULL,
       empleado_nombre TEXT NOT NULL,
       empleado_wa_id TEXT NOT NULL,
@@ -295,6 +306,17 @@ export async function initDb() {
     `ALTER TABLE leads ADD COLUMN asignado_a TEXT`,
     `ALTER TABLE leads ADD COLUMN asignado_id INTEGER`,
     `ALTER TABLE empleado_asistencia ADD COLUMN timestamp INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN inicio_real_at INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN pausado_at INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN fin_real_at INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN tiempo_acumulado_segundos INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_programado_id INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_programado_nombre TEXT`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_programado_wa_id TEXT`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_actual_id INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_actual_nombre TEXT`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_actual_wa_id TEXT`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN asignacion_estado TEXT NOT NULL DEFAULT 'asignada'`,
   ]
   for (const sql of alterStmts) {
     try {
@@ -1315,7 +1337,7 @@ export async function getRoundOverviewForDashboard(dateKey = toBuenosAiresDateKe
       ? {
           id: nextPending.id,
           hora: nextPending.programadoAtLabel ?? formatTimeLabel(nextPending.programadoAt),
-          responsable: nextPending.empleadoNombre,
+          responsable: nextPending.responsableActualNombre ?? nextPending.empleadoNombre,
         }
       : null,
   }
@@ -1357,6 +1379,13 @@ export async function createOccurrences(rows: Array<{
   empleadoId: number
   empleadoNombre: string
   empleadoWaId: string
+  responsableProgramadoId?: number
+  responsableProgramadoNombre?: string
+  responsableProgramadoWaId?: string
+  responsableActualId?: number | null
+  responsableActualNombre?: string | null
+  responsableActualWaId?: string | null
+  asignacionEstado?: 'sin_asignar' | 'asignada' | 'en_progreso' | 'completada' | 'vencida'
   supervisorWaId?: string | null
   nombreRonda: string
 }>) {
@@ -1372,6 +1401,13 @@ export async function createOccurrences(rows: Array<{
     recordatorioEnviadoAt: row.recordatorioEnviadoAt,
     confirmadoAt: row.confirmadoAt,
     escaladoAt: row.escaladoAt,
+    responsableProgramadoId: row.responsableProgramadoId ?? row.empleadoId,
+    responsableProgramadoNombre: row.responsableProgramadoNombre ?? row.empleadoNombre,
+    responsableProgramadoWaId: normalizeWaNumber(row.responsableProgramadoWaId ?? row.empleadoWaId),
+    responsableActualId: row.responsableActualId ?? row.empleadoId,
+    responsableActualNombre: row.responsableActualNombre ?? row.empleadoNombre,
+    responsableActualWaId: normalizeWaNumber(row.responsableActualWaId ?? row.empleadoWaId),
+    asignacionEstado: row.asignacionEstado ?? 'asignada',
     empleadoId: row.empleadoId,
     empleadoNombre: row.empleadoNombre,
     empleadoWaId: normalizeWaNumber(row.empleadoWaId),
@@ -1410,11 +1446,16 @@ export async function getOccurrenceById(id: number) {
 export async function updateRoundOccurrenceStatus(
   id: number,
   data: {
-    estado: 'pendiente' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
+    estado: 'pendiente' | 'en_progreso' | 'pausada' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
     confirmadoAt?: Date | null
     canalConfirmacion?: 'whatsapp' | 'panel' | 'system'
     nota?: string | null
     escaladoAt?: Date | null
+    inicioRealAt?: Date | null
+    pausadoAt?: Date | null
+    finRealAt?: Date | null
+    tiempoAcumuladoSegundos?: number
+    asignacionEstado?: 'sin_asignar' | 'asignada' | 'en_progreso' | 'completada' | 'vencida'
   }
 ) {
   const updates: Record<string, unknown> = {
@@ -1425,7 +1466,51 @@ export async function updateRoundOccurrenceStatus(
   if (data.canalConfirmacion !== undefined) updates.canalConfirmacion = data.canalConfirmacion
   if (data.nota !== undefined) updates.nota = data.nota
   if (data.escaladoAt !== undefined) updates.escaladoAt = data.escaladoAt
+  if (data.inicioRealAt !== undefined) updates.inicioRealAt = data.inicioRealAt
+  if (data.pausadoAt !== undefined) updates.pausadoAt = data.pausadoAt
+  if (data.finRealAt !== undefined) updates.finRealAt = data.finRealAt
+  if (data.tiempoAcumuladoSegundos !== undefined) updates.tiempoAcumuladoSegundos = data.tiempoAcumuladoSegundos
+  if (data.asignacionEstado !== undefined) updates.asignacionEstado = data.asignacionEstado
   await db.update(schema.rondasOcurrencia).set(updates as any).where(eq(schema.rondasOcurrencia.id, id)).run()
+}
+
+export async function updateOccurrenceLifecycle(
+  id: number,
+  updates: Partial<{
+    estado: 'pendiente' | 'en_progreso' | 'pausada' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
+    confirmadoAt: Date | null
+    canalConfirmacion: 'whatsapp' | 'panel' | 'system'
+    nota: string | null
+    escaladoAt: Date | null
+    inicioRealAt: Date | null
+    pausadoAt: Date | null
+    finRealAt: Date | null
+    tiempoAcumuladoSegundos: number
+    asignacionEstado: 'sin_asignar' | 'asignada' | 'en_progreso' | 'completada' | 'vencida'
+  }>
+) {
+  await updateRoundOccurrenceStatus(id, updates as any)
+}
+
+export async function updateOccurrenceAssignment(
+  id: number,
+  updates: Partial<{
+    responsableActualId: number | null
+    responsableActualNombre: string | null
+    responsableActualWaId: string | null
+    asignacionEstado: 'sin_asignar' | 'asignada' | 'en_progreso' | 'completada' | 'vencida'
+  }>
+) {
+  const data: Record<string, unknown> = {
+    updatedAt: new Date(),
+  }
+  if (updates.responsableActualId !== undefined) data.responsableActualId = updates.responsableActualId
+  if (updates.responsableActualNombre !== undefined) data.responsableActualNombre = updates.responsableActualNombre
+  if (updates.responsableActualWaId !== undefined) {
+    data.responsableActualWaId = normalizeOptionalWaNumber(updates.responsableActualWaId)
+  }
+  if (updates.asignacionEstado !== undefined) data.asignacionEstado = updates.asignacionEstado
+  await db.update(schema.rondasOcurrencia).set(data as any).where(eq(schema.rondasOcurrencia.id, id)).run()
 }
 
 export async function markOccurrenceReply(
@@ -1457,7 +1542,7 @@ export async function markOccurrenceOverdue(id: number) {
 
 export async function createRoundEvent(event: {
   occurrenceId: number
-  type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update'
+  type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update' | 'asignacion' | 'reasignacion' | 'liberacion'
   at?: Date
   actorType?: 'system' | 'employee' | 'admin'
   actorId?: number | null
@@ -1479,7 +1564,7 @@ export async function createRoundEvent(event: {
 
 export async function addOccurrenceEvent(event: {
   occurrenceId: number
-  type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update'
+  type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update' | 'asignacion' | 'reasignacion' | 'liberacion'
   at: Date
   actorType?: 'system' | 'employee' | 'admin'
   actorId?: number | null
@@ -1883,10 +1968,21 @@ function toRoundOccurrenceRecord(occurrence: schema.RondaOcurrencia) {
     fechaOperativa: occurrence.fechaOperativa,
     programadoAt: toDate(occurrence.programadoAt),
     programadoAtLabel: occurrence.programadoAtLabel ?? undefined,
-    estado: occurrence.estado === 'vencido' ? 'vencido' : 'pendiente',
+    estado: occurrence.estado,
     recordatorioEnviadoAt: toNullableDate(occurrence.recordatorioEnviadoAt),
     confirmadoAt: toNullableDate(occurrence.confirmadoAt),
     escaladoAt: toNullableDate(occurrence.escaladoAt),
+    inicioRealAt: toNullableDate(occurrence.inicioRealAt ?? null),
+    pausadoAt: toNullableDate(occurrence.pausadoAt ?? null),
+    finRealAt: toNullableDate(occurrence.finRealAt ?? null),
+    tiempoAcumuladoSegundos: Number(occurrence.tiempoAcumuladoSegundos ?? 0),
+    responsableProgramadoId: occurrence.responsableProgramadoId ?? occurrence.empleadoId,
+    responsableProgramadoNombre: occurrence.responsableProgramadoNombre ?? occurrence.empleadoNombre,
+    responsableProgramadoWaId: occurrence.responsableProgramadoWaId ?? occurrence.empleadoWaId,
+    responsableActualId: occurrence.responsableActualId ?? occurrence.empleadoId,
+    responsableActualNombre: occurrence.responsableActualNombre ?? occurrence.empleadoNombre,
+    responsableActualWaId: occurrence.responsableActualWaId ?? occurrence.empleadoWaId,
+    asignacionEstado: occurrence.asignacionEstado ?? 'asignada',
     empleadoId: occurrence.empleadoId,
     empleadoNombre: occurrence.empleadoNombre,
     empleadoWaId: occurrence.empleadoWaId,
@@ -1903,7 +1999,7 @@ function toNullableDate(value: Date | string | number | null) {
   return value ? toDate(value) : null
 }
 
-function describeRoundEvent(type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update') {
+function describeRoundEvent(type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update' | 'asignacion' | 'reasignacion' | 'liberacion') {
   switch (type) {
     case 'recordatorio': return 'Recordatorio enviado'
     case 'confirmacion': return 'Control confirmado'
@@ -1911,6 +2007,9 @@ function describeRoundEvent(type: 'recordatorio' | 'confirmacion' | 'observacion
     case 'vencimiento': return 'Control vencido por falta de respuesta'
     case 'escalacion': return 'Incidente escalado a supervisor'
     case 'admin_update': return 'Actualizacion administrativa'
+    case 'asignacion': return 'Ronda asignada'
+    case 'reasignacion': return 'Ronda reasignada'
+    case 'liberacion': return 'Ronda liberada'
     default: return 'Evento de ronda'
   }
 }

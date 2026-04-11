@@ -44,6 +44,9 @@ const tasksServiceMock = vi.hoisted(() => ({
 
 const roundsServiceMock = vi.hoisted(() => ({
   registerWhatsappReply: vi.fn(),
+  startOccurrence: vi.fn(),
+  pauseOccurrence: vi.fn(),
+  finishOccurrence: vi.fn(),
 }))
 
 vi.mock('./db', () => dbMock)
@@ -249,6 +252,59 @@ describe('bot api compatibility contract', () => {
         asignacionEstado: 'pendiente_confirmacion',
       },
     })
+  })
+
+  it('starts, pauses and finishes a bathroom round through the bot contract', async () => {
+    roundsServiceMock.startOccurrence.mockResolvedValue({
+      id: 501,
+      estado: 'en_progreso',
+      tiempoAcumuladoSegundos: 0,
+    })
+    roundsServiceMock.pauseOccurrence.mockResolvedValue({
+      id: 501,
+      estado: 'pausada',
+      tiempoAcumuladoSegundos: 420,
+    })
+    roundsServiceMock.finishOccurrence.mockResolvedValue({
+      id: 501,
+      estado: 'cumplido',
+      tiempoAcumuladoSegundos: 840,
+    })
+
+    const started = await requestJson('/api/bot/rondas/ocurrencia/501/iniciar', {
+      method: 'POST',
+      body: { empleadoId: 7 },
+    })
+    const paused = await requestJson('/api/bot/rondas/ocurrencia/501/pausar', {
+      method: 'POST',
+      body: { empleadoId: 7 },
+    })
+    const finished = await requestJson('/api/bot/rondas/ocurrencia/501/finalizar', {
+      method: 'POST',
+      body: { empleadoId: 7, nota: 'Todo limpio' },
+    })
+
+    expect(started.status).toBe(200)
+    expect(paused.status).toBe(200)
+    expect(finished.status).toBe(200)
+    expect(roundsServiceMock.startOccurrence).toHaveBeenCalledWith({ occurrenceId: 501, empleadoId: 7 })
+    expect(roundsServiceMock.pauseOccurrence).toHaveBeenCalledWith({ occurrenceId: 501, empleadoId: 7 })
+    expect(roundsServiceMock.finishOccurrence).toHaveBeenCalledWith({ occurrenceId: 501, empleadoId: 7, note: 'Todo limpio' })
+    expect(finished.body.occurrence).toMatchObject({ id: 501, estado: 'cumplido' })
+  })
+
+  it('returns conflict when a previous assignee tries to start a reassigned round', async () => {
+    roundsServiceMock.startOccurrence.mockRejectedValue(
+      new Error('Round occurrence does not belong to current employee')
+    )
+
+    const response = await requestJson('/api/bot/rondas/ocurrencia/501/iniciar', {
+      method: 'POST',
+      body: { empleadoId: 7 },
+    })
+
+    expect(response.status).toBe(409)
+    expect(response.body.error).toContain('current employee')
   })
 })
 

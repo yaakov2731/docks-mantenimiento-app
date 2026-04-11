@@ -309,6 +309,42 @@ export const appRouter = router({
     timeline: protectedProcedure
       .input(z.object({ fechaOperativa: z.string() }))
       .query(({ input }) => getRoundTimeline(input.fechaOperativa)),
+
+    reasignarOcurrencia: protectedProcedure
+      .input(z.object({
+        occurrenceId: z.number(),
+        empleadoId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const empleado = await getEmpleadoById(input.empleadoId)
+        if (!empleado) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Empleado no encontrado' })
+        }
+        if (!empleado.waId) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'El empleado debe tener WhatsApp cargado' })
+        }
+
+        return roundsService.reassignOccurrence({
+          occurrenceId: input.occurrenceId,
+          adminUserId: ctx.user.id,
+          adminUserName: ctx.user.name,
+          empleadoId: empleado.id,
+          empleadoNombre: empleado.nombre,
+          empleadoWaId: empleado.waId,
+        })
+      }),
+
+    liberarOcurrencia: protectedProcedure
+      .input(z.object({
+        occurrenceId: z.number(),
+      }))
+      .mutation(({ input, ctx }) =>
+        roundsService.releaseOccurrence({
+          occurrenceId: input.occurrenceId,
+          adminUserId: ctx.user.id,
+          adminUserName: ctx.user.name,
+        })
+      ),
   }),
 
   tareasOperativas: router({
