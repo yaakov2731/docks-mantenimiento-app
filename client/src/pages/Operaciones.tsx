@@ -24,6 +24,16 @@ export default function Operaciones() {
       await Promise.all([refetchResumen(), refetchTimeline()])
     },
   })
+  const reassignOccurrence = trpc.rondas.reasignarOcurrencia.useMutation({
+    onSuccess: async () => {
+      await Promise.all([refetchResumen(), refetchTimeline()])
+    },
+  })
+  const releaseOccurrence = trpc.rondas.liberarOcurrencia.useMutation({
+    onSuccess: async () => {
+      await Promise.all([refetchResumen(), refetchTimeline()])
+    },
+  })
 
   const supervisors = useMemo(
     () => usuarios.filter((user: any) => user.role === 'admin'),
@@ -61,7 +71,21 @@ export default function Operaciones() {
             }}
           />
 
-          <RoundsTimeline items={timeline} />
+          <RoundsTimeline
+            items={timeline}
+            employees={empleados}
+            busyOccurrenceId={
+              reassignOccurrence.variables?.occurrenceId ??
+              releaseOccurrence.variables?.occurrenceId ??
+              null
+            }
+            onAssign={async ({ occurrenceId, empleadoId }) => {
+              await reassignOccurrence.mutateAsync({ occurrenceId, empleadoId })
+            }}
+            onRelease={async ({ occurrenceId }) => {
+              await releaseOccurrence.mutateAsync({ occurrenceId })
+            }}
+          />
         </section>
 
         <OperationsSupportRail resumen={resumen} empleados={empleados} />

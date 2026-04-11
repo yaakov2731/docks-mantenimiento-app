@@ -356,6 +356,80 @@ botRouter.post('/rondas/ocurrencia/:id/responder', authBot, async (req, res) => 
   }
 })
 
+botRouter.post('/rondas/ocurrencia/:id/iniciar', authBot, async (req, res) => {
+  try {
+    const occurrenceId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    if (!Number.isFinite(occurrenceId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'occurrenceId y empleadoId son requeridos' })
+    }
+
+    const occurrence = await roundsService.startOccurrence({
+      occurrenceId,
+      empleadoId,
+    })
+
+    return res.json({ success: true, occurrence })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo iniciar la ronda'
+    if (message.includes('not found')) return res.status(404).json({ error: message })
+    if (message.includes('current employee') || message.includes('cannot be started') || message.includes('no current assignee')) {
+      return res.status(409).json({ error: message })
+    }
+    return res.status(500).json({ error: message })
+  }
+})
+
+botRouter.post('/rondas/ocurrencia/:id/pausar', authBot, async (req, res) => {
+  try {
+    const occurrenceId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    if (!Number.isFinite(occurrenceId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'occurrenceId y empleadoId son requeridos' })
+    }
+
+    const occurrence = await roundsService.pauseOccurrence({
+      occurrenceId,
+      empleadoId,
+    })
+
+    return res.json({ success: true, occurrence })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo pausar la ronda'
+    if (message.includes('not found')) return res.status(404).json({ error: message })
+    if (message.includes('current employee') || message.includes('not in progress')) {
+      return res.status(409).json({ error: message })
+    }
+    return res.status(500).json({ error: message })
+  }
+})
+
+botRouter.post('/rondas/ocurrencia/:id/finalizar', authBot, async (req, res) => {
+  try {
+    const occurrenceId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    const nota = typeof req.body.nota === 'string' ? req.body.nota : undefined
+    if (!Number.isFinite(occurrenceId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'occurrenceId y empleadoId son requeridos' })
+    }
+
+    const occurrence = await roundsService.finishOccurrence({
+      occurrenceId,
+      empleadoId,
+      note: nota,
+    })
+
+    return res.json({ success: true, occurrence })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo finalizar la ronda'
+    if (message.includes('not found')) return res.status(404).json({ error: message })
+    if (message.includes('current employee') || message.includes('cannot be finished')) {
+      return res.status(409).json({ error: message })
+    }
+    return res.status(500).json({ error: message })
+  }
+})
+
 botRouter.post('/tarea-operativa/:id/aceptar', authBot, async (req, res) => {
   try {
     const taskId = Number(req.params.id)

@@ -22,10 +22,23 @@ export type RoundOccurrenceRecord = {
   fechaOperativa: string
   programadoAt: Date
   programadoAtLabel?: string
-  estado: 'pendiente' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
+  estado: 'pendiente' | 'en_progreso' | 'pausada' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
   recordatorioEnviadoAt: Date | null
   confirmadoAt: Date | null
   escaladoAt: Date | null
+  inicioRealAt?: Date | null
+  pausadoAt?: Date | null
+  finRealAt?: Date | null
+  tiempoAcumuladoSegundos?: number
+  nota?: string | null
+  canalConfirmacion?: 'whatsapp' | 'panel' | 'system'
+  responsableProgramadoId?: number
+  responsableProgramadoNombre?: string
+  responsableProgramadoWaId?: string
+  responsableActualId?: number | null
+  responsableActualNombre?: string | null
+  responsableActualWaId?: string | null
+  asignacionEstado?: 'sin_asignar' | 'asignada' | 'en_progreso' | 'completada' | 'vencida'
   empleadoId: number
   empleadoNombre: string
   empleadoWaId: string
@@ -43,7 +56,7 @@ export type RoundRepository = {
   markOccurrenceOverdue(id: number): Promise<void>
   addOccurrenceEvent(event: {
     occurrenceId: number
-    type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update'
+    type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update' | 'asignacion' | 'reasignacion' | 'liberacion'
     at: Date
     actorType?: 'system' | 'employee' | 'admin'
     actorId?: number | null
@@ -58,6 +71,14 @@ export type RoundRepository = {
     id: number,
     estado: 'cumplido' | 'cumplido_con_observacion' | 'vencido',
     nota?: string | null
+  ): Promise<void>
+  updateOccurrenceLifecycle?(
+    id: number,
+    updates: Partial<RoundOccurrenceRecord>
+  ): Promise<void>
+  updateOccurrenceAssignment?(
+    id: number,
+    updates: Partial<RoundOccurrenceRecord>
   ): Promise<void>
 }
 
@@ -101,6 +122,17 @@ export function createRoundsService(repo: RoundRepository) {
             recordatorioEnviadoAt: null,
             confirmadoAt: null,
             escaladoAt: null,
+            inicioRealAt: null,
+            pausadoAt: null,
+            finRealAt: null,
+            tiempoAcumuladoSegundos: 0,
+            responsableProgramadoId: selectedSchedule.record.empleadoId,
+            responsableProgramadoNombre: selectedSchedule.record.empleadoNombre,
+            responsableProgramadoWaId: selectedSchedule.record.empleadoWaId,
+            responsableActualId: selectedSchedule.record.empleadoId,
+            responsableActualNombre: selectedSchedule.record.empleadoNombre,
+            responsableActualWaId: selectedSchedule.record.empleadoWaId,
+            asignacionEstado: 'asignada' as const,
             empleadoId: selectedSchedule.record.empleadoId,
             empleadoNombre: selectedSchedule.record.empleadoNombre,
             empleadoWaId: selectedSchedule.record.empleadoWaId,
@@ -144,8 +176,11 @@ export function createRoundsService(repo: RoundRepository) {
 
         if (item.recordatorioEnviadoAt) continue
 
+        const targetWaId = item.responsableActualWaId ?? item.empleadoWaId
+        if (!targetWaId) continue
+
         await repo.enqueueBotMessage(
-          item.empleadoWaId,
+          targetWaId,
           buildRoundReminderMessage({
             occurrenceId: item.id,
             nombreRonda: item.nombreRonda ?? 'Control de banos',
@@ -176,7 +211,7 @@ export function createRoundsService(repo: RoundRepository) {
 
       const occurrence = await repo.getOccurrenceById(input.occurrenceId)
       if (!occurrence) throw new Error('Round occurrence not found')
-      if (occurrence.empleadoId !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
+      assertCurrentRoundOwner(occurrence, input.empleadoId)
       if (occurrence.estado !== 'pendiente') throw new Error('Round occurrence is no longer pending')
 
       const note = normalizeNote(input.note)
@@ -190,7 +225,7 @@ export function createRoundsService(repo: RoundRepository) {
         at: now,
         actorType: 'employee',
         actorId: input.empleadoId,
-        actorName: occurrence.empleadoNombre,
+        actorName: occurrence.responsableActualNombre ?? occurrence.empleadoNombre,
         description: resolved.description,
         metadata: {
           source: 'whatsapp-reply',
@@ -206,6 +241,214 @@ export function createRoundsService(repo: RoundRepository) {
         canalConfirmacion: 'whatsapp' as const,
         confirmadoAt: now,
       }
+    },
+
+    async startOccurrence(input: { occurrenceId: number; empleadoId: number; now?: Date }) {
+      if (!repo.getOccurrenceById || !repo.updateOccurrenceLifecycle) {
+        throw new Error('Round repository does not support lifecycle updates')
+      }
+
+      const occurrence = await ensureOccurrence(repo, input.occurrenceId)
+      assertCurrentRoundOwner(occurrence, input.empleadoId)
+      if (!occurrence.responsableActualId) throw new Error('Round occurrence has no current assignee')
+      if (occurrence.estado !== 'pendiente' && occurrence.estado !== 'pausada') {
+        throw new Error('Round occurrence cannot be started from its current state')
+      }
+
+      const now = input.now ?? new Date()
+      const resumed = occurrence.estado === 'pausada'
+
+      await repo.updateOccurrenceLifecycle(input.occurrenceId, {
+        estado: 'en_progreso',
+        inicioRealAt: now,
+        pausadoAt: null,
+        asignacionEstado: 'en_progreso',
+      })
+      await repo.addOccurrenceEvent({
+        occurrenceId: input.occurrenceId,
+        type: 'confirmacion',
+        at: now,
+        actorType: 'employee',
+        actorId: input.empleadoId,
+        actorName: occurrence.responsableActualNombre ?? occurrence.empleadoNombre,
+        description: resumed ? 'Ronda reanudada' : 'Ronda iniciada',
+        metadata: { source: resumed ? 'round-resume' : 'round-start' },
+      })
+
+      return {
+        ...occurrence,
+        estado: 'en_progreso' as const,
+        inicioRealAt: now,
+        pausadoAt: null,
+        asignacionEstado: 'en_progreso' as const,
+      }
+    },
+
+    async pauseOccurrence(input: { occurrenceId: number; empleadoId: number; now?: Date }) {
+      if (!repo.getOccurrenceById || !repo.updateOccurrenceLifecycle) {
+        throw new Error('Round repository does not support lifecycle updates')
+      }
+
+      const occurrence = await ensureOccurrence(repo, input.occurrenceId)
+      assertCurrentRoundOwner(occurrence, input.empleadoId)
+      if (occurrence.estado !== 'en_progreso') {
+        throw new Error('Round occurrence is not in progress')
+      }
+
+      const now = input.now ?? new Date()
+      const accumulated = getRoundWorkedSeconds(occurrence, now)
+
+      await repo.updateOccurrenceLifecycle(input.occurrenceId, {
+        estado: 'pausada',
+        inicioRealAt: null,
+        pausadoAt: now,
+        tiempoAcumuladoSegundos: accumulated,
+        asignacionEstado: 'en_progreso',
+      })
+      await repo.addOccurrenceEvent({
+        occurrenceId: input.occurrenceId,
+        type: 'admin_update',
+        at: now,
+        actorType: 'employee',
+        actorId: input.empleadoId,
+        actorName: occurrence.responsableActualNombre ?? occurrence.empleadoNombre,
+        description: 'Ronda pausada',
+        metadata: { source: 'round-pause' },
+      })
+
+      return {
+        ...occurrence,
+        estado: 'pausada' as const,
+        inicioRealAt: null,
+        pausadoAt: now,
+        tiempoAcumuladoSegundos: accumulated,
+        asignacionEstado: 'en_progreso' as const,
+      }
+    },
+
+    async finishOccurrence(input: { occurrenceId: number; empleadoId: number; now?: Date; note?: string }) {
+      if (!repo.getOccurrenceById || !repo.updateOccurrenceLifecycle) {
+        throw new Error('Round repository does not support lifecycle updates')
+      }
+
+      const occurrence = await ensureOccurrence(repo, input.occurrenceId)
+      assertCurrentRoundOwner(occurrence, input.empleadoId)
+      if (occurrence.estado !== 'en_progreso' && occurrence.estado !== 'pausada') {
+        throw new Error('Round occurrence cannot be finished from its current state')
+      }
+
+      const now = input.now ?? new Date()
+      const accumulated = occurrence.estado === 'en_progreso'
+        ? getRoundWorkedSeconds(occurrence, now)
+        : Number(occurrence.tiempoAcumuladoSegundos ?? 0)
+      const note = normalizeNote(input.note)
+
+      await repo.updateOccurrenceLifecycle(input.occurrenceId, {
+        estado: 'cumplido',
+        inicioRealAt: null,
+        pausadoAt: null,
+        finRealAt: now,
+        tiempoAcumuladoSegundos: accumulated,
+        confirmadoAt: now,
+        canalConfirmacion: 'whatsapp',
+        nota: note,
+        asignacionEstado: 'completada',
+      })
+      await repo.addOccurrenceEvent({
+        occurrenceId: input.occurrenceId,
+        type: 'confirmacion',
+        at: now,
+        actorType: 'employee',
+        actorId: input.empleadoId,
+        actorName: occurrence.responsableActualNombre ?? occurrence.empleadoNombre,
+        description: note ? `Ronda finalizada: ${note}` : 'Ronda finalizada',
+        metadata: { source: 'round-finish' },
+      })
+
+      return {
+        ...occurrence,
+        estado: 'cumplido' as const,
+        inicioRealAt: null,
+        pausadoAt: null,
+        finRealAt: now,
+        tiempoAcumuladoSegundos: accumulated,
+        confirmadoAt: now,
+        canalConfirmacion: 'whatsapp' as const,
+        nota: note,
+        asignacionEstado: 'completada' as const,
+      }
+    },
+
+    async reassignOccurrence(input: {
+      occurrenceId: number
+      adminUserId: number
+      adminUserName: string
+      empleadoId: number
+      empleadoNombre: string
+      empleadoWaId: string
+    }) {
+      if (!repo.getOccurrenceById || !repo.updateOccurrenceAssignment) {
+        throw new Error('Round repository does not support assignment updates')
+      }
+
+      const occurrence = await ensureOccurrence(repo, input.occurrenceId)
+      assertOccurrenceOpenForAssignment(occurrence)
+      const nextAssignmentState = deriveAssignmentStateForOpenOccurrence(occurrence)
+
+      await repo.updateOccurrenceAssignment(input.occurrenceId, {
+        responsableActualId: input.empleadoId,
+        responsableActualNombre: input.empleadoNombre,
+        responsableActualWaId: input.empleadoWaId,
+        asignacionEstado: nextAssignmentState,
+      })
+      await repo.addOccurrenceEvent({
+        occurrenceId: input.occurrenceId,
+        type: 'reasignacion',
+        at: new Date(),
+        actorType: 'admin',
+        actorId: input.adminUserId,
+        actorName: input.adminUserName,
+        description: `Ronda reasignada a ${input.empleadoNombre}`,
+        metadata: {
+          source: 'panel_admin',
+          previousEmployeeId: occurrence.responsableActualId ?? occurrence.empleadoId,
+          nextEmployeeId: input.empleadoId,
+        },
+      })
+
+      return ensureOccurrence(repo, input.occurrenceId)
+    },
+
+    async releaseOccurrence(input: {
+      occurrenceId: number
+      adminUserId: number
+      adminUserName: string
+    }) {
+      if (!repo.getOccurrenceById || !repo.updateOccurrenceAssignment) {
+        throw new Error('Round repository does not support assignment updates')
+      }
+
+      const occurrence = await ensureOccurrence(repo, input.occurrenceId)
+      assertOccurrenceOpenForAssignment(occurrence)
+
+      await repo.updateOccurrenceAssignment(input.occurrenceId, {
+        responsableActualId: null,
+        responsableActualNombre: null,
+        responsableActualWaId: null,
+        asignacionEstado: 'sin_asignar',
+      })
+      await repo.addOccurrenceEvent({
+        occurrenceId: input.occurrenceId,
+        type: 'liberacion',
+        at: new Date(),
+        actorType: 'admin',
+        actorId: input.adminUserId,
+        actorName: input.adminUserName,
+        description: 'Ronda liberada para reasignacion',
+        metadata: { source: 'panel_admin' },
+      })
+
+      return ensureOccurrence(repo, input.occurrenceId)
     },
   }
 }
@@ -243,6 +486,32 @@ function normalizeNote(note?: string) {
   return trimmed ? trimmed : null
 }
 
+async function ensureOccurrence(repo: RoundRepository, occurrenceId: number) {
+  if (!repo.getOccurrenceById) throw new Error('Round repository does not support occurrence lookups')
+  const occurrence = await repo.getOccurrenceById(occurrenceId)
+  if (!occurrence) throw new Error('Round occurrence not found')
+  return occurrence
+}
+
+function assertCurrentRoundOwner(occurrence: RoundOccurrenceRecord, empleadoId: number) {
+  const currentOwnerId = occurrence.responsableActualId ?? occurrence.empleadoId
+  if (currentOwnerId !== empleadoId) {
+    throw new Error('Round occurrence does not belong to current employee')
+  }
+}
+
+function assertOccurrenceOpenForAssignment(occurrence: RoundOccurrenceRecord) {
+  if (occurrence.estado === 'cumplido' || occurrence.estado === 'cumplido_con_observacion' || occurrence.estado === 'cancelado') {
+    throw new Error('Round occurrence is already closed')
+  }
+}
+
+function deriveAssignmentStateForOpenOccurrence(occurrence: RoundOccurrenceRecord) {
+  if (occurrence.estado === 'en_progreso' || occurrence.estado === 'pausada') return 'en_progreso' as const
+  if (occurrence.estado === 'vencido') return 'vencida' as const
+  return 'asignada' as const
+}
+
 function resolveReplyOption(option: '1' | '2' | '3', note: string | null) {
   switch (option) {
     case '1':
@@ -273,4 +542,17 @@ function resolveReplyOption(option: '1' | '2' | '3', note: string | null) {
     default:
       throw new Error(`Unsupported WhatsApp reply option: ${option}`)
   }
+}
+
+function getRoundWorkedSeconds(
+  occurrence: Pick<RoundOccurrenceRecord, 'tiempoAcumuladoSegundos' | 'inicioRealAt'>,
+  now: Date
+) {
+  const accumulated = Number(occurrence.tiempoAcumuladoSegundos ?? 0)
+  if (!occurrence.inicioRealAt) return accumulated
+  const startedAt = occurrence.inicioRealAt instanceof Date
+    ? occurrence.inicioRealAt.getTime()
+    : new Date(occurrence.inicioRealAt).getTime()
+  const additional = Math.max(0, Math.floor((now.getTime() - startedAt) / 1000))
+  return accumulated + additional
 }
