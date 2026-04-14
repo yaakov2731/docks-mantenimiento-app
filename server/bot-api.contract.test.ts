@@ -318,7 +318,7 @@ describe('bot api compatibility contract', () => {
     })
   })
 
-  it('lists scheduled operational tasks newest-first for the admin bot flow', async () => {
+  it('lists scheduled operational tasks with pendiente_asignacion before pendiente_confirmacion for the admin bot flow', async () => {
     dbMock.getUsers.mockResolvedValue([
       { id: 1, name: 'Gerente', role: 'admin', activo: true, waId: '5491110000000' },
     ])
@@ -376,7 +376,7 @@ describe('bot api compatibility contract', () => {
     const response = await requestJson('/api/bot/admin/1/tareas-programadas')
 
     expect(response.status).toBe(200)
-    // The bot UI expects the newest actionable tasks first.
+    // Contract: show pendiente_asignacion before pendiente_confirmacion, then sort by urgency within each bucket.
     expect(response.body.items).toHaveLength(2)
     expect(response.body.items.map((item: any) => item.id)).toEqual([301, 302])
     expect(response.body.items[0]).toMatchObject({
