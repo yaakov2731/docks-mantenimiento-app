@@ -19,16 +19,20 @@ const dbMock = vi.hoisted(() => ({
   getPendingBotMessages: vi.fn(),
   markBotMessageSent: vi.fn(),
   markBotMessageFailed: vi.fn(),
+  enqueueBotMessage: vi.fn(),
   getEmpleadoActivoById: vi.fn(),
   getEmpleadoAttendanceStatus: vi.fn(),
   getNextAssignableReporteForEmpleado: vi.fn(),
   getReporteById: vi.fn(),
+  getReportes: vi.fn(),
+  getUsers: vi.fn(),
   getReporteTiempoTrabajadoSegundos: vi.fn((reporte: any) => Number(reporte?.tiempoTrabajadoSegundos ?? reporte?.trabajoAcumuladoSegundos ?? 0)),
   registerEmpleadoAttendance: vi.fn(),
   iniciarTrabajoReporte: vi.fn(),
   pausarTrabajoReporte: vi.fn(),
   completarTrabajoReporte: vi.fn(),
   actualizarReporte: vi.fn(),
+  listOperationalTasks: vi.fn(),
   listOperationalTasksByEmployee: vi.fn(),
   getOperationalTaskById: vi.fn(),
   persistOperationalTaskChange: vi.fn(),
@@ -249,6 +253,239 @@ describe('bot api compatibility contract', () => {
         asignacionEstado: 'pendiente_confirmacion',
       },
     })
+  })
+
+  it('returns the admin summary with separate complaint and scheduled-task counters', async () => {
+    dbMock.getUsers.mockResolvedValue([
+      { id: 1, name: 'Gerente', role: 'admin', activo: true, waId: '5491110000000' },
+    ])
+    dbMock.getReportes.mockResolvedValue([
+      {
+        id: 184,
+        titulo: 'Perdida de agua',
+        local: 'Local 12',
+        planta: 'baja',
+        prioridad: 'alta',
+        estado: 'pendiente',
+        asignacionEstado: 'sin_asignar',
+        locatario: 'Sushi Club',
+        descripcion: 'Sale agua debajo de la bacha',
+        createdAt: new Date('2026-04-12T10:00:00.000Z'),
+      },
+    ])
+    dbMock.listOperationalTasks.mockResolvedValue([
+      {
+        id: 301,
+        origen: 'manual',
+        tipoTrabajo: 'Limpieza',
+        titulo: 'Control banos',
+        descripcion: 'Repasar insumos',
+        ubicacion: 'Pasillo norte',
+        prioridad: 'alta',
+        estado: 'pendiente_asignacion',
+        empleadoId: null,
+        empleadoNombre: null,
+        recurrenteCadaHoras: 2,
+        checklistObjetivo: 'Reponer jabon',
+        trabajoAcumuladoSegundos: 0,
+        proximaRevisionAt: '2026-04-12T11:00:00.000Z',
+        ultimaRevisionAt: null,
+        createdAt: new Date('2026-04-12T09:30:00.000Z'),
+      },
+    ])
+
+    const response = await requestJson('/api/bot/admin/1/resumen')
+
+    expect(response.status).toBe(200)
+    expect(response.body.menu).toEqual([
+      '1. Ver pendientes',
+      '2. Reclamos',
+      '3. Tareas programadas',
+      '4. Buscar por numero',
+      '5. Ayuda',
+    ])
+    expect(response.body.counters).toMatchObject({
+      pending: 1,
+      urgent: 0,
+      unassigned: 1,
+      scheduledPending: 1,
+      scheduledHighPriority: 1,
+      scheduledUnassigned: 1,
+    })
+    expect(response.body.domains.tareasProgramadas.latestPending).toMatchObject({
+      id: 301,
+      estado: 'pendiente_asignacion',
+    })
+  })
+
+  it('lists scheduled operational tasks visible to the admin bot flow', async () => {
+    dbMock.getUsers.mockResolvedValue([
+      { id: 1, name: 'Gerente', role: 'admin', activo: true, waId: '5491110000000' },
+    ])
+    dbMock.listOperationalTasks.mockResolvedValue([
+      {
+        id: 301,
+        origen: 'manual',
+        tipoTrabajo: 'Limpieza',
+        titulo: 'Control banos',
+        descripcion: 'Repasar insumos',
+        ubicacion: 'Pasillo norte',
+        prioridad: 'alta',
+        estado: 'pendiente_asignacion',
+        empleadoId: null,
+        empleadoNombre: null,
+        recurrenteCadaHoras: 2,
+        checklistObjetivo: 'Reponer jabon',
+        trabajoAcumuladoSegundos: 0,
+        createdAt: new Date('2026-04-12T09:30:00.000Z'),
+      },
+      {
+        id: 302,
+        origen: 'manual',
+        tipoTrabajo: 'Reposicion',
+        titulo: 'Control cocina',
+        descripcion: 'Verificar stock',
+        ubicacion: 'Local 7',
+        prioridad: 'media',
+        estado: 'pendiente_confirmacion',
+        empleadoId: 7,
+        empleadoNombre: 'Diego',
+        recurrenteCadaHoras: null,
+        checklistObjetivo: null,
+        trabajoAcumuladoSegundos: 0,
+        createdAt: new Date('2026-04-12T10:00:00.000Z'),
+      },
+      {
+        id: 303,
+        origen: 'manual',
+        tipoTrabajo: 'Electricidad',
+        titulo: 'Tablero pasillo',
+        descripcion: 'Trabajo activo',
+        ubicacion: 'Pasillo sur',
+        prioridad: 'urgente',
+        estado: 'en_progreso',
+        empleadoId: 9,
+        empleadoNombre: 'Ana',
+        recurrenteCadaHoras: null,
+        checklistObjetivo: null,
+        trabajoAcumuladoSegundos: 300,
+        createdAt: new Date('2026-04-12T10:30:00.000Z'),
+      },
+    ])
+
+    const response = await requestJson('/api/bot/admin/1/tareas-programadas')
+
+    expect(response.status).toBe(200)
+    expect(response.body.items).toHaveLength(2)
+    expect(response.body.items.map((item: any) => item.id)).toEqual([301, 302])
+    expect(response.body.items[0]).toMatchObject({
+      id: 301,
+      estado: 'pendiente_asignacion',
+      accionesPermitidas: ['asignar'],
+    })
+    expect(response.body.items[1]).toMatchObject({
+      id: 302,
+      estado: 'pendiente_confirmacion',
+      accionesPermitidas: ['reasignar'],
+    })
+  })
+
+  it('assigns a scheduled operational task from the admin bot flow', async () => {
+    dbMock.getUsers.mockResolvedValue([
+      { id: 1, name: 'Gerente', role: 'admin', activo: true, waId: '5491110000000' },
+    ])
+    dbMock.getOperationalTaskById.mockResolvedValue({
+      id: 301,
+      origen: 'manual',
+      tipoTrabajo: 'Limpieza',
+      titulo: 'Control banos',
+      descripcion: 'Repasar insumos',
+      ubicacion: 'Pasillo norte',
+      prioridad: 'alta',
+      estado: 'pendiente_asignacion',
+      empleadoId: null,
+      empleadoNombre: null,
+      empleadoWaId: null,
+      trabajoAcumuladoSegundos: 0,
+    })
+    dbMock.getEmpleadoById.mockResolvedValue({
+      id: 7,
+      nombre: 'Diego',
+      waId: '549112223333',
+      activo: true,
+    })
+
+    const response = await requestJson('/api/bot/admin/1/tarea-programada/301/asignar', {
+      method: 'POST',
+      body: { empleadoId: 7 },
+    })
+
+    expect(response.status).toBe(200)
+    expect(dbMock.persistOperationalTaskChange).toHaveBeenCalledWith(
+      301,
+      expect.objectContaining({
+        empleadoId: 7,
+        empleadoNombre: 'Diego',
+        empleadoWaId: '549112223333',
+        estado: 'pendiente_confirmacion',
+        aceptadoAt: null,
+        trabajoIniciadoAt: null,
+        pausadoAt: null,
+      }),
+      expect.arrayContaining([
+        expect.objectContaining({
+          tipo: 'asignacion',
+          actorTipo: 'admin',
+          actorId: 1,
+          actorNombre: 'Gerente',
+        }),
+      ]),
+    )
+    expect(dbMock.enqueueBotMessage).toHaveBeenCalledWith(
+      '549112223333',
+      expect.stringContaining('Nueva tarea operativa'),
+    )
+    expect(response.body.task).toMatchObject({
+      id: 301,
+      estado: 'pendiente_confirmacion',
+      empleadoId: 7,
+      empleadoNombre: 'Diego',
+    })
+  })
+
+  it('blocks reassigning an in-progress scheduled task from the admin bot flow', async () => {
+    dbMock.getUsers.mockResolvedValue([
+      { id: 1, name: 'Gerente', role: 'admin', activo: true, waId: '5491110000000' },
+    ])
+    dbMock.getOperationalTaskById.mockResolvedValue({
+      id: 303,
+      origen: 'manual',
+      tipoTrabajo: 'Electricidad',
+      titulo: 'Tablero pasillo',
+      descripcion: 'Trabajo activo',
+      ubicacion: 'Pasillo sur',
+      prioridad: 'urgente',
+      estado: 'en_progreso',
+      empleadoId: 9,
+      empleadoNombre: 'Ana',
+      empleadoWaId: '549119998877',
+      trabajoAcumuladoSegundos: 300,
+    })
+    dbMock.getEmpleadoById.mockResolvedValue({
+      id: 7,
+      nombre: 'Diego',
+      waId: '549112223333',
+      activo: true,
+    })
+
+    const response = await requestJson('/api/bot/admin/1/tarea-programada/303/asignar', {
+      method: 'POST',
+      body: { empleadoId: 7 },
+    })
+
+    expect(response.status).toBe(400)
+    expect(response.body.error).toContain('cannot be reassigned')
+    expect(dbMock.persistOperationalTaskChange).not.toHaveBeenCalled()
   })
 })
 
