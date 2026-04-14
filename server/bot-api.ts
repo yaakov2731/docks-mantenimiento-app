@@ -15,9 +15,11 @@ import {
   registrarSalidaEmpleado,
   getTareasEmpleado,
   crearActualizacion,
+  getReportes,
   getPendingBotMessages,
   markBotMessageSent,
   markBotMessageFailed,
+  enqueueBotMessage,
   getEmpleadoActivoById,
   getEmpleadoAttendanceStatus,
   getNextAssignableReporteForEmpleado,
@@ -28,13 +30,16 @@ import {
   pausarTrabajoReporte,
   completarTrabajoReporte,
   actualizarReporte,
+  listOperationalTasks,
   listOperationalTasksByEmployee,
   getOperationalTaskById,
   persistOperationalTaskChange,
   addOperationalTaskEvent,
+  getUsers,
 } from './db'
 import { notifyOwner } from './_core/notification'
 import { readEnv } from './_core/env'
+import { assignOperationalTaskToEmployee } from './operational-task-assignment'
 import { createRoundsService } from './rounds/service'
 import { createOperationalTasksService } from './tasks/service'
 
@@ -277,6 +282,147 @@ function buildEmpleadoCounters(tareas: any[]) {
     reclamosPendientesConfirmacion: reclamos.filter(task => task.asignacionEstado === 'pendiente_confirmacion').length,
     operacionesPendientesConfirmacion: operaciones.filter(task => task.asignacionEstado === 'pendiente_confirmacion').length,
   }
+}
+
+function normalizeWaNumber(value?: string | null) {
+  return typeof value === 'string' ? value.replace(/\D/g, '') : ''
+}
+
+function buildAdminMenu() {
+  return [
+    '1. Ver pendientes',
+    '2. Reclamos',
+    '3. Tareas programadas',
+    '4. Buscar por numero',
+    '5. Ayuda',
+  ]
+}
+
+function buildAdminActions() {
+  return ['ver_pendientes', 'ver_reclamos', 'ver_tareas_programadas', 'buscar_por_numero', 'ayuda']
+}
+
+function serializeAdminReport(reporte: any) {
+  return {
+    id: reporte.id,
+    titulo: reporte.titulo,
+    local: reporte.local,
+    planta: reporte.planta,
+    prioridad: reporte.prioridad,
+    estado: reporte.estado,
+    asignacionEstado: reporte.asignacionEstado,
+    asignadoId: reporte.asignadoId ?? null,
+    asignadoA: reporte.asignadoA ?? null,
+    descripcion: reporte.descripcion,
+    locatario: reporte.locatario ?? null,
+    createdAt: formatDateTime(reporte.createdAt),
+  }
+}
+
+function adminReportPriorityRank(prioridad?: string) {
+  switch (prioridad) {
+    case 'urgente': return 4
+    case 'alta': return 3
+    case 'media': return 2
+    case 'baja': return 1
+    default: return 0
+  }
+}
+
+async function getAdminBotUserByWaNumber(waNumber: string) {
+  const normalized = normalizeWaNumber(waNumber)
+  if (!normalized) return null
+
+  const users = await getUsers()
+  return users.find((user: any) => user?.role === 'admin' && normalizeWaNumber(user?.waId) === normalized) ?? null
+}
+
+async function getAdminBotUserById(adminId: number) {
+  const users = await getUsers()
+  return users.find((user: any) => Number(user?.id) === adminId && user?.role === 'admin') ?? null
+}
+
+async function listAdminPendingReports() {
+  const reports = await getReportes()
+  return reports
+    .filter((report: any) => !['completado', 'cancelado'].includes(report?.estado))
+    .sort((left: any, right: any) =>
+      adminReportPriorityRank(right.prioridad) - adminReportPriorityRank(left.prioridad) ||
+      new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime() ||
+      Number(left.id ?? 0) - Number(right.id ?? 0)
+    )
+}
+
+function adminOperationalTaskPriorityRank(prioridad?: string) {
+  switch (prioridad) {
+    case 'urgente': return 4
+    case 'alta': return 3
+    case 'media': return 2
+    case 'baja': return 1
+    default: return 0
+  }
+}
+
+function isAdminAssignableOperationalTask(task: any) {
+  return ['pendiente_asignacion', 'pendiente_confirmacion'].includes(task?.estado)
+}
+
+function serializeAdminOperationalTask(task: any) {
+  const accionesPermitidas = task.estado === 'pendiente_confirmacion' ? ['reasignar'] : ['asignar']
+
+  return {
+    id: task.id,
+    titulo: task.titulo,
+    descripcion: task.descripcion,
+    tipoTrabajo: task.tipoTrabajo,
+    ubicacion: task.ubicacion,
+    prioridad: task.prioridad,
+    estado: task.estado,
+    empleadoId: task.empleadoId ?? null,
+    empleadoNombre: task.empleadoNombre ?? null,
+    recurrenteCadaHoras: task.recurrenteCadaHoras ?? null,
+    checklistObjetivo: task.checklistObjetivo ?? null,
+    ultimaRevisionAt: formatDateTime(task.ultimaRevisionAt),
+    proximaRevisionAt: formatDateTime(task.proximaRevisionAt),
+    tiempoTrabajadoSegundos: Number(task.tiempoTrabajadoSegundos ?? task.trabajoAcumuladoSegundos ?? 0),
+    accionesPermitidas,
+  }
+}
+
+async function listAdminPendingOperationalTasks() {
+  const tasks = await listOperationalTasks()
+  return tasks
+    .filter(isAdminAssignableOperationalTask)
+    .sort((left: any, right: any) =>
+      Number(right.estado === 'pendiente_asignacion') - Number(left.estado === 'pendiente_asignacion') ||
+      adminOperationalTaskPriorityRank(right.prioridad) - adminOperationalTaskPriorityRank(left.prioridad) ||
+      Number(left.ordenAsignacion ?? 0) - Number(right.ordenAsignacion ?? 0) ||
+      Number(left.id ?? 0) - Number(right.id ?? 0)
+    )
+}
+
+async function notifyEmployeeAboutAdminReportAssignment(reporte: any, empleado: any) {
+  if (!empleado?.waId) return
+
+  const lines = [
+    '*Nuevo reclamo asignado — Docks del Puerto*',
+    '',
+    `Asignado a: ${empleado.nombre}`,
+    `Reclamo #${reporte.id}`,
+    reporte.titulo ? `Trabajo: ${reporte.titulo}` : '',
+    reporte.local ? `Local: ${reporte.local}` : '',
+    reporte.planta ? `Planta: ${reporte.planta}` : '',
+    reporte.prioridad ? `Prioridad: ${String(reporte.prioridad).toUpperCase()}` : '',
+    '',
+    reporte.descripcion ?? '',
+    '',
+    'Respondé con una opción:',
+    '1. Aceptar tarea',
+    '2. No puedo realizarla',
+    '3. Ver cola del día',
+  ]
+
+  await enqueueBotMessage(empleado.waId, lines.filter(Boolean).join('\n'))
 }
 
 async function resolveOperationalTaskAssignment(taskId: number, empleadoId?: number | null) {
@@ -611,6 +757,275 @@ botRouter.get('/locales-disponibles', authBot, (_req, res) => {
     disponibles: [],
     mensaje: 'Contactarse con administración para consultar disponibilidad actualizada.',
   })
+})
+
+// GET /api/bot/admin/identificar/:waNumber
+botRouter.get('/admin/identificar/:waNumber', authBot, async (req, res) => {
+  try {
+    const admin = await getAdminBotUserByWaNumber(req.params.waNumber)
+    if (!admin) return res.status(404).json({ found: false })
+    return res.json({
+      found: true,
+      id: admin.id,
+      name: admin.name,
+      role: admin.role,
+      accionesPermitidas: buildAdminActions(),
+      menu: buildAdminMenu(),
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo identificar el admin' })
+  }
+})
+
+// GET /api/bot/admin/:id/resumen
+botRouter.get('/admin/:id/resumen', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    if (!adminId) return res.status(400).json({ error: 'id de admin invalido' })
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const [pendingReports, pendingTasks] = await Promise.all([
+      listAdminPendingReports(),
+      listAdminPendingOperationalTasks(),
+    ])
+
+    return res.json({
+      admin: {
+        id: admin.id,
+        name: admin.name,
+        role: admin.role,
+      },
+      counters: {
+        pending: pendingReports.length,
+        urgent: pendingReports.filter((item: any) => item.prioridad === 'urgente').length,
+        unassigned: pendingReports.filter((item: any) => !item.asignadoId).length,
+        scheduledPending: pendingTasks.length,
+        scheduledHighPriority: pendingTasks.filter((item: any) => ['urgente', 'alta'].includes(item.prioridad)).length,
+        scheduledUnassigned: pendingTasks.filter((item: any) => !item.empleadoId).length,
+      },
+      latestPending: pendingReports[0] ? serializeAdminReport(pendingReports[0]) : null,
+      latestScheduledTask: pendingTasks[0] ? serializeAdminOperationalTask(pendingTasks[0]) : null,
+      domains: {
+        reclamos: {
+          total: pendingReports.length,
+          latestPending: pendingReports[0] ? serializeAdminReport(pendingReports[0]) : null,
+        },
+        tareasProgramadas: {
+          total: pendingTasks.length,
+          latestPending: pendingTasks[0] ? serializeAdminOperationalTask(pendingTasks[0]) : null,
+        },
+      },
+      accionesPermitidas: buildAdminActions(),
+      menu: buildAdminMenu(),
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo cargar el resumen admin' })
+  }
+})
+
+// GET /api/bot/admin/:id/reclamos
+botRouter.get('/admin/:id/reclamos', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    if (!adminId) return res.status(400).json({ error: 'id de admin invalido' })
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const items = await listAdminPendingReports()
+    return res.json({
+      items: items.map(serializeAdminReport),
+      accionesPermitidas: ['asignar'],
+      menu: buildAdminMenu(),
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo listar reclamos' })
+  }
+})
+
+// GET /api/bot/admin/:id/reporte/:reporteId
+botRouter.get('/admin/:id/reporte/:reporteId', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    const reporteId = parseId(req.params.reporteId)
+    if (!adminId || !reporteId) return res.status(400).json({ error: 'adminId y reporteId son requeridos' })
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const report = await getReporteById(reporteId)
+    if (!report) return res.status(404).json({ error: 'Reclamo no encontrado' })
+
+    const serialized = serializeAdminReport(report)
+    return res.json({
+      report: serialized,
+      item: serialized,
+      menu: buildAdminMenu(),
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo obtener el reclamo' })
+  }
+})
+
+// POST /api/bot/admin/:id/reporte/:reporteId/asignar
+botRouter.post('/admin/:id/reporte/:reporteId/asignar', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    const reporteId = parseId(req.params.reporteId)
+    const empleadoId = Number(req.body?.empleadoId)
+
+    if (!adminId || !reporteId || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'adminId, reporteId y empleadoId son requeridos' })
+    }
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const report = await getReporteById(reporteId)
+    if (!report) return res.status(404).json({ error: 'Reclamo no encontrado' })
+
+    const empleado = await getEmpleadoById(empleadoId)
+    if (!empleado) return res.status(404).json({ error: 'Empleado no encontrado' })
+
+    await actualizarReporte(reporteId, {
+      estado: 'pendiente' as any,
+      asignadoId: empleado.id,
+      asignadoA: empleado.nombre,
+      asignacionEstado: 'pendiente_confirmacion' as any,
+      asignacionRespondidaAt: null as any,
+      trabajoIniciadoAt: null as any,
+    } as any)
+
+    await crearActualizacion({
+      reporteId,
+      usuarioNombre: admin.name,
+      tipo: 'asignacion',
+      descripcion: `Asignado a: ${empleado.nombre}. Pendiente de confirmación del empleado.`,
+      estadoAnterior: report.estado,
+      estadoNuevo: 'pendiente',
+    } as any)
+
+    const updated = await getReporteById(reporteId)
+    const responseReport = {
+      ...report,
+      ...(updated ?? {}),
+      id: reporteId,
+      estado: 'pendiente',
+      asignadoId: empleado.id,
+      asignadoA: empleado.nombre,
+      asignacionEstado: 'pendiente_confirmacion',
+      asignacionRespondidaAt: null,
+      trabajoIniciadoAt: null,
+    }
+    await notifyEmployeeAboutAdminReportAssignment(responseReport, empleado)
+
+    return res.json({
+      success: true,
+      report: serializeAdminReport(responseReport),
+      empleado: {
+        id: empleado.id,
+        nombre: empleado.nombre,
+      },
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo asignar el reclamo' })
+  }
+})
+
+// GET /api/bot/admin/:id/tareas-programadas
+botRouter.get('/admin/:id/tareas-programadas', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    if (!adminId) return res.status(400).json({ error: 'id de admin invalido' })
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const items = await listAdminPendingOperationalTasks()
+    return res.json({
+      items: items.map(serializeAdminOperationalTask),
+      accionesPermitidas: ['asignar', 'reasignar'],
+      menu: buildAdminMenu(),
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo listar tareas programadas' })
+  }
+})
+
+// GET /api/bot/admin/:id/tarea-programada/:taskId
+botRouter.get('/admin/:id/tarea-programada/:taskId', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    const taskId = parseId(req.params.taskId)
+    if (!adminId || !taskId) return res.status(400).json({ error: 'adminId y taskId son requeridos' })
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const task = await getOperationalTaskById(taskId)
+    if (!task) return res.status(404).json({ error: 'Tarea operativa no encontrada' })
+
+    const serialized = serializeAdminOperationalTask(task)
+    return res.json({
+      task: serialized,
+      item: serialized,
+      menu: buildAdminMenu(),
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo obtener la tarea programada' })
+  }
+})
+
+// POST /api/bot/admin/:id/tarea-programada/:taskId/asignar
+botRouter.post('/admin/:id/tarea-programada/:taskId/asignar', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    const taskId = parseId(req.params.taskId)
+    const empleadoId = Number(req.body?.empleadoId)
+
+    if (!adminId || !taskId || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'adminId, taskId y empleadoId son requeridos' })
+    }
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const result = await assignOperationalTaskToEmployee({
+      taskId,
+      empleadoId,
+      actor: {
+        id: admin.id,
+        name: admin.name,
+      },
+    })
+
+    const responseTask = {
+      ...result.task,
+      estado: 'pendiente_confirmacion',
+      empleadoId: result.empleado.id,
+      empleadoNombre: result.empleado.nombre,
+    }
+
+    return res.json({
+      success: true,
+      task: serializeAdminOperationalTask(responseTask),
+      empleado: {
+        id: result.empleado.id,
+        nombre: result.empleado.nombre,
+      },
+    })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo asignar la tarea programada'
+    if (message.includes('not found') || message.includes('no encontrado')) {
+      return res.status(404).json({ error: message })
+    }
+    if (message.includes('cannot be reassigned')) {
+      return res.status(400).json({ error: message })
+    }
+    return res.status(500).json({ error: message })
+  }
 })
 
 // GET /api/bot/empleado/identificar/:waNumber
