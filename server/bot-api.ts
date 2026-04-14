@@ -763,12 +763,14 @@ botRouter.get('/locales-disponibles', authBot, (_req, res) => {
 botRouter.get('/admin/identificar/:waNumber', authBot, async (req, res) => {
   try {
     const admin = await getAdminBotUserByWaNumber(req.params.waNumber)
-    if (!admin) return res.status(404).json({ found: false })
+    if (!admin) return res.status(200).json({ found: false })
     return res.json({
       found: true,
-      id: admin.id,
-      name: admin.name,
-      role: admin.role,
+      admin: {
+        id: admin.id,
+        name: admin.name,
+        role: admin.role,
+      },
       accionesPermitidas: buildAdminActions(),
       menu: buildAdminMenu(),
     })
@@ -835,8 +837,10 @@ botRouter.get('/admin/:id/reclamos', authBot, async (req, res) => {
     if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
 
     const items = await listAdminPendingReports()
+    const reclamos = items.map(serializeAdminReport)
     return res.json({
-      items: items.map(serializeAdminReport),
+      reclamos,
+      items: reclamos,
       accionesPermitidas: ['asignar'],
       menu: buildAdminMenu(),
     })
@@ -860,6 +864,7 @@ botRouter.get('/admin/:id/reporte/:reporteId', authBot, async (req, res) => {
 
     const serialized = serializeAdminReport(report)
     return res.json({
+      reporte: serialized,
       report: serialized,
       item: serialized,
       menu: buildAdminMenu(),
@@ -923,6 +928,8 @@ botRouter.post('/admin/:id/reporte/:reporteId/asignar', authBot, async (req, res
 
     return res.json({
       success: true,
+      reporteId,
+      reporte: serializeAdminReport(responseReport),
       report: serializeAdminReport(responseReport),
       empleado: {
         id: empleado.id,
