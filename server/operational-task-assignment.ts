@@ -78,15 +78,17 @@ export async function notifyOperationalTaskAssignment(
     `Tarea #${task.id}`,
     task.titulo ? `Trabajo: ${task.titulo}` : '',
     task.tipoTrabajo ? `Tipo: ${task.tipoTrabajo}` : '',
-    task.ubicacion ? `Ubicacion: ${task.ubicacion}` : '',
+    task.ubicacion ? `Ubicación: ${task.ubicacion}` : '',
     task.prioridad ? `Prioridad: ${String(task.prioridad).toUpperCase()}` : '',
     '',
     task.descripcion ?? '',
     '',
-    'Responde con una opcion:',
+    'Respondé con una opción:',
     '1. Aceptar tarea',
     '2. No puedo realizarla',
-    '3. Ver cola del dia',
+    '3. Ver cola del día',
+    '',
+    'Cuando la aceptes, el reloj de trabajo queda en marcha y después vas a poder pausar o finalizar desde el bot.',
   ]
 
   await enqueueBotMessage(employee.waId, lines.filter(Boolean).join('\n'))
