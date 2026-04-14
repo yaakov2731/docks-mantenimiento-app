@@ -6,6 +6,7 @@ import { router, publicProcedure, protectedProcedure, JWT_COOKIE } from './_core
 import { notifyOwner, notifyCompleted } from './_core/notification'
 import { readEnv } from './_core/env'
 import * as database from './db'
+import { notifyOperationalTaskAssignment } from './operational-task-assignment'
 import { createRoundsService } from './rounds/service'
 import { saveRoundScheduleAndSyncToday } from './rounds/schedule'
 import {
@@ -19,8 +20,7 @@ import {
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead,
   createRoundTemplate, saveRoundSchedule, getRoundOverviewForDashboard, getRoundTimeline,
-  createOperationalTask, createOperationalTaskFromReporte, getOperationalTaskById, listOperationalTasks, listOperationalTasksByEmployee, getOperationalTasksOverview,
-  enqueueBotMessage,
+  createOperationalTask, createOperationalTaskFromReporte, listOperationalTasks, listOperationalTasksByEmployee, getOperationalTasksOverview,
   iniciarTrabajoReporte,
   pausarTrabajoReporte,
   completarTrabajoReporte,
@@ -592,35 +592,6 @@ export const appRouter = router({
 })
 
 export type AppRouter = typeof appRouter
-
-async function notifyOperationalTaskAssignment(taskId: number, employee: { nombre: string; waId?: string | null }) {
-  if (!employee.waId) return
-
-  const task = await getOperationalTaskById(taskId)
-  if (!task) return
-
-  const lines = [
-    '*Nueva tarea operativa — Docks del Puerto*',
-    '',
-    `Asignado a: ${employee.nombre}`,
-    `Tarea #${task.id}`,
-    task.titulo ? `Trabajo: ${task.titulo}` : '',
-    task.tipoTrabajo ? `Tipo: ${task.tipoTrabajo}` : '',
-    task.ubicacion ? `Ubicación: ${task.ubicacion}` : '',
-    task.prioridad ? `Prioridad: ${String(task.prioridad).toUpperCase()}` : '',
-    '',
-    task.descripcion ?? '',
-    '',
-    'Respondé con una opción:',
-    '1. Aceptar tarea',
-    '2. No puedo realizarla',
-    '3. Ver cola del día',
-    '',
-    'Cuando la aceptes, el reloj de trabajo queda en marcha y después vas a poder pausar o finalizar desde el bot.',
-  ]
-
-  await enqueueBotMessage(employee.waId, lines.filter(Boolean).join('\n'))
-}
 
 function buildLeadAssignmentMessage({
   lead,
