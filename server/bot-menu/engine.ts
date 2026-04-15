@@ -35,6 +35,7 @@ import { buildAsistenciaMenu, handleAsistencia } from './menus/employee/asistenc
 import {
   buildRondasLista, handleRondasLista,
   handleRondaDetalle, handleRondaObservacion, handleRondaObservacionLibre,
+  handleRondaRechazo,
 } from './menus/employee/rondas'
 
 // Admin
@@ -45,6 +46,7 @@ import {
   handleCambiarPrioridad, handleCancelarReclamo,
   buildEstadoGeneral, buildEstadoRondas, buildSLAVencidos,
 } from './menus/admin/reclamos'
+import { buildAdminRondasMenu, handleAdminRondas, buildAdminRondasUnassigned, handleAdminRondasUnassigned, buildAdminRondasAssign, handleAdminRondasAssign, buildAdminRondasCreate, handleAdminRondasCreate, handleAdminRondasCreateCustom, handleAdminRondasCreateLocation, buildAdminRondasByEmployee, handleAdminRondasByEmployee } from './menus/admin/rondas'
 
 // Sales
 import {
@@ -185,6 +187,7 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'ronda_detalle') return handleRondaDetalle(session, input)
     if (currentMenu === 'ronda_observacion') return handleRondaObservacion(session, input)
     if (currentMenu === 'ronda_observacion_libre') return handleRondaObservacionLibre(session, input)
+    if (currentMenu === 'ronda_rechazo') return handleRondaRechazo(session, input)
   }
 
   // ── ADMIN ─────────────────────────────────────────────────────────────────────
@@ -197,6 +200,7 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
       if (input === '4') { return buildEstadoGeneral(session) }
       if (input === '5') { return buildEstadoRondas() }
       if (input === '6') { return buildSLAVencidos() }
+      if (input === '7') { await navigateTo(session, 'admin_rondas', { page: 1 }); return buildAdminRondasMenu({ ...session, currentMenu: 'admin_rondas', contextData: { page: 1 } }) }
       if (input === '0') return buildHelpMessage('admin')
       return invalidMenuOption(await buildAdminMainMenu(session))
     }
@@ -208,6 +212,13 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'admin_asignar_confirmar') return handleAsignarConfirmar(session, input)
     if (currentMenu === 'admin_cambiar_prioridad') return handleCambiarPrioridad(session, input)
     if (currentMenu === 'admin_cancelar_reclamo') return handleCancelarReclamo(session, input)
+    if (currentMenu === 'admin_rondas') return handleAdminRondas(session, input)
+    if (currentMenu === 'admin_rondas_unassigned') return handleAdminRondasUnassigned(session, input)
+    if (currentMenu === 'admin_rondas_assign') return handleAdminRondasAssign(session, input)
+    if (currentMenu === 'admin_rondas_create') return handleAdminRondasCreate(session, input)
+    if (currentMenu === 'admin_rondas_create_custom') return handleAdminRondasCreateCustom(session, input)
+    if (currentMenu === 'admin_rondas_create_location') return handleAdminRondasCreateLocation(session, input)
+    if (currentMenu === 'admin_rondas_by_employee') return handleAdminRondasByEmployee(session, input)
   }
 
   // ── VENTAS ────────────────────────────────────────────────────────────────────

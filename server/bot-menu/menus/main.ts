@@ -66,6 +66,7 @@ export async function buildAdminMainMenu(session: BotSession): Promise<string> {
     `4️⃣  📊 Estado general del día`,
     `5️⃣  🚻 Estado rondas de baños`,
     `6️⃣  ⚠️  Tareas vencidas (SLA)`,
+    `7️⃣  🆕 Crear ronda de baños`,
     SEP,
     `0️⃣  ❓ Ayuda`,
   ].join('\n')
@@ -110,6 +111,7 @@ export function buildHelpMessage(userType: 'employee' | 'admin' | 'sales'): stri
       `📋 *Reclamos:* ver, asignar y gestionar reclamos`,
       `📊 *Estado:* resumen del día y métricas`,
       `⚠️  *SLA:* tareas que superaron el tiempo límite`,
+      `🚻 *Rondas:* crear y asignar rondas de baños`,
     )
   } else {
     base.push(

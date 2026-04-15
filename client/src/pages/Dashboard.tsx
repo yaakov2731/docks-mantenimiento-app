@@ -79,6 +79,14 @@ export default function Dashboard() {
   const { data: reportes = [], refetch } = trpc.reportes.listar.useQuery(filters, { refetchInterval: 30000 })
   const { data: reporte } = trpc.reportes.obtener.useQuery({ id: selected! }, { enabled: !!selected, refetchInterval: 15000 })
   const { data: empleados = [] } = trpc.empleados.listar.useQuery()
+  const { data: user } = trpc.auth.me.useQuery()
+  const isAdmin = user?.role === 'admin'
+  const eliminarReporte = trpc.reportes.eliminar.useMutation({
+    onSuccess: () => {
+      refetch()
+      setSelected(null)
+    },
+  })
   const cambiarEstado = trpc.reportes.actualizarEstado.useMutation({
     onSuccess: () => { refetch(); setSelected(null) },
     onError: (err) => alert(err.message),
@@ -268,10 +276,23 @@ export default function Dashboard() {
                     />
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : ''}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 flex items-center gap-2">
                     <button className="text-primary text-xs hover:underline" onClick={e => { e.stopPropagation(); window.open(`/imprimir?id=${r.id}`, '_blank') }}>
                       Imprimir
                     </button>
+                    {isAdmin ? (
+                      <button
+                        className="text-red-600 text-xs hover:underline"
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (window.confirm('¿Eliminar este reclamo demo? Esta acción no se puede deshacer.')) {
+                            eliminarReporte.mutate({ id: r.id })
+                          }
+                        }}
+                      >
+                        Eliminar
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -354,6 +375,20 @@ export default function Dashboard() {
                 <Button size="sm" variant="outline" onClick={() => window.open(`/imprimir?id=${reporte.id}`, '_blank')}>
                   Imprimir A4
                 </Button>
+                {isAdmin ? (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => {
+                      if (window.confirm('¿Eliminar este reclamo demo? Esta acción no se puede deshacer.')) {
+                        eliminarReporte.mutate({ id: reporte.id })
+                      }
+                    }}
+                    loading={eliminarReporte.isLoading}
+                  >
+                    Eliminar reclamo
+                  </Button>
+                ) : null}
                 <Button
                   size="sm"
                   variant="secondary"

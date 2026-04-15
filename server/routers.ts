@@ -14,7 +14,7 @@ import { assignReporteToEmployee } from './reporte-assignment'
 import {
   getUserByUsername,
   getUsers, getSalesUsers, getUserById, createPanelUser, updateUserPassword, deactivateUser, updateUserWhatsapp,
-  crearReporte, getReportes, getReporteById, actualizarReporte, getEstadisticas,
+  crearReporte, getReportes, getReporteById, actualizarReporte, eliminarReporte, getEstadisticas,
   crearActualizacion, getActualizacionesByReporte,
   getEmpleados, crearEmpleado, actualizarEmpleado, getEmpleadoById, getEmpleadoActivoById,
   buildAttendanceTurns,
@@ -649,6 +649,14 @@ export const appRouter = router({
           tipo: 'nota',
           descripcion: input.nota,
         })
+        return { success: true }
+      }),
+
+    eliminar: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        await eliminarReporte(input.id)
         return { success: true }
       }),
 

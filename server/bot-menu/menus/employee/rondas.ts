@@ -4,26 +4,40 @@
  */
 import { BotSession, navigateTo, navigateBack } from '../../session'
 import { SEP, parseMenuOption, invalidOption, paginate, errorMsg } from '../../shared/guards'
-import { createRoundsService } from '../../../rounds/service'
-import * as roundDb from '../../../db'
+import { getBathroomRoundTasksForEmployee, acceptOperationalTask, persistOperationalTaskChange, addOperationalTaskEvent } from '../../../db'
 
-const roundsService = createRoundsService(roundDb as any)
+function getRondaEstadoLabel(estado: string): string {
+  switch (estado) {
+    case 'pendiente_confirmacion': return '⏳ Pendiente de confirmación'
+    case 'en_progreso': return '🔄 En progreso'
+    case 'pausada': return '⏸️ Pausada'
+    case 'terminada': return '✅ Completada'
+    case 'cancelada': return '❌ Cancelada'
+    case 'rechazada': return '🚫 Rechazada'
+    default: return `Estado: ${estado}`
+  }
+}
+
+function formatDuration(seconds: number): string {
+  const safe = Math.max(0, Math.floor(seconds))
+  const hours = Math.floor(safe / 3600)
+  const minutes = Math.floor((safe % 3600) / 60)
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m`
+  return `${safe}s`
+}
 
 // ─── Lista de rondas pendientes ───────────────────────────────────────────────
 
 export async function buildRondasLista(session: BotSession): Promise<string> {
-  const rondas = await getRondasPendientesEmpleado(session.userId)
+  const rondas = await getBathroomRoundTasksForEmployee(session.userId)
 
   if (rondas.length === 0) {
-    const proxima = await getProximaRondaEmpleado(session.userId)
-    const proximaStr = proxima
-      ? `⏰ Próximo control: *${proxima.programadoAtLabel ?? '—'}*`
-      : 'No hay controles programados para hoy.'
     return [
       `🚻 *Control de baños*`,
       SEP,
-      `✅ No tenés controles pendientes ahora.`,
-      proximaStr,
+      `✅ No tenés rondas asignadas ahora.`,
+      `Las rondas se asignan según el horario establecido.`,
       SEP,
       `0️⃣  Volver al menú principal`,
     ].join('\n')
@@ -32,19 +46,20 @@ export async function buildRondasLista(session: BotSession): Promise<string> {
   const page = session.contextData.page ?? 1
   const paged = paginate(rondas, page, 5)
   const lines = [
-    `🚻 *Controles pendientes* (${rondas.length})`,
+    `🚻 *Rondas asignadas* (${rondas.length})`,
     SEP,
   ]
 
   paged.items.forEach((r, i) => {
     const num = (page - 1) * 5 + i + 1
-    const demora = calcDemoraMin(r.programadoAt)
-    const estadoStr = demora > 0
-      ? `⏰ Pendiente (${demora} min de demora)`
-      : `⏳ Programado para ${r.programadoAtLabel}`
+    const estadoStr = getRondaEstadoLabel(r.estado)
+    const tiempoStr = r.tiempoTrabajadoSegundos > 0
+      ? ` (${formatDuration(r.tiempoTrabajadoSegundos)})`
+      : ''
     lines.push(
-      `${num}️⃣  *${r.nombreRonda}* — ${r.programadoAtLabel ?? '—'}`,
-      `   ${estadoStr}`,
+      `${num}️⃣  *${r.titulo}*`,
+      `   📍 ${r.ubicacion}`,
+      `   ${estadoStr}${tiempoStr}`,
       `   🔑 ID: ${r.id}`,
     )
   })
@@ -58,7 +73,7 @@ export async function buildRondasLista(session: BotSession): Promise<string> {
 }
 
 export async function handleRondasLista(session: BotSession, input: string): Promise<string> {
-  const rondas = await getRondasPendientesEmpleado(session.userId)
+  const rondas = await getBathroomRoundTasksForEmployee(session.userId)
   const page = session.contextData.page ?? 1
   const paged = paginate(rondas, page, 5)
 
@@ -85,49 +100,216 @@ export async function handleRondasLista(session: BotSession, input: string): Pro
 // ─── Detalle de ronda ─────────────────────────────────────────────────────────
 
 function buildRondaDetalle(ronda: any): string {
-  const demora = calcDemoraMin(ronda.programadoAt)
-  return [
-    `🚻 *${ronda.nombreRonda}*`,
-    `⏰ Programado: *${ronda.programadoAtLabel ?? '—'}*`,
-    demora > 0 ? `⚠️ Demora: ${demora} minutos` : '',
+  const estado = ronda.estado
+  const lines = [
+    `🚻 *${ronda.titulo}*`,
+    `📍 Ubicación: *${ronda.ubicacion}*`,
     `🔑 ID: *${ronda.id}*`,
+    `⏱️ Tiempo trabajado: *${formatDuration(ronda.tiempoTrabajadoSegundos)}*`,
     SEP,
-    `¿Resultado del control?`,
-    `1️⃣  ✅ Todo en orden`,
-    `2️⃣  ⚠️  Realizado con observación`,
-    `3️⃣  ❌ No pude realizar el control`,
-    `0️⃣  Volver`,
-  ].filter(Boolean).join('\n')
+  ]
+
+  if (estado === 'pendiente_confirmacion') {
+    lines.push(
+      `¿Aceptás esta ronda?`,
+      `1️⃣  ✅ Sí, comenzar ahora`,
+      `2️⃣  🚫 No puedo / Ocupado / Franco`,
+      `0️⃣  Volver`
+    )
+  } else if (estado === 'en_progreso') {
+    lines.push(
+      `¿Qué querés hacer?`,
+      `1️⃣  ✅ Completar ronda - Todo en orden`,
+      `2️⃣  ⚠️  Completar con observación`,
+      `3️⃣  ⏸️  Pausar temporalmente`,
+      `0️⃣  Volver`
+    )
+  } else if (estado === 'pausada') {
+    lines.push(
+      `Ronda pausada. ¿Continuar?`,
+      `1️⃣  ▶️  Reanudar ronda`,
+      `2️⃣  ✅ Completar ronda - Todo en orden`,
+      `3️⃣  ⚠️  Completar con observación`,
+      `0️⃣  Volver`
+    )
+  } else {
+    lines.push(
+      `Estado: ${getRondaEstadoLabel(estado)}`,
+      `0️⃣  Volver`
+    )
+  }
+
+  return lines.join('\n')
 }
 
 export async function handleRondaDetalle(session: BotSession, input: string): Promise<string> {
   const { rondaId } = session.contextData
   if (!rondaId) return errorMsg('No se encontró la ronda.')
 
-  if (input === '1') {
-    return finalizarRonda(session, rondaId as number, '3', undefined) // opción 3 = finalizar OK
-  }
-  if (input === '2') {
-    await navigateTo(session, 'ronda_observacion', { rondaId })
-    return buildRondaObservacion()
-  }
-  if (input === '3') {
-    return marcarNoPudo(session, rondaId as number)
-  }
-  if (input === '0') return null as any
-
-  // Buscar ronda para repintar el menú
-  const rondas = await getRondasPendientesEmpleado(session.userId)
+  // Obtener la tarea de ronda
+  const rondas = await getBathroomRoundTasksForEmployee(session.userId)
   const ronda = rondas.find(r => r.id === rondaId)
   if (!ronda) return errorMsg('Ronda no encontrada.')
+
+  const estado = ronda.estado
+
+  if (estado === 'pendiente_confirmacion') {
+    if (input === '1') {
+      // Aceptar y comenzar
+      try {
+        await acceptOperationalTask(rondaId as number, session.userId)
+        // Refrescar la ronda
+        const rondasActualizadas = await getBathroomRoundTasksForEmployee(session.userId)
+        const rondaActualizada = rondasActualizadas.find(r => r.id === rondaId)
+        return buildRondaDetalle(rondaActualizada || ronda)
+      } catch (error: any) {
+        return errorMsg(`Error al aceptar la ronda: ${error.message}`)
+      }
+    }
+    if (input === '2') {
+      // Rechazar
+      await navigateTo(session, 'ronda_rechazo', { rondaId })
+      return buildRondaRechazo()
+    }
+    if (input === '0') return null as any
+  } else if (estado === 'en_progreso') {
+    if (input === '1') {
+      // Completar OK
+      return await completarRonda(session, rondaId as number, 'Todo en orden')
+    }
+    if (input === '2') {
+      // Completar con observación
+      await navigateTo(session, 'ronda_observacion', { rondaId })
+      return buildRondaObservacion()
+    }
+    if (input === '3') {
+      // Pausar
+      try {
+        const tasksService = { pauseTask: async (input: any) => {
+          const now = new Date()
+          await persistOperationalTaskChange(rondaId as number, {
+            estado: 'pausada',
+            trabajoAcumuladoSegundos: ronda.tiempoTrabajadoSegundos,
+            trabajoIniciadoAt: null,
+            pausadoAt: now,
+          }, [{
+            tareaId: rondaId as number,
+            tipo: 'pausa',
+            actorTipo: 'employee',
+            actorId: session.userId,
+            actorNombre: session.userName,
+            descripcion: 'Ronda pausada por el empleado',
+            createdAt: now,
+          }])
+        }}
+        await tasksService.pauseTask({ taskId: rondaId, empleadoId: session.userId })
+        // Refrescar
+        const rondasActualizadas = await getBathroomRoundTasksForEmployee(session.userId)
+        const rondaActualizada = rondasActualizadas.find(r => r.id === rondaId)
+        return buildRondaDetalle(rondaActualizada || ronda)
+      } catch (error: any) {
+        return errorMsg(`Error al pausar: ${error.message}`)
+      }
+    }
+    if (input === '0') return null as any
+  } else if (estado === 'pausada') {
+    if (input === '1') {
+      // Reanudar
+      try {
+        const tasksService = { resumeTask: async (input: any) => {
+          const now = new Date()
+          await persistOperationalTaskChange(rondaId as number, {
+            estado: 'en_progreso',
+            trabajoIniciadoAt: now,
+            pausadoAt: null,
+          }, [{
+            tareaId: rondaId as number,
+            tipo: 'reanudar',
+            actorTipo: 'employee',
+            actorId: session.userId,
+            actorNombre: session.userName,
+            descripcion: 'Ronda reanudada',
+            createdAt: now,
+          }])
+        }}
+        await tasksService.resumeTask({ taskId: rondaId, empleadoId: session.userId })
+        // Refrescar
+        const rondasActualizadas = await getBathroomRoundTasksForEmployee(session.userId)
+        const rondaActualizada = rondasActualizadas.find(r => r.id === rondaId)
+        return buildRondaDetalle(rondaActualizada || ronda)
+      } catch (error: any) {
+        return errorMsg(`Error al reanudar: ${error.message}`)
+      }
+    }
+    if (input === '2') {
+      // Completar OK
+      return await completarRonda(session, rondaId as number, 'Todo en orden')
+    }
+    if (input === '3') {
+      // Completar con observación
+      await navigateTo(session, 'ronda_observacion', { rondaId })
+      return buildRondaObservacion()
+    }
+    if (input === '0') return null as any
+  }
+
   return invalidOption(buildRondaDetalle(ronda))
+}
+
+// ─── Sub-flujo: Rechazo ──────────────────────────────────────────────────────
+
+function buildRondaRechazo(): string {
+  return [
+    `🚫 *¿Por qué no podés hacer la ronda?*`,
+    SEP,
+    `1️⃣  Estoy ocupado con otra tarea`,
+    `2️⃣  Estoy de franco`,
+    `3️⃣  No puedo (otro motivo)`,
+    `0️⃣  Cancelar`,
+  ].join('\n')
+}
+
+export async function handleRondaRechazo(session: BotSession, input: string): Promise<string> {
+  const { rondaId } = session.contextData
+  if (!rondaId) return errorMsg('No se encontró la ronda.')
+
+  const motivos: Record<string, string> = {
+    '1': 'Empleado indicó que está ocupado',
+    '2': 'Empleado indicó que está de franco',
+    '3': 'Empleado indicó que no puede',
+  }
+
+  const motivo = motivos[input]
+  if (!motivo) {
+    if (input === '0') return null as any
+    return invalidOption(buildRondaRechazo())
+  }
+
+  try {
+    const now = new Date()
+    await persistOperationalTaskChange(rondaId as number, {
+      estado: 'rechazada',
+    }, [{
+      tareaId: rondaId as number,
+      tipo: 'rechazo',
+      actorTipo: 'employee',
+      actorId: session.userId,
+      actorNombre: session.userName,
+      descripcion: motivo,
+      createdAt: now,
+    }])
+
+    return `✅ Ronda rechazada. Será reasignada a otro empleado.`
+  } catch (error: any) {
+    return errorMsg(`Error al rechazar: ${error.message}`)
+  }
 }
 
 // ─── Sub-flujo: Observación ──────────────────────────────────────────────────
 
 function buildRondaObservacion(): string {
   return [
-    `⚠️  *¿Qué observaste?*`,
+    `⚠️  *¿Qué observaste en la ronda?*`,
     SEP,
     `1️⃣  🧻 Falta papel / toallas`,
     `2️⃣  🧴 Falta jabón / desinfectante`,
@@ -156,102 +338,46 @@ export async function handleRondaObservacion(session: BotSession, input: string)
 
   const obs = OBSERVACIONES[input]
   if (!obs) {
-    if (input === '0') {
-      await navigateBack(session)
-      const rondas = await getRondasPendientesEmpleado(session.userId)
-      const ronda = rondas.find(r => r.id === rondaId)
-      return ronda ? buildRondaDetalle(ronda) : await buildRondasLista(session)
-    }
+    if (input === '0') return null as any
     return invalidOption(buildRondaObservacion())
   }
 
-  return finalizarRonda(session, rondaId as number, '4', obs) // opción 4 = finalizar con observación
+  return await completarRonda(session, rondaId as number, obs)
 }
 
-export async function handleRondaObservacionLibre(session: BotSession, texto: string): Promise<string> {
+export async function handleRondaObservacionLibre(session: BotSession, input: string): Promise<string> {
   const { rondaId } = session.contextData
   if (!rondaId) return errorMsg('No se encontró la ronda.')
-  return finalizarRonda(session, rondaId as number, '4', texto.substring(0, 300))
+
+  if (!input.trim()) return `✏️  Escribí la observación brevemente:`
+
+  return await completarRonda(session, rondaId as number, input.trim())
 }
 
-// ─── Acciones sobre ronda ─────────────────────────────────────────────────────
+// ─── Función auxiliar para completar ronda ───────────────────────────────────
 
-async function finalizarRonda(
-  session: BotSession,
-  occurrenceId: number,
-  opcion: string,
-  nota: string | undefined
-): Promise<string> {
+async function completarRonda(session: BotSession, rondaId: number, observacion: string): Promise<string> {
   try {
-    if (opcion === '3') {
-      await roundsService.finishOccurrence({ occurrenceId, empleadoId: session.userId, note: nota })
-    } else {
-      await roundsService.reportObservation({ occurrenceId, empleadoId: session.userId, note: nota })
-    }
+    const tasksService = { finishTask: async (input: any) => {
+      const now = new Date()
+      await persistOperationalTaskChange(rondaId, {
+        estado: 'terminada',
+        terminadoAt: now,
+      }, [{
+        tareaId: rondaId,
+        tipo: 'terminacion',
+        actorTipo: 'employee',
+        actorId: session.userId,
+        actorNombre: session.userName,
+        descripcion: `Ronda completada: ${observacion}`,
+        metadata: { observacion },
+        createdAt: now,
+      }])
+    }}
+    await tasksService.finishTask({ taskId: rondaId, empleadoId: session.userId, note: observacion })
 
-    await navigateTo(session, 'rondas_lista', { page: 1 })
-    const conObs = opcion === '4'
-    return [
-      conObs ? `⚠️  *Control registrado con observación.*` : `✅ *Control registrado.*`,
-      conObs && nota ? `📝 Observación: "${nota}"` : '',
-      conObs ? `\nSe notificó al encargado.` : ``,
-      ``,
-      `0️⃣  Volver a controles`,
-    ].filter(l => l !== '').join('\n')
-  } catch (e: any) {
-    return errorMsg(e?.message ?? 'No se pudo registrar el control.')
+    return `✅ Ronda completada exitosamente!\n\nObservación: ${observacion}`
+  } catch (error: any) {
+    return errorMsg(`Error al completar: ${error.message}`)
   }
-}
-
-async function marcarNoPudo(session: BotSession, occurrenceId: number): Promise<string> {
-  try {
-    await roundsService.markUnableToComplete({ occurrenceId, empleadoId: session.userId })
-    await navigateTo(session, 'rondas_lista', { page: 1 })
-    return [
-      `❌ *Control marcado como no realizado.*`,
-      `Se notificó al encargado.`,
-      ``,
-      `0️⃣  Volver a controles`,
-    ].join('\n')
-  } catch (e: any) {
-    return errorMsg(e?.message ?? 'No se pudo registrar.')
-  }
-}
-
-// ─── DB helpers ───────────────────────────────────────────────────────────────
-
-async function getRondasPendientesEmpleado(empleadoId: number): Promise<any[]> {
-  const { db: dbInstance, rondasOcurrencia } = await import('../../../db').then(async (m) => {
-    // Acceso directo a la tabla via drizzle
-    const { createClient } = await import('@libsql/client')
-    const { drizzle } = await import('drizzle-orm/libsql')
-    const { eq, and, or } = await import('drizzle-orm')
-    const schema = await import('../../../../drizzle/schema')
-    const { readEnv } = await import('../../../_core/env')
-    const cl = createClient({ url: readEnv('TURSO_URL')!, authToken: readEnv('TURSO_TOKEN')! })
-    const db = drizzle(cl, { schema })
-    const rows = await db.select().from(schema.rondasOcurrencia).where(
-      and(
-        eq(schema.rondasOcurrencia.empleadoId, empleadoId),
-        or(
-          eq(schema.rondasOcurrencia.estado, 'pendiente'),
-          eq(schema.rondasOcurrencia.estado, 'iniciada' as any),
-        )
-      )
-    )
-    return { db, rondasOcurrencia: rows }
-  })
-  return rondasOcurrencia ?? []
-}
-
-async function getProximaRondaEmpleado(empleadoId: number): Promise<any | null> {
-  const pendientes = await getRondasPendientesEmpleado(empleadoId)
-  return pendientes.length > 0 ? pendientes[0] : null
-}
-
-function calcDemoraMin(programadoAt: Date | number | null | undefined): number {
-  if (!programadoAt) return 0
-  const ts = programadoAt instanceof Date ? programadoAt.getTime() : Number(programadoAt) * 1000
-  const diff = Math.floor((Date.now() - ts) / 60000)
-  return diff > 0 ? diff : 0
 }

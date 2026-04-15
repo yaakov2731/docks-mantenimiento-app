@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client'
 import { drizzle } from 'drizzle-orm/libsql'
-import { eq, and, or, like, inArray, sql, desc } from 'drizzle-orm'
+import { eq, and, or, like, inArray, sql, desc, not, isNull } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import * as schema from '../drizzle/schema'
 import { readEnv } from './_core/env'
@@ -736,6 +736,12 @@ export async function getReporteById(id: number) {
 export async function actualizarReporte(id: number, data: Partial<typeof schema.reportes.$inferInsert>) {
   await db.update(schema.reportes).set({ ...data, updatedAt: new Date() } as any).where(eq(schema.reportes.id, id)).run()
 }
+
+export async function eliminarReporte(id: number) {
+  await db.delete(schema.actualizaciones).where(eq(schema.actualizaciones.reporteId, id)).run()
+  await db.delete(schema.reportes).where(eq(schema.reportes.id, id)).run()
+}
+
 export function getReporteTiempoTrabajadoSegundos(reporte: any) {
   const acumulado = Number(reporte.trabajoAcumuladoSegundos ?? 0)
   if (!reporte.trabajoIniciadoAt) return acumulado
@@ -1262,6 +1268,101 @@ export async function getOperationalTasksOverview() {
       a.empleadoNombre.localeCompare(b.empleadoNombre)
     ),
   }
+}
+
+// --- TAREAS DE RONDAS DE BAÑOS ASIGNABLES ---
+export async function createBathroomRoundTask(input: {
+  empleadoId: number
+  empleadoNombre: string
+  empleadoWaId?: string
+  titulo: string
+  descripcion: string
+  ubicacion: string
+  prioridad: 'baja' | 'media' | 'alta' | 'urgente'
+  checklistObjetivo?: string
+  intervaloHoras?: number
+  programadoPara?: Date
+}): Promise<number> {
+  const now = new Date()
+  const taskId = await createOperationalTask({
+    origen: 'manual',
+    tipoTrabajo: 'ronda_banos',
+    titulo: input.titulo,
+    descripcion: input.descripcion,
+    ubicacion: input.ubicacion,
+    prioridad: input.prioridad,
+    estado: 'pendiente_asignacion',
+    empleadoId: input.empleadoId,
+    empleadoNombre: input.empleadoNombre,
+    empleadoWaId: input.empleadoWaId,
+    asignadoAt: now,
+    ordenAsignacion: 0,
+    createdAt: now,
+    updatedAt: now,
+  })
+
+  // Agregar evento de asignación
+  await addOperationalTaskEvent({
+    tareaId: taskId,
+    tipo: 'asignacion',
+    actorTipo: 'admin',
+    actorId: null,
+    actorNombre: 'Sistema',
+    descripcion: `Ronda de baños asignada: ${input.titulo}`,
+    metadata: {
+      tipoTrabajo: 'ronda_banos',
+      checklistObjetivo: input.checklistObjetivo,
+      intervaloHoras: input.intervaloHoras,
+      programadoPara: input.programadoPara?.toISOString(),
+    },
+    createdAt: now,
+  })
+
+  return taskId
+}
+
+export async function getBathroomRoundTasksForEmployee(empleadoId: number) {
+  const rows = await db.select().from(schema.tareasOperativas)
+    .where(and(
+      eq(schema.tareasOperativas.tipoTrabajo, 'ronda_banos'),
+      eq(schema.tareasOperativas.empleadoId, empleadoId),
+      not(inArray(schema.tareasOperativas.estado, ['terminada', 'cancelada', 'rechazada']))
+    ))
+    .orderBy(desc(schema.tareasOperativas.createdAt))
+
+  return rows.map(toOperationalTaskRecord)
+}
+
+export async function getUnassignedBathroomRoundTasks() {
+  const rows = await db.select().from(schema.tareasOperativas)
+    .where(and(
+      eq(schema.tareasOperativas.tipoTrabajo, 'ronda_banos'),
+      isNull(schema.tareasOperativas.empleadoId)
+    ))
+    .orderBy(desc(schema.tareasOperativas.createdAt))
+
+  return rows.map(toOperationalTaskRecord)
+}
+
+export async function assignBathroomRoundTask(taskId: number, empleadoId: number, empleadoNombre: string, empleadoWaId?: string) {
+  const now = new Date()
+  await updateOperationalTask(taskId, {
+    empleadoId,
+    empleadoNombre,
+    empleadoWaId,
+    estado: 'pendiente_confirmacion',
+    asignadoAt: now,
+  })
+
+  await addOperationalTaskEvent({
+    tareaId: taskId,
+    tipo: 'asignacion',
+    actorTipo: 'admin',
+    actorId: null,
+    actorNombre: 'Sistema',
+    descripcion: `Ronda asignada a ${empleadoNombre}`,
+    createdAt: now,
+  })
 }
 
 // --- NOTIFICACIONES ---

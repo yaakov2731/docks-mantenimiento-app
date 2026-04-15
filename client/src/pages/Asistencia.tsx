@@ -152,6 +152,53 @@ function groupTurnsByDay(turns: any[]) {
   return [...groups.values()]
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function getAttendanceDateKey(ms: number) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(ms))
+}
+
+function getPeriodHeaders(periodo?: any) {
+  if (!periodo?.startMs || !periodo?.endMs) return []
+  const headers = []
+  for (let cursor = periodo.startMs; cursor < periodo.endMs; cursor += DAY_MS) {
+    headers.push({
+      key: getAttendanceDateKey(cursor),
+      label: new Date(cursor).toLocaleDateString('es-AR', { day: '2-digit', weekday: 'short', timeZone: 'America/Argentina/Buenos_Aires' }),
+    })
+  }
+  return headers
+}
+
+function renderAttendanceDayCell(day: any) {
+  if (!day) {
+    return <span className="text-slate-400">–</span>
+  }
+  const worked = day.workedSeconds ?? 0
+  const hasAny = day.entradas || day.salidas || day.iniciosAlmuerzo || day.finesAlmuerzo
+  if (!hasAny) {
+    return <span className="text-slate-400">–</span>
+  }
+  return (
+    <div className="space-y-0.5 text-[11px] leading-tight">
+      <div className={worked > 0 ? 'text-emerald-700 font-semibold' : 'text-slate-700'}>
+        {worked > 0 ? '✔' : '•'} {worked > 0 ? <WorkingTime seconds={worked} /> : 'Registro'}
+      </div>
+      <div className="flex flex-wrap gap-1 text-[10px] text-slate-500">
+        {day.entradas ? <span className="rounded-full bg-slate-100 px-1.5">E {day.entradas}</span> : null}
+        {day.salidas ? <span className="rounded-full bg-slate-100 px-1.5">S {day.salidas}</span> : null}
+        {day.iniciosAlmuerzo ? <span className="rounded-full bg-slate-100 px-1.5">I {day.iniciosAlmuerzo}</span> : null}
+        {day.finesAlmuerzo ? <span className="rounded-full bg-slate-100 px-1.5">F {day.finesAlmuerzo}</span> : null}
+      </div>
+    </div>
+  )
+}
+
 function TurnChip({ turn }: { turn: any }) {
   const active = !!turn.turnoAbierto
   return (
@@ -228,6 +275,14 @@ export default function Asistencia() {
   )
 
   const canExport = !!resumen.data && empleados.length > 0
+
+  const periodHeaders = useMemo(() => getPeriodHeaders(periodoInfo), [periodoInfo])
+  const attendanceMatrix = useMemo(() => {
+    return empleados.map((empleado: any) => ({
+      ...empleado,
+      dailyByFecha: new Map((empleado.liquidacion?.dias ?? []).map((dia: any) => [dia.fecha, dia])),
+    }))
+  }, [empleados])
 
   const digitalTime = now.toLocaleTimeString('es-AR', {
     hour: '2-digit',
@@ -414,6 +469,44 @@ export default function Asistencia() {
               Actualizar tablero
             </Button>
           </div>
+
+          <div className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-slate-400">Relojes del equipo</div>
+                <div className="mt-1 text-sm text-slate-500">Vista rápida de quién está en turno o almuerzo.</div>
+              </div>
+              <Clock3 size={18} className="text-primary" />
+            </div>
+            <div className="mt-4 space-y-3 max-h-[360px] overflow-y-auto pr-1">
+              {empleados.map((empleado: any) => {
+                const onShift = !!empleado.attendance?.onShift
+                const onLunch = !!empleado.attendance?.onLunch
+                const statusLabel = onLunch ? 'Almuerzo' : onShift ? 'En servicio' : 'Fuera de turno'
+                const statusTone = onLunch ? 'bg-amber-100 text-amber-700' : onShift ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                const currentSeconds = onLunch
+                  ? empleado.attendance?.currentLunchSeconds ?? 0
+                  : onShift
+                    ? empleado.attendance?.currentShiftSeconds ?? 0
+                    : 0
+                return (
+                  <div key={empleado.empleadoId} className="rounded-[18px] border border-slate-200 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-800 truncate">{empleado.nombre}</div>
+                        <div className="text-[11px] text-slate-500">{empleado.especialidad || 'Mantenimiento general'}</div>
+                      </div>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${statusTone}`}>{statusLabel}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+                      <div>{currentSeconds > 0 ? <><span className="font-semibold text-slate-700"><WorkingTime seconds={currentSeconds} /></span> en reloj</> : 'Sin turno abierto'}</div>
+                      <div>{empleado.attendance?.lastActionAt ? formatTime(empleado.attendance.lastActionAt) : 'N/A'}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -453,6 +546,42 @@ export default function Asistencia() {
           tone="amber"
           icon={Wallet}
         />
+      </div>
+
+      <div className="surface-panel rounded-[24px] p-4 mb-4 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-heading font-semibold text-lg text-gray-900">Control mensual de asistencia</h3>
+            <p className="text-sm text-slate-500">Registro día a día para todo el período seleccionado.</p>
+          </div>
+          <div className="text-xs uppercase tracking-[0.24em] text-slate-400">
+            {periodoInfo?.label ?? 'Período'} · {periodoInfo?.desde} a {periodoInfo?.hasta}
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="whitespace-nowrap border-b border-slate-200 px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Empleado</th>
+                {periodHeaders.map((day) => (
+                  <th key={day.key} className="border-b border-slate-200 px-2 py-2 text-center text-[10px] uppercase text-slate-500">{day.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {attendanceMatrix.map((empleado: any) => (
+                <tr key={empleado.empleadoId} className="even:bg-slate-50">
+                  <td className="border-b border-slate-200 px-3 py-2 font-medium text-slate-800">{empleado.nombre}</td>
+                  {periodHeaders.map((day) => (
+                    <td key={day.key} className="border-b border-slate-200 px-2 py-2 align-top text-center">
+                      {renderAttendanceDayCell(empleado.dailyByFecha.get(day.key))}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="grid 2xl:grid-cols-[1.65fr_0.95fr] gap-4">
