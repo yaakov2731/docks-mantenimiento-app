@@ -58,7 +58,7 @@ export default function Home() {
   if (step === 'success') {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <header className="bg-primary px-6 py-5">
+        <header className="bg-gradient-to-r from-slate-950 via-blue-950 to-blue-900 px-6 py-5">
           <div className="max-w-2xl mx-auto">
             <BrandLogo variant="dark" size="sm" />
           </div>
@@ -95,7 +95,7 @@ export default function Home() {
     <div className="min-h-screen bg-background">
 
       {/* Header — single dark band */}
-      <header className="bg-primary px-6 pt-6 pb-10">
+      <header className="bg-gradient-to-r from-slate-950 via-blue-950 to-blue-900 px-6 pt-6 pb-10">
         <div className="max-w-2xl mx-auto flex items-start justify-between gap-4">
           <BrandLogo variant="dark" size="md" showTagline />
           <a
