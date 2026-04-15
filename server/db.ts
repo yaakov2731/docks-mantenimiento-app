@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client'
 import { drizzle } from 'drizzle-orm/libsql'
-import { eq, and, or, like } from 'drizzle-orm'
+import { eq, and, or, like, inArray, sql, desc } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import * as schema from '../drizzle/schema'
 import { readEnv } from './_core/env'
@@ -70,6 +70,10 @@ export async function initDb() {
       telefono TEXT,
       especialidad TEXT,
       wa_id TEXT,
+      pago_diario INTEGER NOT NULL DEFAULT 0,
+      pago_semanal INTEGER NOT NULL DEFAULT 0,
+      pago_quincenal INTEGER NOT NULL DEFAULT 0,
+      pago_mensual INTEGER NOT NULL DEFAULT 0,
       activo INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
@@ -212,6 +216,10 @@ export async function initDb() {
       programado_at_label TEXT,
       recordatorio_enviado_at INTEGER,
       confirmado_at INTEGER,
+      inicio_real_at INTEGER,
+      pausado_at INTEGER,
+      fin_real_at INTEGER,
+      tiempo_acumulado_segundos INTEGER NOT NULL DEFAULT 0,
       empleado_id INTEGER NOT NULL,
       empleado_nombre TEXT NOT NULL,
       empleado_wa_id TEXT NOT NULL,
@@ -295,6 +303,14 @@ export async function initDb() {
     `ALTER TABLE leads ADD COLUMN asignado_a TEXT`,
     `ALTER TABLE leads ADD COLUMN asignado_id INTEGER`,
     `ALTER TABLE empleado_asistencia ADD COLUMN timestamp INTEGER`,
+    `ALTER TABLE empleados ADD COLUMN pago_diario INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE empleados ADD COLUMN pago_semanal INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE empleados ADD COLUMN pago_quincenal INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE empleados ADD COLUMN pago_mensual INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN inicio_real_at INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN pausado_at INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN fin_real_at INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN tiempo_acumulado_segundos INTEGER NOT NULL DEFAULT 0`,
   ]
   for (const sql of alterStmts) {
     try {
@@ -354,71 +370,107 @@ export async function getEmpleadoAttendanceEvents(empleadoId: number) {
   return rows.sort((a, b) => getAttendanceEventTime(a) - getAttendanceEventTime(b))
 }
 
+export function buildAttendanceTurns(events: Array<any>, now = Date.now()) {
+  const sortedEvents = [...events].sort((a, b) => getAttendanceEventTime(a) - getAttendanceEventTime(b))
+  const turns: Array<any> = []
+  let currentTurn: any = null
+
+  for (const event of sortedEvents) {
+    const eventMs = getAttendanceEventTime(event)
+
+    if (event.tipo === 'entrada') {
+      currentTurn = {
+        fecha: toBuenosAiresDateKey(eventMs),
+        entradaAt: new Date(eventMs),
+        salidaAt: null,
+        inicioAlmuerzoAt: null,
+        finAlmuerzoAt: null,
+        lunchStartedAt: null as Date | null,
+        grossSeconds: 0,
+        lunchSeconds: 0,
+        workedSeconds: 0,
+        entradaCanal: event.canal ?? null,
+        salidaCanal: null,
+        turnoAbierto: true,
+      }
+      turns.push(currentTurn)
+      continue
+    }
+
+    if (!currentTurn) continue
+
+    if (event.tipo === 'inicio_almuerzo' && !currentTurn.lunchStartedAt) {
+      currentTurn.inicioAlmuerzoAt = new Date(eventMs)
+      currentTurn.lunchStartedAt = new Date(eventMs)
+      continue
+    }
+
+    if (event.tipo === 'fin_almuerzo' && currentTurn.lunchStartedAt) {
+      currentTurn.finAlmuerzoAt = new Date(eventMs)
+      currentTurn.lunchSeconds += Math.max(0, Math.floor((eventMs - currentTurn.lunchStartedAt.getTime()) / 1000))
+      currentTurn.lunchStartedAt = null
+      continue
+    }
+
+    if (event.tipo === 'salida') {
+      currentTurn.salidaAt = new Date(eventMs)
+      currentTurn.salidaCanal = event.canal ?? null
+      currentTurn.grossSeconds = Math.max(0, Math.floor((eventMs - currentTurn.entradaAt.getTime()) / 1000))
+      if (currentTurn.lunchStartedAt) {
+        currentTurn.lunchSeconds += Math.max(0, Math.floor((eventMs - currentTurn.lunchStartedAt.getTime()) / 1000))
+        currentTurn.lunchStartedAt = null
+      }
+      currentTurn.workedSeconds = Math.max(0, currentTurn.grossSeconds - currentTurn.lunchSeconds)
+      currentTurn.turnoAbierto = false
+      currentTurn = null
+    }
+  }
+
+  if (currentTurn) {
+    const grossSeconds = Math.max(0, Math.floor((now - currentTurn.entradaAt.getTime()) / 1000))
+    const lunchSeconds = currentTurn.lunchStartedAt
+      ? currentTurn.lunchSeconds + Math.max(0, Math.floor((now - currentTurn.lunchStartedAt.getTime()) / 1000))
+      : currentTurn.lunchSeconds
+    currentTurn.grossSeconds = grossSeconds
+    currentTurn.lunchSeconds = lunchSeconds
+    currentTurn.workedSeconds = Math.max(0, grossSeconds - lunchSeconds)
+    currentTurn.turnoAbierto = true
+  }
+
+  return turns.map((turn, index) => ({
+    ...turn,
+    id: `${turn.fecha}-${index + 1}-${turn.entradaAt?.getTime?.() ?? index + 1}`,
+  }))
+}
+
 export async function getEmpleadoAttendanceStatus(empleadoId: number) {
   const rows = await getEmpleadoAttendanceEvents(empleadoId)
   const latest = rows[rows.length - 1] ?? null
   const { start, end } = getBuenosAiresDayRange()
   const now = Date.now()
-
-  let shiftStartedAt: number | null = null
-  let lunchStartedAt: number | null = null
-  let grossWorkedSecondsToday = 0
-  let todayLunchSeconds = 0
-
-  const sumSegmentWithinToday = (segmentStart: number | null, segmentEnd: number) => {
-    if (segmentStart === null) return 0
-    const boundedStart = Math.max(segmentStart, start)
-    const boundedEnd = Math.min(segmentEnd, end)
-    if (boundedEnd <= boundedStart) return 0
-    return Math.floor((boundedEnd - boundedStart) / 1000)
-  }
-
-  for (const row of rows) {
-    const rowMs = getAttendanceEventTime(row)
-    if (row.tipo === 'entrada') {
-      shiftStartedAt = rowMs
-      lunchStartedAt = null
-      continue
-    }
-
-    if (row.tipo === 'inicio_almuerzo' && shiftStartedAt !== null && lunchStartedAt === null) {
-      lunchStartedAt = rowMs
-      continue
-    }
-
-    if (row.tipo === 'fin_almuerzo' && shiftStartedAt !== null && lunchStartedAt !== null) {
-      todayLunchSeconds += sumSegmentWithinToday(lunchStartedAt, rowMs)
-      lunchStartedAt = null
-      continue
-    }
-
-    if (row.tipo === 'salida' && shiftStartedAt !== null) {
-      grossWorkedSecondsToday += sumSegmentWithinToday(shiftStartedAt, rowMs)
-      if (lunchStartedAt !== null) {
-        todayLunchSeconds += sumSegmentWithinToday(lunchStartedAt, rowMs)
-      }
-      shiftStartedAt = null
-      lunchStartedAt = null
-    }
-  }
-
-  if (shiftStartedAt !== null) {
-    grossWorkedSecondsToday += sumSegmentWithinToday(shiftStartedAt, now)
-    if (lunchStartedAt !== null) {
-      todayLunchSeconds += sumSegmentWithinToday(lunchStartedAt, now)
-    }
-  }
-
-  const workedSecondsToday = Math.max(0, grossWorkedSecondsToday - todayLunchSeconds)
+  const turns = buildAttendanceTurns(rows, now)
   const todayRows = rows.filter(row => isWithinDay(getAttendanceEventTime(row), start, end))
+  const todayTurns = turns.filter(turn => {
+    const entryMs = turn.entradaAt instanceof Date ? turn.entradaAt.getTime() : 0
+    return isWithinDay(entryMs, start, end)
+  })
   const lastEntry = [...rows].reverse().find(row => row.tipo === 'entrada') ?? null
   const lastExit = [...rows].reverse().find(row => row.tipo === 'salida') ?? null
   const lastLunchStart = [...rows].reverse().find(row => row.tipo === 'inicio_almuerzo') ?? null
   const lastLunchEnd = [...rows].reverse().find(row => row.tipo === 'fin_almuerzo') ?? null
-  const onShift = shiftStartedAt !== null
-  const onLunch = lunchStartedAt !== null
-  const currentShiftSeconds = onShift ? workedSecondsToday : 0
-  const currentLunchSeconds = onLunch ? sumSegmentWithinToday(lunchStartedAt, now) : 0
+  const currentTurn = [...turns].reverse().find(turn => turn.turnoAbierto) ?? null
+  const lastCompletedTurn = [...turns].reverse().find(turn => !turn.turnoAbierto) ?? null
+  const onShift = !!currentTurn
+  const onLunch = !!currentTurn?.lunchStartedAt
+  const currentShiftGrossSeconds = onShift ? Number(currentTurn?.grossSeconds ?? 0) : 0
+  const currentShiftLunchSeconds = onShift ? Number(currentTurn?.lunchSeconds ?? 0) : 0
+  const workedSecondsToday = onShift ? Math.max(0, currentShiftGrossSeconds - currentShiftLunchSeconds) : 0
+  const grossWorkedSecondsToday = onShift ? currentShiftGrossSeconds : 0
+  const todayLunchSeconds = todayTurns.reduce((total, turn) => total + Number(turn.lunchSeconds ?? 0), 0)
+  const currentShiftSeconds = workedSecondsToday
+  const currentLunchSeconds = onLunch && currentTurn?.lunchStartedAt
+    ? Math.max(0, Math.floor((now - currentTurn.lunchStartedAt.getTime()) / 1000))
+    : 0
 
   return {
     onShift,
@@ -428,18 +480,26 @@ export async function getEmpleadoAttendanceStatus(empleadoId: number) {
     lastChannel: latest?.canal ?? null,
     lastEntryAt: lastEntry ? new Date(getAttendanceEventTime(lastEntry)) : null,
     lastExitAt: lastExit ? new Date(getAttendanceEventTime(lastExit)) : null,
-    lunchStartedAt: lunchStartedAt ? new Date(lunchStartedAt) : null,
+    lunchStartedAt: currentTurn?.lunchStartedAt ?? null,
     lastLunchStartAt: lastLunchStart ? new Date(getAttendanceEventTime(lastLunchStart)) : null,
     lastLunchEndAt: lastLunchEnd ? new Date(getAttendanceEventTime(lastLunchEnd)) : null,
     workedSecondsToday,
     grossWorkedSecondsToday,
     todayLunchSeconds,
+    currentShiftGrossSeconds,
+    currentShiftLunchSeconds,
     currentShiftSeconds,
     currentLunchSeconds,
+    lastShiftGrossSeconds: Number(lastCompletedTurn?.grossSeconds ?? 0),
+    lastShiftLunchSeconds: Number(lastCompletedTurn?.lunchSeconds ?? 0),
+    lastShiftWorkedSeconds: Number(lastCompletedTurn?.workedSeconds ?? 0),
+    lastShiftStartedAt: lastCompletedTurn?.entradaAt ?? null,
+    lastShiftEndedAt: lastCompletedTurn?.salidaAt ?? null,
     todayEntries: todayRows.filter(row => row.tipo === 'entrada').length,
     todayLunchStarts: todayRows.filter(row => row.tipo === 'inicio_almuerzo').length,
     todayLunchEnds: todayRows.filter(row => row.tipo === 'fin_almuerzo').length,
     todayExits: todayRows.filter(row => row.tipo === 'salida').length,
+    todayTurns: todayTurns.length,
   }
 }
 
@@ -484,6 +544,13 @@ export async function registerEmpleadoAttendance(
     canal,
     nota,
   }).run()
+
+  await syncLegacyAttendanceMirror({
+    empleadoId,
+    tipo,
+    canal,
+    nota,
+  })
 
   return {
     success: true,
@@ -808,33 +875,41 @@ export async function getEmpleadoByWaId(waNumber: string) {
 }
 export async function getJornadaActivaEmpleado(empleadoId: number) {
   const rows = await db.select().from(schema.marcacionesEmpleados).where(eq(schema.marcacionesEmpleados.empleadoId, empleadoId))
-  return rows
+  const active = rows
     .filter(row => !row.salidaAt)
     .sort((a, b) => new Date(b.entradaAt as any).getTime() - new Date(a.entradaAt as any).getTime())[0] ?? null
+  if (active) return active
+
+  const attendance = await getEmpleadoAttendanceStatus(empleadoId)
+  if (!attendance.onShift || !attendance.lastEntryAt) return null
+
+  const inserted = await db.insert(schema.marcacionesEmpleados).values({
+    empleadoId,
+    entradaAt: attendance.lastEntryAt,
+    fuente: mapAttendanceChannelToLegacyFuente(attendance.lastChannel),
+    notaEntrada: null,
+  } as any).returning()
+  return inserted[0] ?? null
 }
 export async function registrarEntradaEmpleado(empleadoId: number, opts?: { fuente?: 'whatsapp' | 'panel' | 'otro'; nota?: string }) {
   const jornadaActiva = await getJornadaActivaEmpleado(empleadoId)
   if (jornadaActiva) return { marcacion: jornadaActiva, alreadyOpen: true as const }
-  const inserted = await db.insert(schema.marcacionesEmpleados).values({
+  const result = await registerEmpleadoAttendance(
     empleadoId,
-    entradaAt: new Date(),
-    fuente: opts?.fuente ?? 'whatsapp',
-    notaEntrada: opts?.nota?.trim() || null,
-  } as any).returning()
-  return { marcacion: inserted[0], alreadyOpen: false as const }
+    'entrada',
+    mapLegacyFuenteToAttendanceChannel(opts?.fuente),
+    opts?.nota,
+  )
+  return {
+    marcacion: await getJornadaActivaEmpleado(empleadoId),
+    alreadyOpen: !result.success,
+  }
 }
 export async function registrarSalidaEmpleado(empleadoId: number, opts?: { nota?: string }) {
   const jornadaActiva = await getJornadaActivaEmpleado(empleadoId)
   if (!jornadaActiva) return null
-  const now = new Date()
-  const entradaMs = new Date(jornadaActiva.entradaAt as any).getTime()
-  const duracionSegundos = Math.max(0, Math.floor((now.getTime() - entradaMs) / 1000))
-  await db.update(schema.marcacionesEmpleados).set({
-    salidaAt: now,
-    duracionSegundos,
-    notaSalida: opts?.nota?.trim() || null,
-    updatedAt: now,
-  } as any).where(eq(schema.marcacionesEmpleados.id, jornadaActiva.id)).run()
+  const result = await registerEmpleadoAttendance(empleadoId, 'salida', 'whatsapp', opts?.nota)
+  if (!result.success) return null
   const rows = await db.select().from(schema.marcacionesEmpleados).where(eq(schema.marcacionesEmpleados.id, jornadaActiva.id))
   return rows[0] ?? null
 }
@@ -960,6 +1035,31 @@ export async function listOperationalTasks() {
 export async function listOperationalTasksByEmployee(empleadoId: number) {
   const rows = await db.select().from(schema.tareasOperativas).where(eq(schema.tareasOperativas.empleadoId, empleadoId))
   return rows.map(toOperationalTaskRecord).sort(compareOperationalTasks)
+}
+
+export async function deleteOperationalTasks(taskIds: number[]) {
+  const ids = [...new Set(taskIds.filter((id) => Number.isFinite(id)))]
+  if (ids.length === 0) return 0
+
+  return db.transaction(async (tx) => {
+    const rows = await tx.select({ id: schema.tareasOperativas.id })
+      .from(schema.tareasOperativas)
+      .where(inArray(schema.tareasOperativas.id, ids))
+
+    if (rows.length === 0) return 0
+
+    const existingIds = rows.map((row) => row.id)
+
+    await tx.delete(schema.tareasOperativasEvento)
+      .where(inArray(schema.tareasOperativasEvento.tareaId, existingIds))
+      .run()
+
+    await tx.delete(schema.tareasOperativas)
+      .where(inArray(schema.tareasOperativas.id, existingIds))
+      .run()
+
+    return existingIds.length
+  })
 }
 
 export async function getNextOperationalTaskForEmployee(empleadoId: number, currentTaskId?: number) {
@@ -1190,8 +1290,118 @@ export async function getPendingBotMessages() {
 export async function markBotMessageSent(id: number) {
   await db.update(schema.botQueue).set({ status: 'sent' }).where(eq(schema.botQueue.id, id)).run()
 }
-export async function markBotMessageFailed(id: number) {
-  await db.update(schema.botQueue).set({ status: 'failed' }).where(eq(schema.botQueue.id, id)).run()
+export async function markBotMessageFailed(id: number, errorMsg?: string) {
+  // Incrementa el contador de reintentos. Si supera MAX_RETRIES pasa a dead_letter.
+  const MAX_RETRIES = 3
+  const [current] = await db.select().from(schema.botQueue).where(eq(schema.botQueue.id, id))
+  if (!current) return
+
+  const newRetryCount = ((current as any).retryCount ?? 0) + 1
+  const isDead = newRetryCount >= MAX_RETRIES
+
+  await db.update(schema.botQueue).set({
+    status: isDead ? 'dead_letter' : 'failed',
+    retryCount: newRetryCount,
+    errorMsg: errorMsg ?? (current as any).errorMsg ?? 'Error desconocido',
+    lastAttemptAt: new Date(),
+  } as any).where(eq(schema.botQueue.id, id)).run()
+}
+
+/** Reinicia mensajes fallidos a 'pending' para reintento. */
+export async function retryFailedBotMessages() {
+  await db.update(schema.botQueue).set({
+    status: 'pending',
+    lastAttemptAt: new Date(),
+  } as any).where(eq(schema.botQueue.status, 'failed')).run()
+}
+
+/** Devuelve mensajes en dead_letter (fallaron definitivamente). */
+export async function getDeadLetterBotMessages() {
+  return db.select().from(schema.botQueue)
+    .where(eq(schema.botQueue.status, 'dead_letter' as any))
+    .orderBy(desc(schema.botQueue.createdAt))
+}
+
+/** Registra un heartbeat del bot local (upsert, siempre 1 registro). */
+export async function registerBotHeartbeat(params?: { botVersion?: string; pendingCount?: number }) {
+  const existing = await db.select().from(schema.botHeartbeat).limit(1)
+  if (existing.length > 0) {
+    await db.update(schema.botHeartbeat).set({
+      lastSeenAt: new Date(),
+      botVersion: params?.botVersion ?? (existing[0] as any).botVersion,
+      pendingCount: params?.pendingCount ?? 0,
+    } as any).run()
+  } else {
+    await db.insert(schema.botHeartbeat).values({
+      lastSeenAt: new Date(),
+      botVersion: params?.botVersion,
+      pendingCount: params?.pendingCount ?? 0,
+    } as any).run()
+  }
+}
+
+/** Devuelve el estado de conexión del bot. */
+export async function getBotConnectionStatus() {
+  const [latest] = await db.select().from(schema.botHeartbeat).limit(1)
+  const TIMEOUT_MS = 30 * 60 * 1000 // 30 minutos sin heartbeat = desconectado
+  if (!latest) return { connected: false, lastSeenAt: null, minutesSince: null }
+
+  const lastSeenAt = (latest as any).lastSeenAt as Date
+  const minutesSince = Math.floor((Date.now() - lastSeenAt.getTime()) / 60000)
+  return {
+    connected: minutesSince < 30,
+    lastSeenAt,
+    minutesSince,
+    botVersion: (latest as any).botVersion ?? null,
+    pendingCount: (latest as any).pendingCount ?? 0,
+  }
+}
+
+// ─── SLA Tracking ────────────────────────────────────────────────────────────
+
+const SLA_MINUTES: Record<string, number> = {
+  urgente: 120,    // 2 horas
+  alta: 480,       // 8 horas
+  media: 1440,     // 24 horas
+  baja: 2880,      // 48 horas
+}
+
+/** Calcula el estado SLA de un reclamo dado su prioridad y fecha de creación. */
+export function calcularSLA(prioridad: string, createdAt: Date | number) {
+  const slaMins = SLA_MINUTES[prioridad] ?? 1440
+  const createdMs = createdAt instanceof Date ? createdAt.getTime() : createdAt
+  const elapsedMins = Math.floor((Date.now() - createdMs) / 60000)
+  const pct = Math.round((elapsedMins / slaMins) * 100)
+  return {
+    slaMins,
+    elapsedMins,
+    minRestantes: Math.max(0, slaMins - elapsedMins),
+    porcentajeTranscurrido: Math.min(100, pct),
+    vencida: elapsedMins >= slaMins,
+    enRiesgo: pct >= 80 && pct < 100,
+    estado: elapsedMins >= slaMins ? 'vencida' : pct >= 80 ? 'en_riesgo' : 'ok',
+  }
+}
+
+/** Devuelve reclamos vencidos (SLA superado) que no estén completados/cancelados. */
+export async function getReportesVencidos() {
+  const reportes = await db.select().from(schema.reportes).where(
+    and(
+      or(
+        eq(schema.reportes.estado, 'pendiente'),
+        eq(schema.reportes.estado, 'en_progreso'),
+        eq(schema.reportes.estado, 'pausado'),
+      )
+    )
+  )
+
+  return reportes.filter((r) => {
+    const sla = calcularSLA(r.prioridad, r.createdAt)
+    return sla.vencida
+  }).map((r) => ({
+    ...r,
+    sla: calcularSLA(r.prioridad, r.createdAt),
+  }))
 }
 
 // --- RONDAS ---
@@ -1301,15 +1511,19 @@ export async function getRoundOverviewForDashboard(dateKey = toBuenosAiresDateKe
     .sort((a, b) => toMs(b.confirmadoAt) - toMs(a.confirmadoAt))[0]
   const overdue = ordered.filter((occurrence) => occurrence.estado === 'vencido').length
   const pending = ordered.filter((occurrence) => occurrence.estado === 'pendiente').length
+  const active = ordered.filter((occurrence) => occurrence.estado === 'en_progreso').length
+  const paused = ordered.filter((occurrence) => occurrence.estado === 'pausada').length
 
   return {
     fechaOperativa: dateKey,
     total: ordered.length,
     pendientes: pending,
+    activas: active,
+    pausadas: paused,
     cumplidos: ordered.filter((occurrence) => occurrence.estado === 'cumplido').length,
     cumplidosConObservacion: ordered.filter((occurrence) => occurrence.estado === 'cumplido_con_observacion').length,
     vencidos: overdue,
-    estadoGeneral: overdue > 0 ? 'atrasado' : pending > 0 ? 'pendiente' : 'estable',
+    estadoGeneral: overdue > 0 ? 'atrasado' : active > 0 ? 'activo' : pending > 0 ? 'pendiente' : 'estable',
     ultimaConfirmacion: latestConfirmed?.confirmadoAt ? formatTimeLabel(latestConfirmed.confirmadoAt) : null,
     proximoControl: nextPending
       ? {
@@ -1410,11 +1624,15 @@ export async function getOccurrenceById(id: number) {
 export async function updateRoundOccurrenceStatus(
   id: number,
   data: {
-    estado: 'pendiente' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
+    estado: 'pendiente' | 'en_progreso' | 'pausada' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
     confirmadoAt?: Date | null
     canalConfirmacion?: 'whatsapp' | 'panel' | 'system'
     nota?: string | null
     escaladoAt?: Date | null
+    inicioRealAt?: Date | null
+    pausadoAt?: Date | null
+    finRealAt?: Date | null
+    tiempoAcumuladoSegundos?: number
   }
 ) {
   const updates: Record<string, unknown> = {
@@ -1425,7 +1643,28 @@ export async function updateRoundOccurrenceStatus(
   if (data.canalConfirmacion !== undefined) updates.canalConfirmacion = data.canalConfirmacion
   if (data.nota !== undefined) updates.nota = data.nota
   if (data.escaladoAt !== undefined) updates.escaladoAt = data.escaladoAt
+  if (data.inicioRealAt !== undefined) updates.inicioRealAt = data.inicioRealAt
+  if (data.pausadoAt !== undefined) updates.pausadoAt = data.pausadoAt
+  if (data.finRealAt !== undefined) updates.finRealAt = data.finRealAt
+  if (data.tiempoAcumuladoSegundos !== undefined) updates.tiempoAcumuladoSegundos = data.tiempoAcumuladoSegundos
   await db.update(schema.rondasOcurrencia).set(updates as any).where(eq(schema.rondasOcurrencia.id, id)).run()
+}
+
+export async function updateOccurrenceLifecycle(
+  id: number,
+  updates: Partial<{
+    estado: 'pendiente' | 'en_progreso' | 'pausada' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
+    confirmadoAt: Date | null
+    canalConfirmacion: 'whatsapp' | 'panel' | 'system'
+    nota: string | null
+    escaladoAt: Date | null
+    inicioRealAt: Date | null
+    pausadoAt: Date | null
+    finRealAt: Date | null
+    tiempoAcumuladoSegundos: number
+  }>
+) {
+  await updateRoundOccurrenceStatus(id, updates as any)
 }
 
 export async function markOccurrenceReply(
@@ -1597,6 +1836,96 @@ export async function limpiarDatosDemo() {
     leads: leadsDemo.length,
     colaBot: queueDemo.length,
     total: reportesDemo.length + leadsDemo.length + queueDemo.length,
+  }
+}
+
+export async function reiniciarMetricasOperacion() {
+  const [
+    actualizaciones,
+    reportes,
+    leads,
+    botQueue,
+    tareas,
+    tareasEventos,
+    asistencia,
+    asistenciaAuditoria,
+    liquidaciones,
+    marcaciones,
+    rondasOcurrencias,
+    rondasEventos,
+  ] = await Promise.all([
+    db.select().from(schema.actualizaciones),
+    db.select().from(schema.reportes),
+    db.select().from(schema.leads),
+    db.select().from(schema.botQueue),
+    db.select().from(schema.tareasOperativas),
+    db.select().from(schema.tareasOperativasEvento),
+    db.select().from(schema.empleadoAsistencia),
+    db.select().from(schema.empleadoAsistenciaAuditoria),
+    db.select().from(schema.empleadoLiquidacionCierre),
+    db.select().from(schema.marcacionesEmpleados),
+    db.select().from(schema.rondasOcurrencia),
+    db.select().from(schema.rondasEvento),
+  ])
+
+  await db.delete(schema.actualizaciones).run()
+  await db.delete(schema.reportes).run()
+  await db.delete(schema.leads).run()
+  await db.delete(schema.botQueue).run()
+  await db.delete(schema.tareasOperativasEvento).run()
+  await db.delete(schema.tareasOperativas).run()
+  await db.delete(schema.empleadoAsistenciaAuditoria).run()
+  await db.delete(schema.empleadoAsistencia).run()
+  await db.delete(schema.empleadoLiquidacionCierre).run()
+  await db.delete(schema.marcacionesEmpleados).run()
+  await db.delete(schema.rondasEvento).run()
+  await db.delete(schema.rondasOcurrencia).run()
+
+  try {
+    await db.run(sql`DELETE FROM sqlite_sequence WHERE name IN (
+      'actualizaciones',
+      'reportes',
+      'leads',
+      'bot_queue',
+      'tareas_operativas_evento',
+      'tareas_operativas',
+      'empleado_asistencia_auditoria',
+      'empleado_asistencia',
+      'empleado_liquidacion_cierre',
+      'marcaciones_empleados',
+      'rondas_evento',
+      'rondas_ocurrencia'
+    )`)
+  } catch {
+    // sqlite_sequence is only present after AUTOINCREMENT tables have been used.
+  }
+
+  return {
+    actualizaciones: actualizaciones.length,
+    reportes: reportes.length,
+    leads: leads.length,
+    colaBot: botQueue.length,
+    tareas: tareas.length,
+    tareasEventos: tareasEventos.length,
+    asistencia: asistencia.length,
+    asistenciaAuditoria: asistenciaAuditoria.length,
+    liquidaciones: liquidaciones.length,
+    marcaciones: marcaciones.length,
+    rondas: rondasOcurrencias.length,
+    rondasEventos: rondasEventos.length,
+    total:
+      actualizaciones.length +
+      reportes.length +
+      leads.length +
+      botQueue.length +
+      tareas.length +
+      tareasEventos.length +
+      asistencia.length +
+      asistenciaAuditoria.length +
+      liquidaciones.length +
+      marcaciones.length +
+      rondasOcurrencias.length +
+      rondasEventos.length,
   }
 }
 
@@ -1849,6 +2178,53 @@ function normalizeWaNumber(value?: string | null) {
   return value.replace(/\D/g, '')
 }
 
+function mapLegacyFuenteToAttendanceChannel(fuente?: 'whatsapp' | 'panel' | 'otro') {
+  return fuente === 'whatsapp' ? 'whatsapp' : 'panel'
+}
+
+function mapAttendanceChannelToLegacyFuente(canal?: string | null) {
+  if (canal === 'whatsapp') return 'whatsapp'
+  if (canal === 'panel') return 'panel'
+  return 'otro'
+}
+
+async function syncLegacyAttendanceMirror(params: {
+  empleadoId: number
+  tipo: AttendanceAction
+  canal: 'whatsapp' | 'panel' | 'manual_admin'
+  nota?: string
+}) {
+  if (params.tipo === 'inicio_almuerzo' || params.tipo === 'fin_almuerzo') return
+
+  const rows = await db.select().from(schema.marcacionesEmpleados).where(eq(schema.marcacionesEmpleados.empleadoId, params.empleadoId))
+  const open = rows
+    .filter((row) => !row.salidaAt)
+    .sort((left, right) => new Date(right.entradaAt as any).getTime() - new Date(left.entradaAt as any).getTime())[0] ?? null
+
+  if (params.tipo === 'entrada') {
+    if (open) return
+    await db.insert(schema.marcacionesEmpleados).values({
+      empleadoId: params.empleadoId,
+      entradaAt: new Date(),
+      fuente: mapAttendanceChannelToLegacyFuente(params.canal),
+      notaEntrada: params.nota?.trim() || null,
+    } as any).run()
+    return
+  }
+
+  if (!open) return
+
+  const now = new Date()
+  const entradaMs = new Date(open.entradaAt as any).getTime()
+  const duracionSegundos = Math.max(0, Math.floor((now.getTime() - entradaMs) / 1000))
+  await db.update(schema.marcacionesEmpleados).set({
+    salidaAt: now,
+    duracionSegundos,
+    notaSalida: params.nota?.trim() || null,
+    updatedAt: now,
+  } as any).where(eq(schema.marcacionesEmpleados.id, open.id)).run()
+}
+
 function normalizeOptionalWaNumber(value?: string | null) {
   const normalized = normalizeWaNumber(value)
   return normalized || null
@@ -1883,10 +2259,16 @@ function toRoundOccurrenceRecord(occurrence: schema.RondaOcurrencia) {
     fechaOperativa: occurrence.fechaOperativa,
     programadoAt: toDate(occurrence.programadoAt),
     programadoAtLabel: occurrence.programadoAtLabel ?? undefined,
-    estado: occurrence.estado === 'vencido' ? 'vencido' : 'pendiente',
+    estado: occurrence.estado,
     recordatorioEnviadoAt: toNullableDate(occurrence.recordatorioEnviadoAt),
     confirmadoAt: toNullableDate(occurrence.confirmadoAt),
+    inicioRealAt: toNullableDate(occurrence.inicioRealAt),
+    pausadoAt: toNullableDate(occurrence.pausadoAt),
+    finRealAt: toNullableDate(occurrence.finRealAt),
+    tiempoAcumuladoSegundos: Number(occurrence.tiempoAcumuladoSegundos ?? 0),
     escaladoAt: toNullableDate(occurrence.escaladoAt),
+    nota: occurrence.nota ?? null,
+    canalConfirmacion: occurrence.canalConfirmacion,
     empleadoId: occurrence.empleadoId,
     empleadoNombre: occurrence.empleadoNombre,
     empleadoWaId: occurrence.empleadoWaId,

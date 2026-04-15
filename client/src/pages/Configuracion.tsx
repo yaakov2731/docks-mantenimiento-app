@@ -12,6 +12,7 @@ export default function Configuracion() {
   const [showForm, setShowForm] = useState(false)
   const [showTgHelp, setShowTgHelp] = useState(false)
   const [cleanupResult, setCleanupResult] = useState<string>('')
+  const [resetResult, setResetResult] = useState<string>('')
   const [userForm, setUserForm] = useState(emptyUserForm)
   const [showUserForm, setShowUserForm] = useState(false)
   const [passwordReset, setPasswordReset] = useState<{ id: number; password: string } | null>(null)
@@ -24,6 +25,13 @@ export default function Configuracion() {
   const limpiarDemo = trpc.configuracion.limpiarDatosDemo.useMutation({
     onSuccess: (result) => {
       setCleanupResult(`Demo limpiada: ${result.reportes} reclamos, ${result.leads} leads y ${result.colaBot} mensajes de cola.`)
+    },
+  })
+  const reiniciarMetricas = trpc.configuracion.reiniciarMetricas.useMutation({
+    onSuccess: (result) => {
+      setResetResult(
+        `Operación reiniciada: ${result.reportes} reclamos, ${result.tareas} tareas, ${result.asistencia} eventos de asistencia y ${result.rondas} rondas eliminadas.`
+      )
     },
   })
   const crearUsuario = trpc.usuarios.crear.useMutation({
@@ -73,6 +81,28 @@ export default function Configuracion() {
               <Trash2 size={16} /> Limpiar datos demo
             </Button>
             {cleanupResult && <span className="text-sm text-amber-900">{cleanupResult}</span>}
+          </div>
+        </div>
+
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 space-y-3">
+          <div>
+            <h3 className="font-heading font-semibold text-rose-900">Reiniciar métricas operativas</h3>
+            <p className="text-sm text-rose-800 mt-1">
+              Borra reclamos, tareas, asistencia, liquidaciones, rondas generadas, leads y cola del bot para arrancar con la operación en cero. No toca usuarios, empleados ni configuraciones base.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="destructive"
+              loading={reiniciarMetricas.isLoading}
+              onClick={() => {
+                if (!confirm('Se van a borrar todas las métricas operativas y no se puede deshacer. ¿Continuar?')) return
+                reiniciarMetricas.mutate()
+              }}
+            >
+              <Trash2 size={16} /> Reiniciar métricas
+            </Button>
+            {resetResult && <span className="text-sm text-rose-900">{resetResult}</span>}
           </div>
         </div>
 

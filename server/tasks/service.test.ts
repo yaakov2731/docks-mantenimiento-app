@@ -258,6 +258,44 @@ describe('operational tasks service', () => {
     expect(repo.events.map((event) => event.tipo)).toEqual(['terminacion'])
   })
 
+  it('supports the db repository method names used by the bot api when finishing a task', async () => {
+    const repo = createFakeTasksRepo({
+      tasks: [
+        {
+          id: 51,
+          empleadoId: 2,
+          empleadoNombre: 'Jacobo',
+          estado: 'en_progreso',
+          titulo: 'Pintar local 24',
+          trabajoAcumuladoSegundos: 60,
+          trabajoIniciadoAt: new Date('2026-04-07T11:59:00.000Z'),
+        },
+        {
+          id: 52,
+          empleadoId: 2,
+          empleadoNombre: 'Jacobo',
+          estado: 'pendiente_confirmacion',
+          titulo: 'Cerrar deposito',
+          trabajoAcumuladoSegundos: 0,
+        },
+      ],
+    })
+
+    const dbShapedRepo = {
+      getOperationalTaskById: repo.getTaskById,
+      getNextOperationalTaskForEmployee: repo.getNextTaskForEmployee,
+      acceptOperationalTask: repo.acceptOperationalTask,
+      persistOperationalTaskChange: repo.persistTaskChange,
+    }
+
+    const service = createOperationalTasksService(dbShapedRepo as any)
+    const result = await service.finishTask({ taskId: 51, empleadoId: 2, note: 'Trabajo listo' })
+
+    expect(result.task.estado).toBe('terminada')
+    expect(result.task.trabajoAcumuladoSegundos).toBe(120)
+    expect(result.nextTask).toMatchObject({ id: 52, titulo: 'Cerrar deposito' })
+  })
+
   it('rejects a pending assigned task without starting a timer', async () => {
     const repo = createFakeTasksRepo({
       tasks: [
@@ -278,6 +316,56 @@ describe('operational tasks service', () => {
     expect(task.aceptadoAt).toBeNull()
     expect(task.trabajoIniciadoAt).toBeNull()
     expect(repo.events.map((event) => event.tipo)).toEqual(['rechazo'])
+  })
+
+  it('resumes a paused task without losing accumulated time', async () => {
+    const repo = createFakeTasksRepo({
+      tasks: [
+        {
+          id: 32,
+          empleadoId: 6,
+          empleadoNombre: 'Julia',
+          estado: 'pausada',
+          trabajoAcumuladoSegundos: 420,
+          pausadoAt: new Date('2026-04-07T11:58:00.000Z'),
+        },
+      ],
+    })
+
+    const service = createOperationalTasksService(repo as any)
+    const task = await service.resumeTask({ taskId: 32, empleadoId: 6 })
+
+    expect(task.estado).toBe('en_progreso')
+    expect(task.trabajoAcumuladoSegundos).toBe(420)
+    expect(task.trabajoIniciadoAt?.toISOString()).toBe('2026-04-07T12:00:00.000Z')
+    expect(task.pausadoAt).toBeNull()
+    expect(repo.events.map((event) => event.tipo)).toEqual(['reanudar'])
+  })
+
+  it('cancels an assigned task and returns it to the unassigned queue', async () => {
+    const repo = createFakeTasksRepo({
+      tasks: [
+        {
+          id: 33,
+          empleadoId: 6,
+          empleadoNombre: 'Julia',
+          estado: 'pausada',
+          trabajoAcumuladoSegundos: 420,
+          aceptadoAt: new Date('2026-04-07T11:40:00.000Z'),
+          pausadoAt: new Date('2026-04-07T11:58:00.000Z'),
+        },
+      ],
+    })
+
+    const service = createOperationalTasksService(repo as any)
+    const task = await service.cancelTask({ taskId: 33, empleadoId: 6, note: 'No pude terminar' })
+
+    expect(task.estado).toBe('pendiente_asignacion')
+    expect(task.empleadoId).toBeNull()
+    expect(task.trabajoAcumuladoSegundos).toBe(420)
+    expect(task.trabajoIniciadoAt).toBeNull()
+    expect(task.pausadoAt).toBeNull()
+    expect(repo.events.map((event) => event.tipo)).toEqual(['cancelacion'])
   })
 
   it('keeps task state unchanged when the atomic acceptance path fails before persistence', async () => {

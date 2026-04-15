@@ -13,7 +13,16 @@ vi.mock('../lib/trpc', () => ({
     empleados: {
       listar: {
         useQuery: () => ({
-          data: [{ id: 1, nombre: 'Juan', especialidad: 'Electricista', pagoDiario: 10 }],
+          data: [{
+            id: 1,
+            nombre: 'Juan',
+            especialidad: 'Electricista',
+            pagoDiario: 10,
+            pagoSemanal: 70,
+            pagoQuincenal: 140,
+            pagoMensual: 280,
+            waId: '5491112345678',
+          }],
           refetch: vi.fn(),
         }),
       },
@@ -59,5 +68,17 @@ describe('Empleados', () => {
     expect(screen.getByLabelText(/fecha/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/hora/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /guardar marcación/i })).toBeInTheDocument()
+  })
+
+  it('loads name and payroll values when editing an employee', async () => {
+    render(<Empleados />)
+
+    await userEvent.click(screen.getByRole('button', { name: /editar ficha/i }))
+
+    expect(screen.getByDisplayValue('Juan')).toBeInTheDocument()
+    expect(screen.getByLabelText(/pago diario \(ars\)/i)).toHaveValue('10')
+    expect(screen.getByLabelText(/pago semanal \(ars\)/i)).toHaveValue('70')
+    expect(screen.getByLabelText(/pago quincenal \(ars\)/i)).toHaveValue('140')
+    expect(screen.getByLabelText(/pago mensual \(ars\)/i)).toHaveValue('280')
   })
 })

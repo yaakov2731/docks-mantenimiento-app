@@ -28,10 +28,16 @@ type FakeOccurrence = {
   fechaOperativa: string
   programadoAt: Date
   programadoAtLabel?: string
-  estado: 'pendiente' | 'vencido'
+  estado: 'pendiente' | 'en_progreso' | 'pausada' | 'cumplido' | 'cumplido_con_observacion' | 'vencido'
   recordatorioEnviadoAt: Date | null
   confirmadoAt: Date | null
   escaladoAt: Date | null
+  inicioRealAt?: Date | null
+  pausadoAt?: Date | null
+  finRealAt?: Date | null
+  tiempoAcumuladoSegundos?: number
+  nota?: string | null
+  canalConfirmacion?: 'whatsapp' | 'panel' | 'system'
   empleadoId: number
   empleadoNombre: string
   empleadoWaId: string
@@ -42,7 +48,15 @@ type FakeOccurrence = {
 function createFakeRepo(initial: { templates?: FakeTemplate[]; schedules?: FakeSchedule[]; occurrences?: FakeOccurrence[] } = {}) {
   const templates = [...(initial.templates ?? [])]
   const schedules = [...(initial.schedules ?? [])]
-  const occurrences = [...(initial.occurrences ?? [])]
+  const occurrences = (initial.occurrences ?? []).map((occurrence) => ({
+    inicioRealAt: null,
+    pausadoAt: null,
+    finRealAt: null,
+    tiempoAcumuladoSegundos: 0,
+    nota: null,
+    canalConfirmacion: 'whatsapp' as const,
+    ...occurrence,
+  }))
   const createdBatches: FakeOccurrence[][] = []
   const reminderMarks: Array<{ id: number; at: Date }> = []
   const overdueMarks: Array<{ id: number }> = []
@@ -70,8 +84,17 @@ function createFakeRepo(initial: { templates?: FakeTemplate[]; schedules?: FakeS
       return occurrences.filter((occurrence) => occurrence.plantillaId === templateId && occurrence.fechaOperativa === dateKey)
     },
     async createOccurrences(rows: FakeOccurrence[]) {
-      createdBatches.push(rows.map((row) => ({ ...row })))
-      occurrences.push(...rows.map((row) => ({ ...row })))
+      const normalizedRows = rows.map((row) => ({
+        inicioRealAt: null,
+        pausadoAt: null,
+        finRealAt: null,
+        tiempoAcumuladoSegundos: 0,
+        nota: null,
+        canalConfirmacion: 'whatsapp' as const,
+        ...row,
+      }))
+      createdBatches.push(normalizedRows.map((row) => ({ ...row })))
+      occurrences.push(...normalizedRows.map((row) => ({ ...row })))
     },
     async listReminderCandidates(_now: Date) {
       return occurrences.filter((occurrence) => occurrence.estado === 'pendiente')
@@ -95,6 +118,29 @@ function createFakeRepo(initial: { templates?: FakeTemplate[]; schedules?: FakeS
     async notifySupervisor(item: any) {
       supervisorMessages.push(item)
     },
+    async getOccurrenceById(id: number) {
+      return occurrences.find((item) => item.id === id) ?? null
+    },
+    async markOccurrenceReply(
+      id: number,
+      estado: 'cumplido' | 'cumplido_con_observacion' | 'vencido',
+      nota?: string | null
+    ) {
+      const occurrence = occurrences.find((item) => item.id === id)
+      if (!occurrence) return
+      occurrence.estado = estado
+      occurrence.nota = nota ?? null
+      occurrence.confirmadoAt = new Date()
+      occurrence.canalConfirmacion = 'whatsapp'
+    },
+    async updateOccurrenceLifecycle(
+      id: number,
+      updates: Partial<FakeOccurrence>
+    ) {
+      const occurrence = occurrences.find((item) => item.id === id)
+      if (!occurrence) throw new Error('Round occurrence not found in fake repo')
+      Object.assign(occurrence, updates)
+    },
   }
 }
 
@@ -112,9 +158,11 @@ describe('rounds orchestration service', () => {
         'Control programado para las 14:00.',
         '',
         'Respondé:',
-        '1. Banos revisados y limpios',
-        '2. Revisados con observacion',
-        '3. No pude revisar',
+        '1. Iniciar ronda',
+        '2. Pausar ronda',
+        '3. Finalizar ronda',
+        '4. Finalizada con observacion',
+        '5. No pude hacerla',
         '',
         'ID control: 123',
       ].join('\n')
@@ -298,5 +346,55 @@ describe('rounds orchestration service', () => {
       { occurrenceId: 21, type: 'recordatorio', at: new Date('2026-04-06T10:20:00-03:00') },
       { occurrenceId: 22, type: 'vencimiento', at: new Date('2026-04-06T10:20:00-03:00') },
     ])
+  })
+
+  it('starts, pauses and finishes a round with real execution timestamps', async () => {
+    const repo = createFakeRepo({
+      occurrences: [
+        {
+          id: 44,
+          plantillaId: 10,
+          programacionId: 10,
+          fechaOperativa: '2026-04-06',
+          programadoAt: new Date('2026-04-06T10:00:00-03:00'),
+          programadoAtLabel: '10:00',
+          estado: 'pendiente',
+          recordatorioEnviadoAt: new Date('2026-04-06T10:00:00-03:00'),
+          confirmadoAt: null,
+          escaladoAt: null,
+          empleadoId: 7,
+          empleadoNombre: 'Ana',
+          empleadoWaId: '5491111111111',
+          supervisorWaId: '5491100000000',
+          nombreRonda: 'Control de banos',
+        },
+      ],
+    })
+
+    const service = createRoundsService(repo as any)
+
+    const started = await service.startOccurrence({ occurrenceId: 44, empleadoId: 7 })
+    expect(started.estado).toBe('en_progreso')
+    expect(started.inicioRealAt?.toISOString()).toBeTruthy()
+
+    const startedAt = new Date(started.inicioRealAt!)
+    const pausedAt = new Date(startedAt.getTime() + 9 * 60 * 1000)
+    const finishedAt = new Date(pausedAt.getTime() + 4 * 60 * 1000)
+
+    const paused = await service.pauseOccurrence({ occurrenceId: 44, empleadoId: 7, now: pausedAt })
+    expect(paused.estado).toBe('pausada')
+    expect(paused.tiempoAcumuladoSegundos).toBe(540)
+    expect(paused.pausadoAt?.toISOString()).toBe(pausedAt.toISOString())
+
+    const resumed = await service.startOccurrence({ occurrenceId: 44, empleadoId: 7, now: finishedAt })
+    expect(resumed.estado).toBe('en_progreso')
+    expect(resumed.tiempoAcumuladoSegundos).toBe(540)
+    expect(resumed.inicioRealAt?.toISOString()).toBe(finishedAt.toISOString())
+
+    const closedAt = new Date(finishedAt.getTime() + 6 * 60 * 1000)
+    const finished = await service.finishOccurrence({ occurrenceId: 44, empleadoId: 7, now: closedAt })
+    expect(finished.estado).toBe('cumplido')
+    expect(finished.tiempoAcumuladoSegundos).toBe(900)
+    expect(finished.finRealAt?.toISOString()).toBe(closedAt.toISOString())
   })
 })

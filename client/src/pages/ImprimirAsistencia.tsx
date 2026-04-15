@@ -2,7 +2,7 @@ import { useSearch } from 'wouter'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
 import WorkingTime from '../components/WorkingTime'
-import { attendanceChannelLabel, getAttendanceEventDateTime } from '../lib/attendancePresentation'
+import { attendanceActionLabel, attendanceChannelLabel, getAttendanceEventDateTime } from '../lib/attendancePresentation'
 import { Printer } from 'lucide-react'
 
 type Periodo = 'dia' | 'semana' | 'quincena' | 'mes'
@@ -105,29 +105,65 @@ export default function ImprimirAsistencia() {
             <table className="w-full text-sm border border-gray-200">
               <thead className="bg-slate-50">
                 <tr>
-                  {['Empleado', 'Especialidad', 'Tarifa aplicada', 'Ingreso', 'Salida', 'Horas', 'Días', 'Total', 'Estado'].map(header => (
+                  {['Empleado', 'Especialidad', 'Tarifa aplicada', 'Ingreso', 'Inicio almuerzo', 'Fin almuerzo', 'Salida', 'Horas', 'Días', 'Total', 'Estado'].map(header => (
                     <th key={header} className="px-3 py-2 text-left border-b border-gray-200 font-medium text-gray-500">{header}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {empleados.map((empleado: any) => (
-                  <tr key={empleado.empleadoId} className="border-b border-gray-100">
-                    <td className="px-3 py-2 font-medium">{empleado.nombre}</td>
-                    <td className="px-3 py-2">{empleado.especialidad || 'General'}</td>
-                    <td className="px-3 py-2">
-                      {formatCurrency(empleado.liquidacion?.tarifaMonto ?? 0)} · {ratePeriodLabel(empleado.liquidacion?.tarifaPeriodo)}
-                    </td>
-                    <td className="px-3 py-2">{formatDateTime(empleado.hoy?.primerIngresoAt)}</td>
-                    <td className="px-3 py-2">{empleado.attendance?.onShift ? 'Turno abierto' : formatDateTime(empleado.hoy?.ultimaSalidaAt)}</td>
-                    <td className="px-3 py-2"><WorkingTime seconds={empleado.liquidacion?.segundosTrabajados ?? 0} /></td>
-                    <td className="px-3 py-2">{empleado.liquidacion?.diasTrabajados ?? 0}</td>
-                    <td className="px-3 py-2 font-semibold">{formatCurrency(empleado.liquidacion?.totalPagar ?? 0)}</td>
-                    <td className="px-3 py-2">
-                      {empleado.cierre?.pagadoAt ? 'Pagado' : empleado.cierre ? 'Cerrado' : 'Abierto'}
-                    </td>
-                  </tr>
-                ))}
+                {empleados.map((empleado: any) => {
+                  const currentTurn = (empleado.turnos ?? []).find((turn: any) => turn.turnoAbierto) ?? null
+                  return (
+                    <tr key={empleado.empleadoId} className="border-b border-gray-100">
+                      <td className="px-3 py-2 font-medium">{empleado.nombre}</td>
+                      <td className="px-3 py-2">{empleado.especialidad || 'General'}</td>
+                      <td className="px-3 py-2">
+                        {formatCurrency(empleado.liquidacion?.tarifaMonto ?? 0)} · {ratePeriodLabel(empleado.liquidacion?.tarifaPeriodo)}
+                      </td>
+                      <td className="px-3 py-2">{formatDateTime(currentTurn?.entradaAt ?? null)}</td>
+                      <td className="px-3 py-2">{formatDateTime(currentTurn?.inicioAlmuerzoAt ?? null)}</td>
+                      <td className="px-3 py-2">{formatDateTime(currentTurn?.finAlmuerzoAt ?? null)}</td>
+                      <td className="px-3 py-2">{currentTurn?.turnoAbierto ? 'Turno abierto' : formatDateTime(currentTurn?.salidaAt ?? null)}</td>
+                      <td className="px-3 py-2"><WorkingTime seconds={empleado.liquidacion?.segundosTrabajados ?? 0} /></td>
+                      <td className="px-3 py-2">{empleado.liquidacion?.diasTrabajados ?? 0}</td>
+                      <td className="px-3 py-2 font-semibold">{formatCurrency(empleado.liquidacion?.totalPagar ?? 0)}</td>
+                      <td className="px-3 py-2">
+                        {empleado.cierre?.pagadoAt ? 'Pagado' : empleado.cierre ? 'Cerrado' : 'Abierto'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <div className="text-xs text-gray-400 uppercase font-medium mb-3">Historial de turnos</div>
+            <table className="w-full text-sm border border-gray-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  {['Empleado', 'Fecha', 'Entrada', 'Inicio almuerzo', 'Fin almuerzo', 'Salida', 'Bruto', 'Almuerzo', 'Neto', 'Estado'].map(header => (
+                    <th key={header} className="px-3 py-2 text-left border-b border-gray-200 font-medium text-gray-500">{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {empleados.flatMap((empleado: any) =>
+                  (empleado.turnos ?? []).map((turno: any) => (
+                    <tr key={turno.id} className="border-b border-gray-100">
+                      <td className="px-3 py-2">{empleado.nombre}</td>
+                      <td className="px-3 py-2">{formatDateTime(turno.entradaAt ?? null).split(',')[0] ?? '—'}</td>
+                      <td className="px-3 py-2">{formatDateTime(turno.entradaAt ?? null)}</td>
+                      <td className="px-3 py-2">{formatDateTime(turno.inicioAlmuerzoAt ?? null)}</td>
+                      <td className="px-3 py-2">{formatDateTime(turno.finAlmuerzoAt ?? null)}</td>
+                      <td className="px-3 py-2">{turno.turnoAbierto ? 'Turno abierto' : formatDateTime(turno.salidaAt ?? null)}</td>
+                      <td className="px-3 py-2"><WorkingTime seconds={turno.grossSeconds ?? 0} /></td>
+                      <td className="px-3 py-2"><WorkingTime seconds={turno.lunchSeconds ?? 0} /></td>
+                      <td className="px-3 py-2"><WorkingTime seconds={turno.workedSeconds ?? 0} /></td>
+                      <td className="px-3 py-2">{turno.turnoAbierto ? 'Abierto' : 'Cerrado'}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -146,7 +182,7 @@ export default function ImprimirAsistencia() {
                 {(data.eventos ?? []).slice(0, 20).map((evento: any) => (
                   <tr key={evento.id} className="border-b border-gray-100">
                     <td className="px-3 py-2">{evento.empleadoNombre}</td>
-                    <td className="px-3 py-2 capitalize">{evento.tipo}</td>
+                    <td className="px-3 py-2">{attendanceActionLabel(evento.tipo)}</td>
                     <td className="px-3 py-2">{attendanceChannelLabel(evento.canal)}</td>
                     <td className="px-3 py-2">{formatDateTime(getAttendanceEventDateTime(evento)?.toString() ?? null)}</td>
                     <td className="px-3 py-2">{evento.nota || '—'}</td>

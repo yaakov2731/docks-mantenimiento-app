@@ -1,4 +1,5 @@
 import { PRIORIDADES } from '../../../../shared/const'
+import WorkingTime from '../WorkingTime'
 
 const TASK_SECTIONS = [
   {
@@ -30,9 +31,12 @@ const TASK_SECTIONS = [
 
 type TaskBoardProps = {
   items: any[]
+  selectable?: boolean
+  selectedIds?: number[]
+  onToggleSelection?: (taskId: number) => void
 }
 
-export function TaskBoard({ items }: TaskBoardProps) {
+export function TaskBoard({ items, selectable = false, selectedIds = [], onToggleSelection }: TaskBoardProps) {
   return (
     <div className="surface-panel relative overflow-hidden rounded-[22px] p-5">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(135deg,rgba(14,116,144,0.08),transparent_70%)]" />
@@ -76,7 +80,15 @@ export function TaskBoard({ items }: TaskBoardProps) {
                     No hay tareas en este estado ahora mismo.
                   </div>
                 ) : (
-                  sectionItems.map((item) => <TaskCard key={item.id} item={item} />)
+                  sectionItems.map((item) => (
+                    <TaskCard
+                      key={item.id}
+                      item={item}
+                      selectable={selectable}
+                      selected={selectedIds.includes(item.id)}
+                      onToggleSelection={onToggleSelection}
+                    />
+                  ))
                 )}
               </div>
             </section>
@@ -87,20 +99,42 @@ export function TaskBoard({ items }: TaskBoardProps) {
   )
 }
 
-function TaskCard({ item }: { item: any }) {
+function TaskCard({
+  item,
+  selectable,
+  selected,
+  onToggleSelection,
+}: {
+  item: any
+  selectable?: boolean
+  selected?: boolean
+  onToggleSelection?: (taskId: number) => void
+}) {
   const priority = PRIORIDADES.find((entry) => entry.value === item.prioridad)
   const stateTone = getSectionTone(item.estado)
+  const taskLabel = `#${String(item.id).padStart(4, '0')}`
 
   return (
     <div className="rounded-[20px] border bg-white px-4 py-4 shadow-sm" style={{ borderColor: stateTone.border }}>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-mono text-slate-400">#{String(item.id).padStart(4, '0')}</div>
+        <div className="flex items-start gap-3">
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={() => onToggleSelection?.(item.id)}
+              aria-label={`Seleccionar tarea ${taskLabel}`}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+            />
+          )}
+          <div>
+          <div className="text-xs font-mono text-slate-400">{taskLabel}</div>
           <div className="mt-1 font-semibold text-slate-800">{item.titulo}</div>
           <div className="mt-1 text-xs text-slate-500">
             {item.tipoTrabajo ?? 'Trabajo general'}
             {item.empleadoNombre ? ` · ${item.empleadoNombre}` : ' · Sin responsable'}
           </div>
+        </div>
         </div>
         <div className="flex flex-col items-end gap-2">
           <div
@@ -124,6 +158,51 @@ function TaskCard({ item }: { item: any }) {
       >
         <div className="font-medium text-slate-700">{item.ubicacion}</div>
         <div className="mt-1">{item.descripcion}</div>
+        {renderTimingSummary(item)}
+      </div>
+    </div>
+  )
+}
+
+function renderTimingSummary(item: any) {
+  const rows = [
+    item.trabajoIniciadoAt
+      ? { label: 'Inicio', value: formatClockLabel(item.trabajoIniciadoAt) }
+      : null,
+    item.pausadoAt
+      ? { label: 'Pausa', value: formatClockLabel(item.pausadoAt) }
+      : null,
+    item.terminadoAt
+      ? { label: 'Fin', value: formatClockLabel(item.terminadoAt) }
+      : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>
+
+  const shouldShowTime = typeof item.tiempoTrabajadoSegundos === 'number' && item.tiempoTrabajadoSegundos >= 0
+  if (rows.length === 0 && !shouldShowTime) return null
+
+  return (
+    <div className="mt-3 border-t border-white/60 pt-3">
+      <div className="flex flex-wrap gap-2">
+        {rows.map((row) => (
+          <span
+            key={`${item.id}-${row.label}`}
+            className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500"
+          >
+            <span>{row.label}</span>
+            <span className="font-semibold text-slate-700">{row.value}</span>
+          </span>
+        ))}
+        {shouldShowTime ? (
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+            <span>Tiempo</span>
+            <WorkingTime
+              seconds={item.tiempoTrabajadoSegundos}
+              isRunning={item.estado === 'en_progreso'}
+              variant="clock"
+              className="font-semibold text-slate-700"
+            />
+          </span>
+        ) : null}
       </div>
     </div>
   )
@@ -186,4 +265,15 @@ function getSectionTone(state: string) {
         badgeText: '#475569',
       }
   }
+}
+
+function formatClockLabel(value?: string | number | Date | null) {
+  if (!value) return '--:--'
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return '--:--'
+  return date.toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 }

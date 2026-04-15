@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { db, initDb, getEmpleadoAttendanceEvents, createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado, getEmpleadoAttendanceStatus, crearEmpleado } from './db'
+import { db, initDb, getEmpleadoAttendanceEvents, createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado, getEmpleadoAttendanceStatus, crearEmpleado, registrarEntradaEmpleado, registrarSalidaEmpleado } from './db'
 import { resetTestDb } from './test/db-factory'
 import * as schema from '../drizzle/schema'
 
@@ -64,15 +64,48 @@ describe('manual attendance support', () => {
     expect(rows.map(row => row.tipo)).toEqual(['entrada', 'inicio_almuerzo', 'fin_almuerzo', 'salida'])
     expect(status.onShift).toBe(false)
     expect(status.onLunch).toBe(false)
-    expect(status.grossWorkedSecondsToday).toBe(21600)
+    expect(status.grossWorkedSecondsToday).toBe(0)
     expect(status.todayLunchSeconds).toBe(2700)
-    expect(status.workedSecondsToday).toBe(18900)
+    expect(status.workedSecondsToday).toBe(0)
+    expect(status.lastShiftGrossSeconds).toBe(21600)
+    expect(status.lastShiftLunchSeconds).toBe(2700)
+    expect(status.lastShiftWorkedSeconds).toBe(18900)
     expect(status.todayEntries).toBe(1)
     expect(status.todayLunchStarts).toBe(1)
     expect(status.todayLunchEnds).toBe(1)
     expect(status.todayExits).toBe(1)
     expect(status.lastLunchStartAt).toEqual(new Date('2026-04-10T14:00:00.000Z'))
     expect(status.lastLunchEndAt).toEqual(new Date('2026-04-10T14:45:00.000Z'))
+  })
+
+  it('keeps legacy entry and exit functions synchronized with live attendance status', async () => {
+    await crearEmpleado({ nombre: 'Juan' } as any)
+
+    const entrada = await registrarEntradaEmpleado(1, {
+      fuente: 'whatsapp',
+      nota: 'inicio legacy',
+    })
+
+    let status = await getEmpleadoAttendanceStatus(1)
+
+    expect(entrada.alreadyOpen).toBe(false)
+    expect(status.onShift).toBe(true)
+    expect(status.lastAction).toBe('entrada')
+    expect(status.lastChannel).toBe('whatsapp')
+    expect(status.todayEntries).toBe(1)
+
+    vi.setSystemTime(new Date('2026-04-10T21:00:00.000Z'))
+    const salida = await registrarSalidaEmpleado(1, { nota: 'fin legacy' })
+
+    status = await getEmpleadoAttendanceStatus(1)
+
+    expect(salida).not.toBeNull()
+    expect(status.onShift).toBe(false)
+    expect(status.lastAction).toBe('salida')
+    expect(status.lastChannel).toBe('whatsapp')
+    expect(status.todayExits).toBe(1)
+    expect(status.workedSecondsToday).toBe(0)
+    expect(status.lastShiftWorkedSeconds).toBeGreaterThan(0)
   })
 
   it('rejects a future manual event', async () => {

@@ -91,6 +91,20 @@ export function EmployeeQueueCard({ items, empleados }: EmployeeQueueCardProps) 
                     <div className="mt-1 text-xs text-cyan-50/70">
                       {bucket.activeTask?.ubicacion ?? bucket.pausedTasks[0]?.ubicacion ?? 'La siguiente tarea queda disponible debajo.'}
                     </div>
+                    {bucket.activeTask?.trabajoIniciadoAt || bucket.pausedTasks[0]?.pausadoAt ? (
+                      <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.14em] text-cyan-50/75">
+                        {bucket.activeTask?.trabajoIniciadoAt ? (
+                          <span className="rounded-full bg-white/10 px-2.5 py-1">
+                            Inicio {formatClockLabel(bucket.activeTask.trabajoIniciadoAt)}
+                          </span>
+                        ) : null}
+                        {bucket.pausedTasks[0]?.pausadoAt ? (
+                          <span className="rounded-full bg-white/10 px-2.5 py-1">
+                            Pausa {formatClockLabel(bucket.pausedTasks[0].pausadoAt)}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -134,6 +148,17 @@ export function EmployeeQueueCard({ items, empleados }: EmployeeQueueCardProps) 
       </div>
     </div>
   )
+}
+
+function formatClockLabel(value?: string | number | Date | null) {
+  if (!value) return '--:--'
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return '--:--'
+  return date.toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 }
 
 function Summary({ label, value }: { label: string; value: string | number }) {

@@ -4,7 +4,7 @@ import { trpc } from '../lib/trpc'
 import BrandLogo from './BrandLogo'
 import {
   LayoutDashboard, ClipboardList, History, Users,
-  Settings, LogOut, Menu, Home, UserCheck, X, ClipboardCheck, Wrench,
+  Settings, LogOut, Menu, Home, UserCheck, X, ClipboardCheck, Wrench, Clock3,
 } from 'lucide-react'
 
 type PanelRole = 'admin' | 'employee' | 'sales'
@@ -12,6 +12,7 @@ type PanelRole = 'admin' | 'employee' | 'sales'
 const navItems = [
   { href: '/',              label: 'Formulario público', icon: Home,            roles: ['admin', 'employee'] as PanelRole[] },
   { href: '/dashboard',     label: 'Dashboard',          icon: LayoutDashboard, roles: ['admin', 'employee'] as PanelRole[] },
+  { href: '/asistencia',    label: 'Asistencia',         icon: Clock3,          roles: ['admin'] as PanelRole[] },
   { href: '/operaciones',   label: 'Operaciones',        icon: ClipboardCheck,  roles: ['admin'] as PanelRole[] },
   { href: '/tareas-operativas', label: 'Tareas operativas', icon: Wrench,       roles: ['admin'] as PanelRole[] },
   { href: '/tareas',        label: 'Mis Tareas',         icon: ClipboardList,   roles: ['admin', 'employee'] as PanelRole[] },

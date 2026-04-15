@@ -2,6 +2,7 @@ import express from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const dbMock = vi.hoisted(() => ({
+  ATTENDANCE_ACTIONS: ['entrada', 'inicio_almuerzo', 'fin_almuerzo', 'salida'],
   initDb: vi.fn(),
   db: {
     delete: vi.fn(() => ({ run: vi.fn(async () => undefined) })),
@@ -19,10 +20,13 @@ const dbMock = vi.hoisted(() => ({
   getPendingBotMessages: vi.fn(),
   markBotMessageSent: vi.fn(),
   markBotMessageFailed: vi.fn(),
+  enqueueBotMessage: vi.fn(),
   getEmpleadoActivoById: vi.fn(),
   getEmpleadoAttendanceStatus: vi.fn(),
   getNextAssignableReporteForEmpleado: vi.fn(),
   getReporteById: vi.fn(),
+  getReportes: vi.fn(),
+  getUsers: vi.fn(),
   getReporteTiempoTrabajadoSegundos: vi.fn((reporte: any) => Number(reporte?.tiempoTrabajadoSegundos ?? reporte?.trabajoAcumuladoSegundos ?? 0)),
   registerEmpleadoAttendance: vi.fn(),
   iniciarTrabajoReporte: vi.fn(),
@@ -37,13 +41,18 @@ const dbMock = vi.hoisted(() => ({
 
 const tasksServiceMock = vi.hoisted(() => ({
   acceptTask: vi.fn(),
+  resumeTask: vi.fn(),
   pauseTask: vi.fn(),
   finishTask: vi.fn(),
+  cancelTask: vi.fn(),
   rejectTask: vi.fn(),
 }))
 
 const roundsServiceMock = vi.hoisted(() => ({
   registerWhatsappReply: vi.fn(),
+  startOccurrence: vi.fn(),
+  pauseOccurrence: vi.fn(),
+  finishOccurrence: vi.fn(),
 }))
 
 vi.mock('./db', () => dbMock)
@@ -78,12 +87,20 @@ describe('bot api compatibility contract', () => {
     })
     dbMock.getEmpleadoAttendanceStatus.mockResolvedValue({
       onShift: true,
+      onLunch: false,
       lastAction: 'entrada',
       lastActionAt: '2026-04-10T14:00:00.000Z',
       lastEntryAt: '2026-04-10T14:00:00.000Z',
+      lastLunchStartAt: '2026-04-10T17:00:00.000Z',
+      lastLunchEndAt: '2026-04-10T17:30:00.000Z',
       workedSecondsToday: 7200,
+      grossWorkedSecondsToday: 9000,
+      todayLunchSeconds: 1800,
       currentShiftSeconds: 3600,
+      currentLunchSeconds: 0,
       todayEntries: 1,
+      todayLunchStarts: 1,
+      todayLunchEnds: 1,
       todayExits: 0,
     })
     dbMock.getTareasEmpleado.mockResolvedValue([
@@ -129,6 +146,13 @@ describe('bot api compatibility contract', () => {
       operacionesActivas: 1,
       reclamosPendientesConfirmacion: 0,
       operacionesPendientesConfirmacion: 1,
+    })
+    expect(response.body.attendance).toMatchObject({
+      onShift: true,
+      onLunch: false,
+      todayLunchSeconds: 1800,
+      todayLunchStarts: 1,
+      todayLunchEnds: 1,
     })
     expect(response.body.tareas).toHaveLength(2)
     expect(response.body.reclamos).toHaveLength(1)
@@ -185,6 +209,41 @@ describe('bot api compatibility contract', () => {
         origen: 'operacion',
         estado: 'en_progreso',
       },
+    })
+  })
+
+  it('accepts lunch actions through the attendance endpoint used by the current bot', async () => {
+    dbMock.getEmpleadoActivoById.mockResolvedValue({
+      id: 7,
+      nombre: 'Diego',
+      especialidad: 'Mantenimiento',
+    })
+    dbMock.registerEmpleadoAttendance.mockResolvedValue({
+      success: true,
+      code: 'ok',
+      status: {
+        onShift: true,
+        onLunch: true,
+        lastAction: 'inicio_almuerzo',
+        todayLunchSeconds: 0,
+        currentLunchSeconds: 0,
+        todayLunchStarts: 1,
+        todayLunchEnds: 0,
+      },
+    })
+
+    const response = await requestJson('/api/bot/empleado/7/asistencia', {
+      method: 'POST',
+      body: { accion: 'inicio_almuerzo' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(dbMock.registerEmpleadoAttendance).toHaveBeenCalledWith(7, 'inicio_almuerzo', 'whatsapp', undefined)
+    expect(response.body.attendance).toMatchObject({
+      onShift: true,
+      onLunch: true,
+      lastAction: 'inicio_almuerzo',
+      todayLunchStarts: 1,
     })
   })
 
@@ -247,6 +306,291 @@ describe('bot api compatibility contract', () => {
         origen: 'operacion',
         estado: 'pendiente',
         asignacionEstado: 'pendiente_confirmacion',
+      },
+    })
+  })
+
+  it('resumes a paused operational task through the legacy start endpoint', async () => {
+    dbMock.getOperationalTaskById.mockResolvedValueOnce({
+      id: 204,
+      empleadoId: 7,
+      empleadoNombre: 'Diego',
+      estado: 'pausada',
+      titulo: 'Control baños',
+      descripcion: 'Retomar limpieza',
+      ubicacion: 'Pasillo norte',
+      prioridad: 'alta',
+      ordenAsignacion: 2,
+      trabajoAcumuladoSegundos: 900,
+    })
+    tasksServiceMock.resumeTask.mockResolvedValue({
+      id: 204,
+      empleadoId: 7,
+      empleadoNombre: 'Diego',
+      estado: 'en_progreso',
+      titulo: 'Control baños',
+      descripcion: 'Retomar limpieza',
+      ubicacion: 'Pasillo norte',
+      prioridad: 'alta',
+      ordenAsignacion: 2,
+      trabajoAcumuladoSegundos: 900,
+    })
+
+    const response = await requestJson('/api/bot/operacion/204/iniciar', {
+      method: 'POST',
+      body: { empleadoId: 7, empleadoNombre: 'Diego' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(tasksServiceMock.resumeTask).toHaveBeenCalledWith({ taskId: 204, empleadoId: 7 })
+    expect(response.body).toMatchObject({
+      success: true,
+      estado: 'en_progreso',
+      task: {
+        id: 204,
+        origen: 'operacion',
+        estado: 'en_progreso',
+      },
+    })
+  })
+
+  it('cancels an operational task and returns it to the assignment queue', async () => {
+    tasksServiceMock.cancelTask.mockResolvedValue({
+      id: 205,
+      empleadoId: null,
+      empleadoNombre: 'Diego',
+      estado: 'pendiente_asignacion',
+      titulo: 'Control baños',
+      descripcion: 'No se pudo terminar',
+      ubicacion: 'Pasillo norte',
+      prioridad: 'alta',
+      ordenAsignacion: 2,
+      trabajoAcumuladoSegundos: 900,
+    })
+
+    const response = await requestJson('/api/bot/tarea-operativa/205/cancelar', {
+      method: 'POST',
+      body: { empleadoId: 7, nota: 'Me llamaron a otra urgencia' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(tasksServiceMock.cancelTask).toHaveBeenCalledWith({
+      taskId: 205,
+      empleadoId: 7,
+      note: 'Me llamaron a otra urgencia',
+    })
+    expect(response.body.task).toMatchObject({
+      id: 205,
+      estado: 'pendiente_asignacion',
+    })
+  })
+
+  it('starts, pauses and finishes a bathroom round through the bot contract', async () => {
+    roundsServiceMock.startOccurrence.mockResolvedValue({
+      id: 501,
+      estado: 'en_progreso',
+      tiempoAcumuladoSegundos: 0,
+    })
+    roundsServiceMock.pauseOccurrence.mockResolvedValue({
+      id: 501,
+      estado: 'pausada',
+      tiempoAcumuladoSegundos: 420,
+    })
+    roundsServiceMock.finishOccurrence.mockResolvedValue({
+      id: 501,
+      estado: 'cumplido',
+      tiempoAcumuladoSegundos: 840,
+    })
+
+    const started = await requestJson('/api/bot/rondas/ocurrencia/501/iniciar', {
+      method: 'POST',
+      body: { empleadoId: 7 },
+    })
+    const paused = await requestJson('/api/bot/rondas/ocurrencia/501/pausar', {
+      method: 'POST',
+      body: { empleadoId: 7 },
+    })
+    const finished = await requestJson('/api/bot/rondas/ocurrencia/501/finalizar', {
+      method: 'POST',
+      body: { empleadoId: 7, nota: 'Todo limpio' },
+    })
+
+    expect(started.status).toBe(200)
+    expect(paused.status).toBe(200)
+    expect(finished.status).toBe(200)
+    expect(roundsServiceMock.startOccurrence).toHaveBeenCalledWith({ occurrenceId: 501, empleadoId: 7 })
+    expect(roundsServiceMock.pauseOccurrence).toHaveBeenCalledWith({ occurrenceId: 501, empleadoId: 7 })
+    expect(roundsServiceMock.finishOccurrence).toHaveBeenCalledWith({ occurrenceId: 501, empleadoId: 7, note: 'Todo limpio' })
+    expect(finished.body.occurrence).toMatchObject({ id: 501, estado: 'cumplido' })
+  })
+
+  it('queues a short admin WhatsApp alert when a new complaint arrives', async () => {
+    dbMock.crearReporte.mockResolvedValue(184)
+    dbMock.getUsers.mockResolvedValue([
+      { id: 1, name: 'Gerente', role: 'admin', activo: true, waId: '5491110000000' },
+    ])
+
+    const response = await requestJson('/api/bot/reporte', {
+      method: 'POST',
+      body: {
+        locatario: 'Sushi Club',
+        local: 'Local 12',
+        planta: 'baja',
+        contacto: '1144556677',
+        categoria: 'plomeria',
+        prioridad: 'alta',
+        titulo: 'Pérdida de agua',
+        descripcion: 'Sale agua debajo de la bacha de cocina',
+      },
+    })
+
+    expect(response.status).toBe(200)
+    expect(dbMock.enqueueBotMessage).toHaveBeenCalledWith(
+      '5491110000000',
+      expect.stringContaining('Nuevo reclamo #184'),
+    )
+    expect(dbMock.enqueueBotMessage).toHaveBeenCalledWith(
+      '5491110000000',
+      expect.stringContaining('1. Ver pendientes'),
+    )
+  })
+
+  it('identifies the admin WhatsApp number used by the bot', async () => {
+    dbMock.getUsers.mockResolvedValue([
+      { id: 1, name: 'Gerente', role: 'admin', activo: true, waId: '5491110000000' },
+      { id: 2, name: 'Ventas', role: 'sales', activo: true, waId: '5491199999999' },
+    ])
+
+    const response = await requestJson('/api/bot/admin/identificar/5491110000000')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      found: true,
+      admin: {
+        id: 1,
+        name: 'Gerente',
+        role: 'admin',
+      },
+    })
+  })
+
+  it('returns the short admin menu and pending complaint counters', async () => {
+    dbMock.getUsers.mockResolvedValue([
+      { id: 1, name: 'Gerente', role: 'admin', activo: true, waId: '5491110000000' },
+    ])
+    dbMock.getReportes.mockResolvedValue([
+      {
+        id: 184,
+        titulo: 'Pérdida de agua',
+        local: 'Local 12',
+        planta: 'baja',
+        prioridad: 'alta',
+        estado: 'pendiente',
+        asignacionEstado: 'sin_asignar',
+        locatario: 'Sushi Club',
+        descripcion: 'Sale agua debajo de la bacha',
+        createdAt: new Date('2026-04-12T10:00:00.000Z'),
+      },
+      {
+        id: 185,
+        titulo: 'Sin luz en depósito',
+        local: 'Local 7',
+        planta: 'alta',
+        prioridad: 'urgente',
+        estado: 'pendiente',
+        asignacionEstado: 'sin_asignar',
+        locatario: 'Mostaza',
+        descripcion: 'Tablero apagado',
+        createdAt: new Date('2026-04-12T11:00:00.000Z'),
+      },
+      {
+        id: 186,
+        titulo: 'Caso cerrado',
+        local: 'Local 2',
+        planta: 'baja',
+        prioridad: 'media',
+        estado: 'completado',
+        asignacionEstado: 'aceptada',
+        locatario: 'Havanna',
+        descripcion: 'Resuelto',
+        createdAt: new Date('2026-04-12T08:00:00.000Z'),
+      },
+    ])
+
+    const response = await requestJson('/api/bot/admin/1/resumen')
+
+    expect(response.status).toBe(200)
+    expect(response.body.admin).toMatchObject({ id: 1, name: 'Gerente' })
+    expect(response.body.counters).toEqual({
+      pending: 2,
+      urgent: 1,
+      unassigned: 2,
+    })
+    expect(response.body.latestPending).toMatchObject({
+      id: 185,
+      prioridad: 'urgente',
+    })
+    expect(response.body.menu).toEqual([
+      '1. Ver pendientes',
+      '2. Asignar último reclamo',
+      '3. Buscar reclamo por número',
+      '4. Ayuda',
+    ])
+  })
+
+  it('assigns a complaint from the admin bot flow and notifies the employee', async () => {
+    dbMock.getUsers.mockResolvedValue([
+      { id: 1, name: 'Gerente', role: 'admin', activo: true, waId: '5491110000000' },
+    ])
+    dbMock.getReporteById.mockResolvedValue({
+      id: 184,
+      titulo: 'Pérdida de agua',
+      local: 'Local 12',
+      planta: 'baja',
+      prioridad: 'alta',
+      estado: 'pendiente',
+      asignacionEstado: 'sin_asignar',
+      locatario: 'Sushi Club',
+      descripcion: 'Sale agua debajo de la bacha',
+      asignadoId: null,
+      asignadoA: null,
+    })
+    dbMock.getEmpleadoById.mockResolvedValue({
+      id: 7,
+      nombre: 'Diego',
+      waId: '549112223333',
+      activo: true,
+    })
+
+    const response = await requestJson('/api/bot/admin/1/reporte/184/asignar', {
+      method: 'POST',
+      body: { empleadoId: 7 },
+    })
+
+    expect(response.status).toBe(200)
+    expect(dbMock.actualizarReporte).toHaveBeenCalledWith(184, expect.objectContaining({
+      asignadoA: 'Diego',
+      asignadoId: 7,
+      estado: 'pendiente',
+      asignacionEstado: 'pendiente_confirmacion',
+      asignacionRespondidaAt: null,
+    }))
+    expect(dbMock.crearActualizacion).toHaveBeenCalledWith(expect.objectContaining({
+      reporteId: 184,
+      usuarioId: 1,
+      usuarioNombre: 'Gerente',
+      tipo: 'asignacion',
+    }))
+    expect(dbMock.enqueueBotMessage).toHaveBeenCalledWith(
+      '549112223333',
+      expect.stringContaining('Nueva tarea asignada'),
+    )
+    expect(response.body).toMatchObject({
+      success: true,
+      reporteId: 184,
+      empleado: {
+        id: 7,
+        nombre: 'Diego',
       },
     })
   })

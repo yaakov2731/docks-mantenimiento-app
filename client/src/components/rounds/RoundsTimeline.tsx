@@ -32,6 +32,28 @@ export function RoundsTimeline({ items }: { items: any[] }) {
                       {item.canalConfirmacion ? ` · ${item.canalConfirmacion}` : ''}
                       {item.escaladoAt ? ' · Escalado' : ''}
                     </div>
+                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                      {item.inicioRealAt ? (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1">
+                          Inicio {formatClockLabel(item.inicioRealAt)}
+                        </span>
+                      ) : null}
+                      {item.pausadoAt ? (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1">
+                          Pausa {formatClockLabel(item.pausadoAt)}
+                        </span>
+                      ) : null}
+                      {item.finRealAt ? (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1">
+                          Fin {formatClockLabel(item.finRealAt)}
+                        </span>
+                      ) : null}
+                      {typeof item.tiempoAcumuladoSegundos === 'number' ? (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1">
+                          Duración {formatDuration(item.tiempoAcumuladoSegundos)}
+                        </span>
+                      ) : null}
+                    </div>
                     {item.nota ? <div className="mt-2 text-sm text-slate-600">{item.nota}</div> : null}
                   </div>
                   <div
@@ -48,4 +70,26 @@ export function RoundsTimeline({ items }: { items: any[] }) {
       </div>
     </div>
   )
+}
+
+function formatClockLabel(value?: string | number | Date | null) {
+  if (!value) return '--:--'
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return '--:--'
+  return date.toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+function formatDuration(seconds?: number) {
+  const safe = Math.max(0, Math.floor(seconds ?? 0))
+  const hours = Math.floor(safe / 3600)
+  const minutes = Math.floor((safe % 3600) / 60)
+  const remainingSeconds = safe % 60
+
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m ${remainingSeconds}s`
+  return `${remainingSeconds}s`
 }

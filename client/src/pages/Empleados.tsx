@@ -13,9 +13,21 @@ import {
   LogOut,
   PencilLine,
   ShieldCheck,
+  WalletCards,
 } from 'lucide-react'
 
-const empty = { nombre: '', email: '', telefono: '', especialidad: '', waId: '' }
+const empty = {
+  nombre: '',
+  email: '',
+  telefono: '',
+  especialidad: '',
+  waId: '',
+  pagoDiario: '',
+  pagoSemanal: '',
+  pagoQuincenal: '',
+  pagoMensual: '',
+}
+type AttendanceAction = 'entrada' | 'inicio_almuerzo' | 'fin_almuerzo' | 'salida'
 
 function pad(value: number) {
   return String(value).padStart(2, '0')
@@ -50,8 +62,53 @@ function formatChannel(canal?: string | null) {
   return canal || 'Sin canal'
 }
 
+function formatDuration(seconds?: number | null) {
+  const safe = Math.max(0, Math.floor(Number(seconds ?? 0)))
+  const hours = Math.floor(safe / 3600)
+  const minutes = Math.floor((safe % 3600) / 60)
+  return `${hours}h ${String(minutes).padStart(2, '0')}m`
+}
+
+function formatCurrency(value?: number | null) {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  }).format(Number(value ?? 0))
+}
+
+function parsePayrollInput(value: string) {
+  const normalized = value.replace(/[^\d]/g, '')
+  return normalized ? Number(normalized) : 0
+}
+
+function getPayrollStatus(empleado: any) {
+  const values = [
+    Number(empleado.pagoDiario ?? 0),
+    Number(empleado.pagoSemanal ?? 0),
+    Number(empleado.pagoQuincenal ?? 0),
+    Number(empleado.pagoMensual ?? 0),
+  ]
+  return values.every(value => value > 0)
+}
+
 function getEventDateTimeValue(evento: any) {
   return evento?.timestamp ?? evento?.createdAt ?? null
+}
+
+function formatAttendanceAction(value?: AttendanceAction | string | null) {
+  switch (value) {
+    case 'entrada':
+      return 'Entrada'
+    case 'inicio_almuerzo':
+      return 'Inicio almuerzo'
+    case 'fin_almuerzo':
+      return 'Fin almuerzo'
+    case 'salida':
+      return 'Salida'
+    default:
+      return value || 'Sin movimientos'
+  }
 }
 
 function AttendanceCard({
@@ -65,14 +122,14 @@ function AttendanceCard({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [manualForm, setManualForm] = useState(() => ({
-    tipo: 'entrada' as 'entrada' | 'salida',
+    tipo: 'entrada' as AttendanceAction,
     fecha: toDateInputValue(),
     hora: toTimeInputValue(),
     nota: '',
   }))
   const [editingEventId, setEditingEventId] = useState<number | null>(null)
   const [correctionForm, setCorrectionForm] = useState(() => ({
-    tipo: 'entrada' as 'entrada' | 'salida',
+    tipo: 'entrada' as AttendanceAction,
     fecha: toDateInputValue(),
     hora: toTimeInputValue(),
     nota: '',
@@ -140,61 +197,117 @@ function AttendanceCard({
   const status = attendanceStatus.data
   const eventos = attendanceEvents.data ?? []
   const auditoria = attendanceAudit.data ?? []
+  const onShift = !!status?.onShift
+  const onLunch = !!status?.onLunch
+  const statusLabel = onLunch ? 'En almuerzo' : onShift ? 'En servicio' : 'Fuera de turno'
+  const canEntry = !onShift
+  const canStartLunch = onShift && !onLunch
+  const canFinishLunch = onShift && onLunch
+  const canExit = onShift && !onLunch
+  const payrollReady = getPayrollStatus(empleado)
+  const profileTone = payrollReady
+    ? 'border-emerald-100 bg-emerald-50 text-emerald-800'
+    : 'border-amber-100 bg-amber-50 text-amber-800'
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-5">
-      <div className="flex items-start justify-between mb-3 gap-4">
-        <div>
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center mb-2">
-            <span className="text-primary font-heading font-bold">{empleado.nombre.charAt(0).toUpperCase()}</span>
+    <div className="surface-panel-strong overflow-hidden rounded-[26px] border border-slate-200 bg-white">
+      <div className="border-b border-slate-100 bg-[linear-gradient(135deg,#ffffff_0%,#f7fafc_60%,#eef6fb_100%)] p-5 md:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
+                <span className="text-lg font-heading font-bold text-primary">{empleado.nombre.charAt(0).toUpperCase()}</span>
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="truncate font-heading text-lg font-semibold text-slate-900">{empleado.nombre}</h3>
+                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${profileTone}`}>
+                    {payrollReady ? 'Escala completa' : 'Escala incompleta'}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                  <span>{empleado.especialidad || 'Sin especialidad cargada'}</span>
+                  <span>{empleado.waId ? 'WhatsApp activo' : 'Sin WhatsApp'}</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <h3 className="font-heading font-semibold">{empleado.nombre}</h3>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap justify-end">
-          <button
-            onClick={() => onEdit(empleado)}
-            className="text-xs text-primary hover:underline transition-colors"
-          >
-            Editar
-          </button>
-          <button
-            onClick={() => setExpanded(current => !current)}
-            className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:underline transition-colors"
-          >
-            <Clock3 size={12} />
-            {expanded ? 'Ocultar asistencia' : 'Asistencia'}
-          </button>
-          <button
-            onClick={() => onDeactivate(empleado.id)}
-            className="text-xs text-gray-400 hover:text-danger transition-colors"
-          >
-            Desactivar
-          </button>
-        </div>
-      </div>
 
-      <div className="space-y-1.5 text-xs text-gray-500">
-        {empleado.especialidad && <div className="flex items-center gap-2"><Wrench size={12} />{empleado.especialidad}</div>}
-        {empleado.telefono && <div className="flex items-center gap-2"><Phone size={12} />{empleado.telefono}</div>}
-        {empleado.email && <div className="flex items-center gap-2"><Mail size={12} />{empleado.email}</div>}
-        {empleado.waId && <div className="flex items-center gap-2 text-green-600"><MessageCircle size={12} />WA: {empleado.waId}</div>}
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => onEdit(empleado)}
+              className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+            >
+              Editar ficha
+            </button>
+            <button
+              onClick={() => setExpanded(current => !current)}
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+            >
+              <Clock3 size={12} />
+              {expanded ? 'Ocultar asistencia' : 'Asistencia'}
+            </button>
+            <button
+              onClick={() => onDeactivate(empleado.id)}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-rose-200 hover:text-rose-600"
+            >
+              Desactivar
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Datos de contacto</div>
+            <div className="mt-3 space-y-2 text-sm text-slate-600">
+              {empleado.especialidad && <div className="flex items-center gap-2"><Wrench size={14} />{empleado.especialidad}</div>}
+              {empleado.telefono && <div className="flex items-center gap-2"><Phone size={14} />{empleado.telefono}</div>}
+              {empleado.email && <div className="flex items-center gap-2"><Mail size={14} />{empleado.email}</div>}
+              {empleado.waId && <div className="flex items-center gap-2 text-emerald-700"><MessageCircle size={14} />WA: {empleado.waId}</div>}
+              {!empleado.especialidad && !empleado.telefono && !empleado.email && !empleado.waId && (
+                <div className="text-sm text-slate-400">Completá la ficha para centralizar el contacto operativo.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[22px] border border-slate-200 bg-slate-950 p-4 text-white">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-300">
+              <WalletCards size={14} />
+              Escala salarial
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {[
+                { label: 'Día', value: empleado.pagoDiario },
+                { label: 'Semana', value: empleado.pagoSemanal },
+                { label: 'Quincena', value: empleado.pagoQuincenal },
+                { label: 'Mes', value: empleado.pagoMensual },
+              ].map(item => (
+                <div key={item.label} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
+                  <div className="text-[11px] uppercase tracking-wide text-slate-400">{item.label}</div>
+                  <div className="mt-1 text-sm font-semibold text-white">{formatCurrency(item.value ?? 0)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {expanded && (
-        <div className="mt-5 border-t border-gray-100 pt-4 space-y-4">
+        <div className="space-y-4 p-5 md:p-6">
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <p className="text-xs uppercase tracking-wide text-emerald-700">Estado actual</p>
                 <p className="text-sm font-semibold text-emerald-950">
-                  {status?.onShift ? 'En turno' : 'Fuera de turno'}
+                  {statusLabel}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button
                   size="sm"
                   variant="success"
                   loading={registrar.isLoading}
+                  disabled={!canEntry}
                   onClick={() => registrar.mutate({ empleadoId: empleado.id, accion: 'entrada' })}
                 >
                   <LogIn size={14} />
@@ -204,6 +317,27 @@ function AttendanceCard({
                   size="sm"
                   variant="outline"
                   loading={registrar.isLoading}
+                  disabled={!canStartLunch}
+                  onClick={() => registrar.mutate({ empleadoId: empleado.id, accion: 'inicio_almuerzo' })}
+                >
+                  <Clock3 size={14} />
+                  Iniciar almuerzo
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={registrar.isLoading}
+                  disabled={!canFinishLunch}
+                  onClick={() => registrar.mutate({ empleadoId: empleado.id, accion: 'fin_almuerzo' })}
+                >
+                  <Clock3 size={14} />
+                  Fin almuerzo
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={registrar.isLoading}
+                  disabled={!canExit}
                   onClick={() => registrar.mutate({ empleadoId: empleado.id, accion: 'salida' })}
                 >
                   <LogOut size={14} />
@@ -213,7 +347,7 @@ function AttendanceCard({
             </div>
             <div className="grid sm:grid-cols-2 gap-3 mt-3 text-xs text-emerald-900">
               <div>
-                <span className="font-medium">Última acción:</span> {status?.lastAction ?? 'Sin movimientos'}
+                <span className="font-medium">Última acción:</span> {formatAttendanceAction(status?.lastAction)}
               </div>
               <div>
                 <span className="font-medium">Canal:</span> {formatChannel(status?.lastChannel)}
@@ -223,6 +357,15 @@ function AttendanceCard({
               </div>
               <div>
                 <span className="font-medium">Última entrada:</span> {formatDateTime(status?.lastEntryAt)}
+              </div>
+              <div>
+                <span className="font-medium">Inicio almuerzo:</span> {formatDateTime(status?.lastLunchStartAt)}
+              </div>
+              <div>
+                <span className="font-medium">Fin almuerzo:</span> {formatDateTime(status?.lastLunchEndAt)}
+              </div>
+              <div>
+                <span className="font-medium">Almuerzo hoy:</span> {formatDuration(status?.todayLunchSeconds)}
               </div>
             </div>
           </div>
@@ -237,10 +380,12 @@ function AttendanceCard({
                 <span className="block text-xs font-medium text-gray-600 mb-1">Tipo</span>
                 <select
                   value={manualForm.tipo}
-                  onChange={e => setManualForm(current => ({ ...current, tipo: e.target.value as 'entrada' | 'salida' }))}
+                  onChange={e => setManualForm(current => ({ ...current, tipo: e.target.value as AttendanceAction }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"
                 >
                   <option value="entrada">Entrada</option>
+                  <option value="inicio_almuerzo">Inicio almuerzo</option>
+                  <option value="fin_almuerzo">Fin almuerzo</option>
                   <option value="salida">Salida</option>
                 </select>
               </label>
@@ -302,7 +447,7 @@ function AttendanceCard({
                   <div key={evento.id} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="text-sm text-gray-800">
-                        <div className="font-medium capitalize">{evento.tipo}</div>
+                        <div className="font-medium">{formatAttendanceAction(evento.tipo)}</div>
                         <div className="text-xs text-gray-500">{formatDateTime(dateValue)}</div>
                         <div className="text-xs text-gray-500">{formatChannel(evento.canal)}</div>
                         {evento.nota && <div className="text-xs text-gray-600 mt-1">{evento.nota}</div>}
@@ -331,10 +476,12 @@ function AttendanceCard({
                           <span className="block text-xs font-medium text-gray-600 mb-1">Tipo</span>
                           <select
                             value={correctionForm.tipo}
-                            onChange={e => setCorrectionForm(current => ({ ...current, tipo: e.target.value as 'entrada' | 'salida' }))}
+                            onChange={e => setCorrectionForm(current => ({ ...current, tipo: e.target.value as AttendanceAction }))}
                             className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"
                           >
                             <option value="entrada">Entrada</option>
+                            <option value="inicio_almuerzo">Inicio almuerzo</option>
+                            <option value="fin_almuerzo">Fin almuerzo</option>
                             <option value="salida">Salida</option>
                           </select>
                         </label>
@@ -411,9 +558,9 @@ function AttendanceCard({
               ) : auditoria.slice(0, 5).map(item => (
                 <div key={item.id} className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-950">
                   <div className="font-medium">Modificado por {item.adminUserName}</div>
-                  <div className="text-xs mt-1">Antes: {item.valorAnteriorTipo} {formatDateTime(item.valorAnteriorTimestamp)}</div>
+                  <div className="text-xs mt-1">Antes: {formatAttendanceAction(item.valorAnteriorTipo)} {formatDateTime(item.valorAnteriorTimestamp)}</div>
                   <div className="text-xs">Canal anterior: {formatChannel(item.valorAnteriorCanal)}</div>
-                  <div className="text-xs">Ahora: {item.valorNuevoTipo} {formatDateTime(item.valorNuevoTimestamp)}</div>
+                  <div className="text-xs">Ahora: {formatAttendanceAction(item.valorNuevoTipo)} {formatDateTime(item.valorNuevoTimestamp)}</div>
                   <div className="text-xs">Canal nuevo: {formatChannel(item.valorNuevoCanal)}</div>
                   <div className="text-xs">Motivo: {item.motivo}</div>
                   <div className="text-[11px] text-amber-800 mt-1">{formatDateTime(item.createdAt)}</div>
@@ -432,6 +579,8 @@ export default function Empleados() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const { data: empleados = [], refetch } = trpc.empleados.listar.useQuery()
+  const empleadosConWhatsapp = empleados.filter((empleado: any) => !!empleado.waId).length
+  const empleadosConEscalaCompleta = empleados.filter((empleado: any) => getPayrollStatus(empleado)).length
 
   const resetForm = () => {
     setForm(empty)
@@ -442,6 +591,17 @@ export default function Empleados() {
   const crear = trpc.empleados.crear.useMutation({ onSuccess: () => { resetForm(); refetch() } })
   const actualizar = trpc.empleados.actualizar.useMutation({ onSuccess: () => { resetForm(); refetch() } })
   const desactivar = trpc.empleados.desactivar.useMutation({ onSuccess: refetch })
+  const payload = {
+    nombre: form.nombre.trim(),
+    email: form.email.trim(),
+    telefono: form.telefono.trim(),
+    especialidad: form.especialidad.trim(),
+    waId: form.waId.trim(),
+    pagoDiario: parsePayrollInput(form.pagoDiario),
+    pagoSemanal: parsePayrollInput(form.pagoSemanal),
+    pagoQuincenal: parsePayrollInput(form.pagoQuincenal),
+    pagoMensual: parsePayrollInput(form.pagoMensual),
+  }
 
   const openEditForm = (empleado: any) => {
     setEditingId(empleado.id)
@@ -451,62 +611,161 @@ export default function Empleados() {
       telefono: empleado.telefono ?? '',
       especialidad: empleado.especialidad ?? '',
       waId: empleado.waId ?? '',
+      pagoDiario: String(empleado.pagoDiario ?? ''),
+      pagoSemanal: String(empleado.pagoSemanal ?? ''),
+      pagoQuincenal: String(empleado.pagoQuincenal ?? ''),
+      pagoMensual: String(empleado.pagoMensual ?? ''),
     })
     setShowForm(true)
   }
 
   return (
     <DashboardLayout title="Empleados de Mantenimiento">
-      <div className="flex justify-between items-center mb-6">
-        <p className="text-sm text-gray-500">{empleados.length} empleados activos</p>
-        <Button onClick={() => {
-          if (showForm && !editingId) {
-            resetForm()
-            return
-          }
-          setEditingId(null)
-          setForm(empty)
-          setShowForm(true)
-        }}>
-          <UserPlus size={16} /> Agregar empleado
-        </Button>
+      <div className="surface-panel-strong relative overflow-hidden rounded-[30px] p-6 md:p-7 mb-6">
+        <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_center,rgba(10,126,164,0.09),transparent_72%)] pointer-events-none" />
+        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
+              Administración de personal
+            </div>
+            <h2 className="mt-3 font-heading text-[24px] font-semibold leading-tight text-sidebar-bg md:text-[30px]">
+              Fichas de empleados con datos operativos y escala salarial clara
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm text-slate-600">
+              Editá el nombre de cada empleado desde el admin, centralizá contacto y definí la tarifa por día, semana,
+              quincena y mes para que las liquidaciones reflejen exactamente lo configurado.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={() => {
+                if (showForm && !editingId) {
+                  resetForm()
+                  return
+                }
+                setEditingId(null)
+                setForm(empty)
+                setShowForm(true)
+              }}
+              className="min-w-[180px] justify-center"
+            >
+              <UserPlus size={16} /> {showForm && !editingId ? 'Cancelar alta' : 'Agregar empleado'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="relative mt-6 grid gap-3 md:grid-cols-3">
+          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Activos</div>
+            <div className="mt-2 font-heading text-3xl font-semibold text-slate-900">{empleados.length}</div>
+            <div className="mt-1 text-xs text-slate-500">Equipo operativo visible en panel</div>
+          </div>
+          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">WhatsApp cargado</div>
+            <div className="mt-2 font-heading text-3xl font-semibold text-slate-900">{empleadosConWhatsapp}</div>
+            <div className="mt-1 text-xs text-slate-500">Listos para operar también por bot</div>
+          </div>
+          <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Escala completa</div>
+            <div className="mt-2 font-heading text-3xl font-semibold text-slate-900">{empleadosConEscalaCompleta}</div>
+            <div className="mt-1 text-xs text-slate-500">Con día, semana, quincena y mes definidos</div>
+          </div>
+        </div>
       </div>
 
       {showForm && (
-        <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
-          <h3 className="font-heading font-semibold mb-4">
-            {editingId ? 'Editar empleado' : 'Nuevo empleado'}
-          </h3>
-          <div className="grid md:grid-cols-2 gap-4">
-            {[
-              { key: 'nombre', label: 'Nombre *', placeholder: 'Juan García' },
-              { key: 'especialidad', label: 'Especialidad', placeholder: 'Electricista, Plomero...' },
-              { key: 'telefono', label: 'Teléfono', placeholder: '+54 11...' },
-              { key: 'email', label: 'Email', placeholder: 'juan@email.com' },
-              { key: 'waId', label: 'WhatsApp (número sin +)', placeholder: '5491112345678' },
-            ].map(({ key, label, placeholder }) => (
-              <div key={key}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                <input
-                  value={(form as any)[key]}
-                  onChange={e => setForm(current => ({ ...current, [key]: e.target.value }))}
-                  placeholder={placeholder}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-            ))}
+        <div className="surface-panel-strong mb-6 overflow-hidden rounded-[28px]">
+          <div className="border-b border-slate-100 bg-slate-950 px-5 py-4 text-white md:px-6">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+              {editingId ? 'Edición de ficha' : 'Alta administrativa'}
+            </div>
+            <h3 className="mt-2 font-heading text-xl font-semibold">
+              {editingId ? 'Actualizar empleado y escala salarial' : 'Nuevo empleado de mantenimiento'}
+            </h3>
           </div>
-          <div className="flex gap-3 mt-4">
+
+          <div className="grid gap-6 p-5 md:p-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="space-y-4">
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Datos personales</div>
+                <div className="mt-3 grid gap-4 md:grid-cols-2">
+                  {[
+                    { key: 'nombre', label: 'Nombre *', placeholder: 'Juan García' },
+                    { key: 'especialidad', label: 'Especialidad', placeholder: 'Electricista, Plomero...' },
+                    { key: 'telefono', label: 'Teléfono', placeholder: '+54 11...' },
+                    { key: 'email', label: 'Email', placeholder: 'juan@email.com' },
+                    { key: 'waId', label: 'WhatsApp (número sin +)', placeholder: '5491112345678', wide: true },
+                  ].map(({ key, label, placeholder, wide }) => (
+                    <label key={key} className={wide ? 'md:col-span-2' : ''}>
+                      <span className="mb-1.5 block text-sm font-medium text-slate-700">{label}</span>
+                      <input
+                        value={(form as any)[key]}
+                        onChange={e => setForm(current => ({ ...current, [key]: e.target.value }))}
+                        placeholder={placeholder}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#f8fbfd_0%,#ffffff_100%)] p-4 md:p-5">
+              <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Escala salarial</div>
+              <p className="mt-2 text-sm text-slate-600">
+                Definí montos exactos para que la liquidación tome la tarifa correcta sin conversiones ocultas.
+              </p>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {[
+                  { key: 'pagoDiario', label: 'Pago diario (ARS)', placeholder: '25000' },
+                  { key: 'pagoSemanal', label: 'Pago semanal (ARS)', placeholder: '150000' },
+                  { key: 'pagoQuincenal', label: 'Pago quincenal (ARS)', placeholder: '300000' },
+                  { key: 'pagoMensual', label: 'Pago mensual (ARS)', placeholder: '600000' },
+                ].map(({ key, label, placeholder }) => (
+                  <label key={key}>
+                    <span className="mb-1.5 block text-sm font-medium text-slate-700">{label}</span>
+                    <input
+                      inputMode="numeric"
+                      value={(form as any)[key]}
+                      onChange={e => setForm(current => ({ ...current, [key]: e.target.value }))}
+                      placeholder={placeholder}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Vista previa</div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'Día', value: payload.pagoDiario },
+                    { label: 'Semana', value: payload.pagoSemanal },
+                    { label: 'Quincena', value: payload.pagoQuincenal },
+                    { label: 'Mes', value: payload.pagoMensual },
+                  ].map(item => (
+                    <div key={item.label} className="rounded-2xl bg-slate-950 px-3 py-3 text-white">
+                      <div className="text-[11px] uppercase tracking-wide text-slate-400">{item.label}</div>
+                      <div className="mt-1 text-sm font-semibold">{formatCurrency(item.value)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3 border-t border-slate-100 px-5 py-4 md:px-6">
             <Button
               onClick={() => {
                 if (editingId) {
-                  actualizar.mutate({ id: editingId, ...form })
+                  actualizar.mutate({ id: editingId, ...payload })
                   return
                 }
-                crear.mutate(form)
+                crear.mutate(payload)
               }}
               loading={crear.isLoading || actualizar.isLoading}
-              disabled={!form.nombre}
+              disabled={!payload.nombre}
+              className="min-w-[150px] justify-center"
             >
               Guardar
             </Button>
@@ -515,9 +774,9 @@ export default function Empleados() {
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
         {empleados.length === 0 ? (
-          <div className="col-span-3 bg-white rounded-xl p-12 text-center shadow-sm">
+          <div className="surface-panel col-span-full rounded-[28px] p-12 text-center">
             <p className="text-gray-400">No hay empleados registrados</p>
           </div>
         ) : empleados.map(empleado => (

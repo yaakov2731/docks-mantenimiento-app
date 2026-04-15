@@ -3,7 +3,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
 import WorkingTime from '../components/WorkingTime'
-import { attendanceChannelLabel, getAttendanceEventDateTime } from '../lib/attendancePresentation'
+import { attendanceActionLabel, attendanceActionTone, attendanceChannelLabel, getAttendanceEventDateTime } from '../lib/attendancePresentation'
 import { exportarAsistenciaExcel } from '../lib/exportAttendanceExcel'
 import {
   Activity,
@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 
 type Periodo = 'dia' | 'semana' | 'quincena' | 'mes'
+type AttendanceAction = 'entrada' | 'inicio_almuerzo' | 'fin_almuerzo' | 'salida'
 
 const periodOptions: { value: Periodo; label: string; hint: string }[] = [
   { value: 'dia', label: 'Hoy', hint: 'Control operativo del día' },
@@ -128,22 +129,47 @@ function SummaryCard({
   )
 }
 
-function DayChip({ day }: { day: any }) {
-  const active = day.entradas > 0 || day.salidas > 0 || day.workedSeconds > 0 || day.turnoAbierto
+function groupTurnsByDay(turns: any[]) {
+  const sorted = [...turns].sort((left, right) => {
+    const leftMs = new Date(left.entradaAt ?? 0).getTime()
+    const rightMs = new Date(right.entradaAt ?? 0).getTime()
+    return rightMs - leftMs
+  })
+  const groups = new Map<string, { fecha: string; etiqueta: string; turnos: any[] }>()
+  for (const turn of sorted) {
+    const key = String(turn.fecha ?? 'sin-fecha')
+    const existing = groups.get(key)
+    if (existing) {
+      existing.turnos.push(turn)
+      continue
+    }
+    groups.set(key, {
+      fecha: key,
+      etiqueta: turn.etiqueta ?? key,
+      turnos: [turn],
+    })
+  }
+  return [...groups.values()]
+}
+
+function TurnChip({ turn }: { turn: any }) {
+  const active = !!turn.turnoAbierto
   return (
     <div
       className={`min-w-[78px] rounded-2xl border px-3 py-2 ${
         active
           ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-          : 'border-slate-200 bg-slate-50 text-slate-500'
+          : 'border-slate-200 bg-slate-50 text-slate-700'
       }`}
     >
-      <div className="text-[10px] uppercase tracking-wide opacity-70">{day.etiqueta}</div>
+      <div className="text-[10px] uppercase tracking-wide opacity-70">
+        {formatTime(turn.entradaAt)} · {turn.turnoAbierto ? 'Abierto' : formatTime(turn.salidaAt)}
+      </div>
       <div className="mt-1 text-xs font-medium">
-        {active ? <WorkingTime seconds={day.workedSeconds ?? 0} /> : 'Sin turno'}
+        <WorkingTime seconds={turn.workedSeconds ?? 0} />
       </div>
       <div className="mt-1 text-[10px] opacity-70">
-        {day.entradas ?? 0} e · {day.salidas ?? 0} s
+        Almuerzo <WorkingTime seconds={turn.lunchSeconds ?? 0} />
       </div>
     </div>
   )
@@ -450,9 +476,41 @@ export default function Asistencia() {
                 {empleados.map((empleado: any) => {
                   const attendance = empleado.attendance ?? {}
                   const liquidacion = empleado.liquidacion ?? {}
-                  const hoy = empleado.hoy ?? {}
+                  const turnos = empleado.turnos ?? []
+                  const currentTurn = turnos.find((turn: any) => turn.turnoAbierto) ?? null
+                  const displayTurn = currentTurn ?? turnos[turnos.length - 1] ?? null
+                  const groupedTurns = groupTurnsByDay(turnos)
                   const onShift = !!attendance.onShift
+                  const onLunch = !!attendance.onLunch
+                  const statusLabel = onLunch ? 'En almuerzo' : onShift ? 'En servicio' : 'Fuera de turno'
+                  const statusTone = onLunch
+                    ? 'bg-amber-50 text-amber-700'
+                    : onShift
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-slate-100 text-slate-600'
+                  const canEntry = !onShift
+                  const canStartLunch = onShift && !onLunch
+                  const canFinishLunch = onShift && onLunch
+                  const canExit = onShift && !onLunch
+                  const displayShiftGrossSeconds = onShift
+                    ? attendance.currentShiftGrossSeconds ?? 0
+                    : displayTurn?.grossSeconds ?? 0
+                  const displayShiftLunchSeconds = onShift
+                    ? attendance.currentShiftLunchSeconds ?? 0
+                    : displayTurn?.lunchSeconds ?? 0
+                  const displayShiftNetSeconds = onShift
+                    ? attendance.currentShiftSeconds ?? 0
+                    : displayTurn?.workedSeconds ?? 0
+                  const liveClockSeconds = onLunch
+                    ? attendance.currentLunchSeconds ?? 0
+                    : onShift
+                      ? attendance.currentShiftSeconds ?? 0
+                      : displayShiftNetSeconds
                   const isSubmitting = registrar.isLoading && registrar.variables?.empleadoId === empleado.empleadoId
+                  const turnHeaderLabel = onShift ? 'Turno actual' : displayTurn ? 'Último turno' : 'Turno actual'
+                  const exitLabel = onShift
+                    ? 'Turno abierto'
+                    : formatTime(displayTurn?.salidaAt ?? null)
 
                   return (
                     <div key={empleado.empleadoId} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
@@ -469,9 +527,9 @@ export default function Asistencia() {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${onShift ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${statusTone}`}>
                             <ShieldCheck size={12} />
-                            {onShift ? 'En servicio' : 'Fuera de turno'}
+                            {statusLabel}
                           </span>
                           {empleado.cierre && (
                             empleado.cierre.pagadoAt ? (
@@ -492,13 +550,14 @@ export default function Asistencia() {
                       <div className="mt-4 rounded-[22px] bg-[#182330] text-white p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-[10px] uppercase tracking-[0.22em] text-white/40">Control diario</div>
+                            <div className="text-[10px] uppercase tracking-[0.22em] text-white/40">{turnHeaderLabel}</div>
                             <div className="mt-2 font-mono text-[32px] leading-none text-cyan-300">
-                              {onShift ? (
-                                <WorkingTime seconds={attendance.currentShiftSeconds ?? 0} isRunning className="font-mono" />
-                              ) : (
-                                formatTime(hoy?.primerIngresoAt)
-                              )}
+                              <WorkingTime
+                                seconds={liveClockSeconds}
+                                isRunning={onShift}
+                                variant="clock"
+                                className="font-mono"
+                              />
                             </div>
                           </div>
                           <div className="rounded-2xl bg-white/10 p-3">
@@ -506,9 +565,11 @@ export default function Asistencia() {
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-white/65">
-                          <span className="rounded-full bg-white/8 px-2.5 py-1">Ingreso: {formatTime(hoy?.primerIngresoAt)}</span>
+                          <span className="rounded-full bg-white/8 px-2.5 py-1">Ingreso: {formatTime(displayTurn?.entradaAt ?? null)}</span>
+                          <span className="rounded-full bg-white/8 px-2.5 py-1">Inicio almuerzo: {formatTime(displayTurn?.inicioAlmuerzoAt ?? null)}</span>
+                          <span className="rounded-full bg-white/8 px-2.5 py-1">Fin almuerzo: {formatTime(displayTurn?.finAlmuerzoAt ?? null)}</span>
                           <span className="rounded-full bg-white/8 px-2.5 py-1">
-                            Salida: {onShift ? 'Turno abierto' : formatTime(hoy?.ultimaSalidaAt)}
+                            Salida: {exitLabel}
                           </span>
                           <span className="rounded-full bg-white/8 px-2.5 py-1">Última vía: {attendanceChannelLabel(attendance.lastChannel)}</span>
                         </div>
@@ -526,6 +587,27 @@ export default function Asistencia() {
                           {empleado.cierre?.pagadoAt && (
                             <div className="mt-1 text-[11px] text-cyan-700">Pagado el {formatDateTime(empleado.cierre.pagadoAt)}</div>
                           )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 mt-3">
+                        <div className="rounded-[18px] border border-slate-200 px-3 py-2">
+                          <div className="text-[11px] text-slate-500">Bruto del turno</div>
+                          <div className="mt-1 font-medium text-slate-800">
+                            <WorkingTime seconds={displayShiftGrossSeconds} />
+                          </div>
+                        </div>
+                        <div className="rounded-[18px] border border-slate-200 px-3 py-2">
+                          <div className="text-[11px] text-slate-500">Almuerzo del turno</div>
+                          <div className="mt-1 font-medium text-slate-800">
+                            <WorkingTime seconds={displayShiftLunchSeconds} />
+                          </div>
+                        </div>
+                        <div className="rounded-[18px] border border-slate-200 px-3 py-2">
+                          <div className="text-[11px] text-slate-500">Neto del turno</div>
+                          <div className="mt-1 font-medium text-slate-800">
+                            <WorkingTime seconds={displayShiftNetSeconds} />
+                          </div>
                         </div>
                       </div>
 
@@ -561,27 +643,58 @@ export default function Asistencia() {
                       </div>
 
                       <div className="mt-3">
-                        <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-2">Historial del período</div>
-                        <div className="flex gap-2 overflow-x-auto pb-1">
-                          {(liquidacion.dias ?? []).map((day: any) => <DayChip key={day.fecha} day={day} />)}
-                        </div>
+                        <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-2">Turnos del período</div>
+                        {groupedTurns.length === 0 ? (
+                          <div className="rounded-[18px] border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
+                            Sin turnos registrados en este período.
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {groupedTurns.map((group) => (
+                              <div key={group.fecha} className="rounded-[18px] border border-slate-200 px-3 py-3">
+                                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{group.etiqueta}</div>
+                                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                                  {group.turnos.map((turn: any) => <TurnChip key={turn.id} turn={turn} />)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex gap-2 mt-4">
+                      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 mt-4">
                         <Button
-                          variant={onShift ? 'outline' : 'success'}
-                          disabled={onShift || isSubmitting}
+                          variant={canEntry ? 'success' : 'outline'}
+                          disabled={!canEntry || isSubmitting}
                           onClick={() => registrar.mutate({ empleadoId: empleado.empleadoId, accion: 'entrada' })}
-                          className="flex-1"
+                          className="w-full"
                         >
                           <LogIn size={14} />
                           Registrar entrada
                         </Button>
                         <Button
-                          variant={onShift ? 'destructive' : 'outline'}
-                          disabled={!onShift || isSubmitting}
+                          variant={canStartLunch ? 'outline' : 'outline'}
+                          disabled={!canStartLunch || isSubmitting}
+                          onClick={() => registrar.mutate({ empleadoId: empleado.empleadoId, accion: 'inicio_almuerzo' as AttendanceAction })}
+                          className="w-full"
+                        >
+                          <Clock3 size={14} />
+                          Iniciar almuerzo
+                        </Button>
+                        <Button
+                          variant={canFinishLunch ? 'outline' : 'outline'}
+                          disabled={!canFinishLunch || isSubmitting}
+                          onClick={() => registrar.mutate({ empleadoId: empleado.empleadoId, accion: 'fin_almuerzo' as AttendanceAction })}
+                          className="w-full"
+                        >
+                          <Clock3 size={14} />
+                          Fin almuerzo
+                        </Button>
+                        <Button
+                          variant={canExit ? 'destructive' : 'outline'}
+                          disabled={!canExit || isSubmitting}
                           onClick={() => registrar.mutate({ empleadoId: empleado.empleadoId, accion: 'salida' })}
-                          className="flex-1"
+                          className="w-full"
                         >
                           <LogOut size={14} />
                           Registrar salida
@@ -589,7 +702,7 @@ export default function Asistencia() {
                       </div>
 
                       <div className="mt-3 text-xs text-slate-500">
-                        Último movimiento: {attendance.lastAction ? `${attendance.lastAction} · ${formatDateTime(attendance.lastActionAt)}` : 'Sin movimientos aún'}
+                        Último movimiento: {attendance.lastAction ? `${attendanceActionLabel(attendance.lastAction)} · ${formatDateTime(attendance.lastActionAt)}` : 'Sin movimientos aún'}
                       </div>
                     </div>
                   )
@@ -663,9 +776,9 @@ export default function Asistencia() {
                         <div className="text-xs text-slate-500">{evento.especialidad || 'Mantenimiento general'}</div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ${evento.tipo === 'entrada' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                          {evento.tipo === 'entrada' ? <LogIn size={12} /> : <LogOut size={12} />}
-                          {evento.tipo}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ${attendanceActionTone(evento.tipo)}`}>
+                          {evento.tipo === 'entrada' ? <LogIn size={12} /> : evento.tipo === 'salida' ? <LogOut size={12} /> : <Clock3 size={12} />}
+                          {attendanceActionLabel(evento.tipo)}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600">
                           <MonitorSmartphone size={11} />

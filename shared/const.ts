@@ -1,9 +1,7 @@
 export const COOKIE_NAME = 'docks_session'
 
 export const LOCALES_PLANTA_BAJA = [
-  ...Array.from({ length: 104 }, (_, i) => `Local ${i + 1}`),
-  ...Array.from({ length: 66 }, (_, i) => `Local ${105 + i}`),
-  ...Array.from({ length: 9 }, (_, i) => `Local ${214 + i}`),
+  ...Array.from({ length: 222 }, (_, i) => `Local ${i + 1}`),
   ...Array.from({ length: 5 }, (_, i) => `Local ${257 + i}`),
   'Plaza Central (223)',
   'Anfiteatro (228)',
@@ -63,6 +61,8 @@ export const RONDAS_DIAS_SEMANA = [
 export const RONDAS_ESTADOS = [
   { value: 'programado', label: 'Programado', color: '#64748B' },
   { value: 'pendiente', label: 'Pendiente', color: '#D97706' },
+  { value: 'en_progreso', label: 'En progreso', color: '#0A7EA4' },
+  { value: 'pausada', label: 'Pausada', color: '#64748B' },
   { value: 'cumplido', label: 'Cumplido', color: '#16A34A' },
   { value: 'cumplido_con_observacion', label: 'Con observación', color: '#92400E' },
   { value: 'vencido', label: 'Vencido', color: '#DC2626' },

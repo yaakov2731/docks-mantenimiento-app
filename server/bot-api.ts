@@ -14,10 +14,13 @@ import {
   registrarEntradaEmpleado,
   registrarSalidaEmpleado,
   getTareasEmpleado,
+  getUsers,
   crearActualizacion,
+  getReportes,
   getPendingBotMessages,
   markBotMessageSent,
   markBotMessageFailed,
+  enqueueBotMessage,
   getEmpleadoActivoById,
   getEmpleadoAttendanceStatus,
   getNextAssignableReporteForEmpleado,
@@ -32,11 +35,20 @@ import {
   getOperationalTaskById,
   persistOperationalTaskChange,
   addOperationalTaskEvent,
+  retryFailedBotMessages,
+  getDeadLetterBotMessages,
+  registerBotHeartbeat,
+  getBotConnectionStatus,
+  calcularSLA,
+  getReportesVencidos,
 } from './db'
+import { parseIntent, buildUnknownIntentResponse } from './messages/intent-parser'
+import { handleIncomingMessage } from './bot-menu/engine'
 import { notifyOwner } from './_core/notification'
 import { readEnv } from './_core/env'
 import { createRoundsService } from './rounds/service'
 import { createOperationalTasksService } from './tasks/service'
+import { assignReporteToEmployee } from './reporte-assignment'
 
 const botRouter = Router()
 const roundsService = createRoundsService(roundDb as any)
@@ -196,6 +208,101 @@ function normalizeOptionalText(value?: unknown) {
   return normalized.length > 0 ? normalized : undefined
 }
 
+function normalizeWaNumber(value?: string | null) {
+  return typeof value === 'string' ? value.replace(/\D/g, '') : ''
+}
+
+async function getAdminBotUsers() {
+  const users = await getUsers()
+  return users.filter((user: any) => user.role === 'admin' && !!normalizeWaNumber(user.waId))
+}
+
+async function getPrimaryAdminBotUser() {
+  const admins = await getAdminBotUsers()
+  return admins[0] ?? null
+}
+
+async function getAdminBotUserById(adminId: number) {
+  const admins = await getAdminBotUsers()
+  return admins.find((admin: any) => admin.id === adminId) ?? null
+}
+
+async function getAdminBotUserByWaNumber(waNumber: string) {
+  const normalized = normalizeWaNumber(waNumber)
+  const admins = await getAdminBotUsers()
+  return admins.find((admin: any) => normalizeWaNumber(admin.waId) === normalized) ?? null
+}
+
+function adminReportPriorityRank(prioridad?: string) {
+  switch (prioridad) {
+    case 'urgente': return 4
+    case 'alta': return 3
+    case 'media': return 2
+    case 'baja': return 1
+    default: return 0
+  }
+}
+
+function isOpenComplaint(reporte: any) {
+  return reporte && !['completado', 'cancelado'].includes(reporte.estado)
+}
+
+function sortAdminPendingReports(left: any, right: any) {
+  return (
+    adminReportPriorityRank(right.prioridad) - adminReportPriorityRank(left.prioridad) ||
+    new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime() ||
+    Number(right.id ?? 0) - Number(left.id ?? 0)
+  )
+}
+
+async function listAdminPendingReports() {
+  const reportes = await getReportes()
+  return reportes.filter(isOpenComplaint).sort(sortAdminPendingReports)
+}
+
+function buildAdminMenu() {
+  return [
+    '1. Ver pendientes',
+    '2. Asignar último reclamo',
+    '3. Buscar reclamo por número',
+    '4. Ayuda',
+  ]
+}
+
+function buildAdminComplaintAlertMessage(reporte: {
+  id: number
+  local: string
+  prioridad: string
+  titulo: string
+  locatario: string
+}) {
+  return [
+    `Nuevo reclamo #${reporte.id}`,
+    `Local: ${reporte.local}`,
+    `Prioridad: ${reporte.prioridad}`,
+    `Motivo: ${reporte.titulo}`,
+    `Locatario: ${reporte.locatario}`,
+    '',
+    ...buildAdminMenu(),
+  ].join('\n')
+}
+
+function serializeAdminReport(reporte: any) {
+  return {
+    id: reporte.id,
+    titulo: reporte.titulo,
+    locatario: reporte.locatario,
+    local: reporte.local,
+    planta: reporte.planta,
+    prioridad: reporte.prioridad,
+    estado: reporte.estado,
+    asignacionEstado: reporte.asignacionEstado,
+    asignadoA: reporte.asignadoA ?? null,
+    descripcion: reporte.descripcion,
+    createdAt: formatDateTime(reporte.createdAt),
+  }
+}
+
 function isValidPrioridad(value: string): value is typeof PRIORIDADES[number] {
   return (PRIORIDADES as readonly string[]).includes(value)
 }
@@ -306,25 +413,139 @@ async function startOperationalTaskCompatibility(params: {
   }
 
   if (task.estado === 'pausada') {
-    const now = new Date()
-    await persistOperationalTaskChange(params.taskId, {
-      estado: 'en_progreso',
-      trabajoIniciadoAt: now,
-      pausadoAt: null,
-    } as any, [{
-      tareaId: params.taskId,
-      tipo: 'reanudar',
-      actorTipo: 'employee',
-      actorId: empleadoId,
-      actorNombre: params.empleadoNombre ?? task.empleadoNombre ?? 'Empleado',
-      descripcion: 'Trabajo reanudado vía WhatsApp',
-      metadata: { source: 'whatsapp_start' },
-      createdAt: now,
-    }])
+    return tasksService.resumeTask({ taskId: params.taskId, empleadoId })
   }
 
   return getOperationalTaskById(params.taskId)
 }
+
+botRouter.get('/admin/identificar/:waNumber', authBot, async (req, res) => {
+  try {
+    const admin = await getAdminBotUserByWaNumber(req.params.waNumber)
+    if (!admin) return res.json({ found: false })
+
+    return res.json({
+      found: true,
+      admin: {
+        id: admin.id,
+        name: admin.name,
+        role: admin.role,
+      },
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo identificar al admin' })
+  }
+})
+
+botRouter.get('/admin/:id/resumen', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    if (!adminId) return res.status(400).json({ error: 'id de admin inválido' })
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const pendingReports = await listAdminPendingReports()
+    const latestPending = pendingReports[0] ?? null
+
+    return res.json({
+      admin: {
+        id: admin.id,
+        name: admin.name,
+        role: admin.role,
+      },
+      counters: {
+        pending: pendingReports.length,
+        urgent: pendingReports.filter((item) => item.prioridad === 'urgente').length,
+        unassigned: pendingReports.filter((item) => !item.asignadoId).length,
+      },
+      latestPending: latestPending ? serializeAdminReport(latestPending) : null,
+      menu: buildAdminMenu(),
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo cargar el resumen admin' })
+  }
+})
+
+botRouter.get('/admin/:id/reclamos', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    if (!adminId) return res.status(400).json({ error: 'id de admin inválido' })
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const pendingReports = await listAdminPendingReports()
+    return res.json({
+      reclamos: pendingReports.map(serializeAdminReport),
+      menu: buildAdminMenu(),
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo listar reclamos pendientes' })
+  }
+})
+
+botRouter.get('/admin/:id/reporte/:reporteId', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    const reporteId = parseId(req.params.reporteId)
+    if (!adminId || !reporteId) return res.status(400).json({ error: 'adminId y reporteId son requeridos' })
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const reporte = await getReporteById(reporteId)
+    if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
+
+    return res.json({
+      reporte: serializeAdminReport(reporte),
+      menu: buildAdminMenu(),
+    })
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message ?? 'No se pudo obtener el reclamo' })
+  }
+})
+
+botRouter.post('/admin/:id/reporte/:reporteId/asignar', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    const reporteId = parseId(req.params.reporteId)
+    const empleadoId = Number(req.body?.empleadoId)
+
+    if (!adminId || !reporteId || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'adminId, reporteId y empleadoId son requeridos' })
+    }
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const empleado = await getEmpleadoById(empleadoId)
+    if (!empleado) return res.status(404).json({ error: 'Empleado no encontrado' })
+
+    await assignReporteToEmployee({
+      reporteId,
+      empleadoId,
+      empleadoNombre: empleado.nombre,
+      actor: {
+        id: admin.id,
+        name: admin.name,
+      },
+    })
+
+    return res.json({
+      success: true,
+      reporteId,
+      empleado: {
+        id: empleado.id,
+        nombre: empleado.nombre,
+      },
+    })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo asignar el reclamo'
+    if (message.includes('no encontrado')) return res.status(404).json({ error: message })
+    return res.status(500).json({ error: message })
+  }
+})
 
 botRouter.post('/rondas/ocurrencia/:id/responder', authBot, async (req, res) => {
   try {
@@ -415,6 +636,110 @@ botRouter.post('/tarea-operativa/:id/rechazar', authBot, async (req, res) => {
     return res.json({ success: true, task })
   } catch (error: any) {
     return mapOperationalTaskError(res, error)
+  }
+})
+
+botRouter.post('/tarea-operativa/:id/cancelar', authBot, async (req, res) => {
+  try {
+    const taskId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    const nota = typeof req.body.nota === 'string' ? req.body.nota : undefined
+    if (!Number.isFinite(taskId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'taskId y empleadoId son requeridos' })
+    }
+
+    const task = await tasksService.cancelTask({ taskId, empleadoId, note: nota })
+    return res.json({ success: true, task })
+  } catch (error: any) {
+    return mapOperationalTaskError(res, error)
+  }
+})
+
+botRouter.post('/rondas/ocurrencia/:id/iniciar', authBot, async (req, res) => {
+  try {
+    const occurrenceId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    if (!Number.isFinite(occurrenceId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'occurrenceId y empleadoId son requeridos' })
+    }
+
+    const occurrence = await roundsService.startOccurrence({ occurrenceId, empleadoId })
+    return res.json({ success: true, occurrence })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo iniciar la ronda'
+    if (message.includes('not found')) return res.status(404).json({ error: message })
+    return res.status(400).json({ error: message })
+  }
+})
+
+botRouter.post('/rondas/ocurrencia/:id/pausar', authBot, async (req, res) => {
+  try {
+    const occurrenceId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    if (!Number.isFinite(occurrenceId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'occurrenceId y empleadoId son requeridos' })
+    }
+
+    const occurrence = await roundsService.pauseOccurrence({ occurrenceId, empleadoId })
+    return res.json({ success: true, occurrence })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo pausar la ronda'
+    if (message.includes('not found')) return res.status(404).json({ error: message })
+    return res.status(400).json({ error: message })
+  }
+})
+
+botRouter.post('/rondas/ocurrencia/:id/finalizar', authBot, async (req, res) => {
+  try {
+    const occurrenceId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    const nota = typeof req.body.nota === 'string' ? req.body.nota : undefined
+    if (!Number.isFinite(occurrenceId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'occurrenceId y empleadoId son requeridos' })
+    }
+
+    const occurrence = await roundsService.finishOccurrence({ occurrenceId, empleadoId, note: nota })
+    return res.json({ success: true, occurrence })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo finalizar la ronda'
+    if (message.includes('not found')) return res.status(404).json({ error: message })
+    return res.status(400).json({ error: message })
+  }
+})
+
+botRouter.post('/rondas/ocurrencia/:id/observar', authBot, async (req, res) => {
+  try {
+    const occurrenceId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    const nota = typeof req.body.nota === 'string' ? req.body.nota : undefined
+    if (!Number.isFinite(occurrenceId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'occurrenceId y empleadoId son requeridos' })
+    }
+
+    const occurrence = await roundsService.reportObservation({ occurrenceId, empleadoId, note: nota })
+    return res.json({ success: true, occurrence })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo registrar la observacion'
+    if (message.includes('not found')) return res.status(404).json({ error: message })
+    return res.status(400).json({ error: message })
+  }
+})
+
+botRouter.post('/rondas/ocurrencia/:id/no-pude', authBot, async (req, res) => {
+  try {
+    const occurrenceId = Number(req.params.id)
+    const empleadoId = Number(req.body.empleadoId)
+    const nota = typeof req.body.nota === 'string' ? req.body.nota : undefined
+    if (!Number.isFinite(occurrenceId) || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'occurrenceId y empleadoId son requeridos' })
+    }
+
+    const occurrence = await roundsService.markUnableToComplete({ occurrenceId, empleadoId, note: nota })
+    return res.json({ success: true, occurrence })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo marcar la ronda como no realizada'
+    if (message.includes('not found')) return res.status(404).json({ error: message })
+    return res.status(400).json({ error: message })
   }
 })
 
@@ -572,6 +897,16 @@ botRouter.post('/reporte', authBot, async (req, res) => {
       return res.status(400).json({ error: `prioridad inválida. Debe ser una de: ${PRIORIDADES.join(', ')}` })
     }
     const id = await crearReporte({ locatario, local, planta, contacto, categoria, prioridad, titulo, descripcion } as any)
+    const primaryAdmin = await getPrimaryAdminBotUser()
+    if (primaryAdmin?.waId) {
+      await enqueueBotMessage(primaryAdmin.waId, buildAdminComplaintAlertMessage({
+        id,
+        local,
+        prioridad,
+        titulo,
+        locatario,
+      }))
+    }
     notifyOwner({
       title: `[${prioridad.toUpperCase()}] Reclamo vía WhatsApp — ${local}`,
       content: `${locatario}: ${titulo}`,
@@ -633,6 +968,9 @@ botRouter.post('/empleado/:id/entrada', authBot, async (req, res) => {
     if (!empleado || empleado.activo === false) return res.status(404).json({ error: 'Empleado no encontrado' })
     const nota = normalizeOptionalText(req.body?.nota)
     const { marcacion, alreadyOpen } = await registrarEntradaEmpleado(empleadoId, { fuente: 'whatsapp', nota })
+    if (!marcacion) {
+      return res.status(409).json({ error: 'No se pudo abrir la jornada del empleado.' })
+    }
     return res.json({
       success: true,
       alreadyOpen,
@@ -1023,9 +1361,15 @@ botRouter.post('/reporte/:id/completar', authBot, async (req, res) => {
 })
 
 // GET /api/bot/queue — bot polls for pending outbound messages
-botRouter.get('/queue', authBot, async (_req, res) => {
+// También registra heartbeat automáticamente en cada polling
+botRouter.get('/queue', authBot, async (req, res) => {
   try {
     const items = await getPendingBotMessages()
+    // Heartbeat implícito: el bot está vivo si está consultando la cola
+    registerBotHeartbeat({
+      botVersion: normalizeOptionalText(req.headers['x-bot-version'] as string),
+      pendingCount: items.length,
+    }).catch(() => { /* no bloquear */ })
     return res.json({ items })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
@@ -1044,15 +1388,146 @@ botRouter.post('/queue/:id/sent', authBot, async (req, res) => {
   }
 })
 
-// POST /api/bot/queue/:id/failed
+// POST /api/bot/queue/:id/failed — ahora acepta errorMsg opcional
 botRouter.post('/queue/:id/failed', authBot, async (req, res) => {
   try {
     const id = parseId(req.params.id)
     if (!id) return res.status(400).json({ error: 'id de mensaje inválido' })
-    await markBotMessageFailed(id)
+    const errorMsg = normalizeOptionalText(req.body?.errorMsg)
+    await markBotMessageFailed(id, errorMsg)
     return res.json({ success: true })
   } catch (e: any) {
     return res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/bot/queue/retry — reintentar mensajes fallidos
+botRouter.post('/queue/retry', authBot, async (_req, res) => {
+  try {
+    await retryFailedBotMessages()
+    return res.json({ success: true, message: 'Mensajes fallidos puestos a reintentar' })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/bot/queue/dead-letter — mensajes que fallaron definitivamente
+botRouter.get('/queue/dead-letter', authBot, async (_req, res) => {
+  try {
+    const items = await getDeadLetterBotMessages()
+    return res.json({ items, total: items.length })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/bot/heartbeat — el bot local reporta que está vivo
+botRouter.post('/heartbeat', authBot, async (req, res) => {
+  try {
+    await registerBotHeartbeat({
+      botVersion: normalizeOptionalText(req.body?.botVersion),
+      pendingCount: Number(req.body?.pendingCount) || 0,
+    })
+    return res.json({ success: true, serverTime: new Date().toISOString() })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/bot/status — estado de conexión del bot y métricas
+botRouter.get('/status', authBot, async (_req, res) => {
+  try {
+    const [connectionStatus, pendingItems, deadLetterItems] = await Promise.all([
+      getBotConnectionStatus(),
+      getPendingBotMessages(),
+      getDeadLetterBotMessages(),
+    ])
+    return res.json({
+      bot: connectionStatus,
+      queue: {
+        pending: pendingItems.length,
+        deadLetter: deadLetterItems.length,
+      },
+    })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/bot/parse-intent — el bot local envía un mensaje y obtiene el intent detectado
+botRouter.post('/parse-intent', authBot, async (req, res) => {
+  try {
+    const message = normalizeText(req.body?.message)
+    if (!message) return res.status(400).json({ error: 'message es requerido' })
+
+    const intent = parseIntent(message)
+    return res.json({ intent })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/bot/sla/vencidos — reclamos que superaron su SLA
+botRouter.get('/sla/vencidos', authBot, async (_req, res) => {
+  try {
+    const vencidos = await getReportesVencidos()
+    return res.json({
+      total: vencidos.length,
+      urgentes: vencidos.filter(r => r.prioridad === 'urgente').length,
+      reportes: vencidos.map(r => ({
+        id: r.id,
+        titulo: r.titulo,
+        local: r.local,
+        prioridad: r.prioridad,
+        estado: r.estado,
+        asignadoA: r.asignadoA ?? null,
+        sla: r.sla,
+      })),
+    })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/bot/reporte/:id/sla — SLA de un reclamo específico
+botRouter.get('/reporte/:id/sla', authBot, async (req, res) => {
+  try {
+    const reporteId = parseId(req.params.id)
+    if (!reporteId) return res.status(400).json({ error: 'id de reclamo inválido' })
+    const reporte = await getReporteById(reporteId)
+    if (!reporte) return res.status(404).json({ error: 'Reclamo no encontrado' })
+    const sla = calcularSLA(reporte.prioridad, reporte.createdAt)
+    return res.json({ reporteId, prioridad: reporte.prioridad, sla })
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/bot/mensaje-entrante
+// Endpoint principal del sistema de menús guiados.
+// El bot local envía cada mensaje WhatsApp recibido aquí y obtiene la respuesta.
+//
+// Body: { waNumber: "5491171153151", message: "1" }
+// Response: { reply: "<texto del mensaje a enviar>" }
+// ─────────────────────────────────────────────────────────────────────────────
+botRouter.post('/mensaje-entrante', authBot, async (req, res) => {
+  try {
+    const waNumber = normalizeText(req.body?.waNumber)
+    const message = normalizeText(req.body?.message)
+
+    if (!waNumber) return res.status(400).json({ error: 'waNumber es requerido' })
+    if (!message)  return res.status(400).json({ error: 'message es requerido' })
+    if (message.length > 1000) return res.status(400).json({ error: 'message demasiado largo' })
+
+    // Registrar heartbeat implícito
+    registerBotHeartbeat({ pendingCount: 0 }).catch(() => {})
+
+    const reply = await handleIncomingMessage(waNumber, message)
+    return res.json({ reply })
+  } catch (e: any) {
+    console.error('[bot/mensaje-entrante]', e)
+    return res.status(500).json({ error: 'Error interno al procesar el mensaje.' })
   }
 })
 

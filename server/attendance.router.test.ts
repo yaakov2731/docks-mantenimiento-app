@@ -54,6 +54,164 @@ describe('attendance router', () => {
     expect(status.todayEntries).toBe(1)
   })
 
+  it('returns a live attendance summary for the admin dashboard', async () => {
+    const empleadoId = await createEmpleadoId()
+    const caller = appRouter.createCaller(adminContext as any)
+
+    await caller.asistencia.registrar({
+      empleadoId,
+      accion: 'entrada',
+      nota: 'inicio desde panel',
+    })
+
+    const summary = await caller.asistencia.resumen({ periodo: 'dia' })
+
+    expect(summary.periodo).toMatchObject({
+      tipo: 'dia',
+    })
+    expect(summary.resumenEquipo).toMatchObject({
+      empleadosActivos: 1,
+      enTurno: 1,
+    })
+    expect(summary.empleados).toHaveLength(1)
+    expect(summary.empleados[0]).toMatchObject({
+      empleadoId,
+      nombre: 'Juan',
+      attendance: {
+        onShift: true,
+        lastAction: 'entrada',
+      },
+      turnos: [
+        {
+          fecha: '2026-04-10',
+          turnoAbierto: true,
+        },
+      ],
+      hoy: {
+        primerIngresoAt: expect.anything(),
+      },
+    })
+    expect(summary.eventos[0]).toMatchObject({
+      empleadoId,
+      empleadoNombre: 'Juan',
+      tipo: 'entrada',
+      canal: 'panel',
+    })
+  })
+
+  it('uses the configured employee rate for the selected payroll period', async () => {
+    await crearEmpleado({
+      nombre: 'Juan',
+      pagoDiario: 15000,
+      pagoSemanal: 90000,
+      pagoQuincenal: 180000,
+      pagoMensual: 360000,
+    } as any)
+    const [empleado] = await getEmpleados()
+    const caller = appRouter.createCaller(adminContext as any)
+
+    await caller.asistencia.registrar({
+      empleadoId: empleado.id,
+      accion: 'entrada',
+    })
+    vi.setSystemTime(new Date('2026-04-10T18:00:00.000Z'))
+    await caller.asistencia.registrar({
+      empleadoId: empleado.id,
+      accion: 'salida',
+    })
+
+    const summary = await caller.asistencia.resumen({ periodo: 'semana' })
+
+    expect(summary.empleados[0]).toMatchObject({
+      pagoDiario: 15000,
+      pagoSemanal: 90000,
+      pagoQuincenal: 180000,
+      pagoMensual: 360000,
+    })
+    expect(summary.empleados[0].liquidacion).toMatchObject({
+      tarifaPeriodo: 'semana',
+      tarifaMonto: 90000,
+      totalPagar: 90000,
+      tarifaOrigen: 'configurado',
+    })
+    expect(summary.resumenEquipo.totalPagar).toBe(90000)
+  })
+
+  it('updates employee name and payroll amounts from the admin router', async () => {
+    await crearEmpleado({ nombre: 'Juan' } as any)
+    const [empleado] = await getEmpleados()
+    const caller = appRouter.createCaller(adminContext as any)
+
+    const result = await caller.empleados.actualizar({
+      id: empleado.id,
+      nombre: 'Juan Carlos',
+      email: 'juan@example.com',
+      telefono: '1133445566',
+      especialidad: 'Electricista',
+      waId: '5491133445566',
+      pagoDiario: 12000,
+      pagoSemanal: 72000,
+      pagoQuincenal: 144000,
+      pagoMensual: 288000,
+    })
+
+    const [updated] = await getEmpleados()
+
+    expect(result.success).toBe(true)
+    expect(updated).toMatchObject({
+      nombre: 'Juan Carlos',
+      email: 'juan@example.com',
+      telefono: '1133445566',
+      especialidad: 'Electricista',
+      waId: '5491133445566',
+      pagoDiario: 12000,
+      pagoSemanal: 72000,
+      pagoQuincenal: 144000,
+      pagoMensual: 288000,
+    })
+  })
+
+  it('closes and marks a payroll period as paid', async () => {
+    const empleadoId = await createEmpleadoId()
+    const caller = appRouter.createCaller(adminContext as any)
+
+    await caller.asistencia.registrar({
+      empleadoId,
+      accion: 'entrada',
+    })
+    vi.setSystemTime(new Date('2026-04-10T18:00:00.000Z'))
+    await caller.asistencia.registrar({
+      empleadoId,
+      accion: 'salida',
+    })
+
+    const closed = await caller.asistencia.cerrarLiquidacion({ periodo: 'dia' })
+    expect(closed.success).toBe(true)
+
+    let summary = await caller.asistencia.resumen({ periodo: 'dia' })
+    expect(summary.cierre).toMatchObject({
+      cerrado: true,
+      pagado: false,
+      closedBy: 'Admin',
+    })
+    expect(summary.empleados[0].cierre).toMatchObject({
+      cerradoPorNombre: 'Admin',
+    })
+
+    const paid = await caller.asistencia.marcarPagado({ periodo: 'dia' })
+    expect(paid.success).toBe(true)
+
+    summary = await caller.asistencia.resumen({ periodo: 'dia' })
+    expect(summary.cierre).toMatchObject({
+      cerrado: true,
+      pagado: true,
+      paidBy: 'Admin',
+    })
+    expect(summary.empleados[0].cierre).toMatchObject({
+      pagadoPorNombre: 'Admin',
+    })
+  })
+
   it('tracks lunch state and blocks exit while lunch is open', async () => {
     const empleadoId = await createEmpleadoId()
     const caller = appRouter.createCaller(adminContext as any)
@@ -105,11 +263,45 @@ describe('attendance router', () => {
     expect(exit.success).toBe(true)
     expect(exit.status.onShift).toBe(false)
     expect(exit.status.onLunch).toBe(false)
-    expect(exit.status.grossWorkedSecondsToday).toBe(14400)
+    expect(exit.status.grossWorkedSecondsToday).toBe(0)
     expect(exit.status.todayLunchSeconds).toBe(1800)
-    expect(exit.status.workedSecondsToday).toBe(12600)
+    expect(exit.status.workedSecondsToday).toBe(0)
+    expect(exit.status.currentShiftGrossSeconds).toBe(0)
+    expect(exit.status.currentShiftLunchSeconds).toBe(0)
+    expect(exit.status.lastShiftGrossSeconds).toBe(14400)
+    expect(exit.status.lastShiftLunchSeconds).toBe(1800)
+    expect(exit.status.lastShiftWorkedSeconds).toBe(12600)
     expect(exit.status.todayExits).toBe(1)
     expect(exit.status.lastAction).toBe('salida')
+  })
+
+  it('separates multiple shifts from the same day into independent turns', async () => {
+    const empleadoId = await createEmpleadoId()
+    const caller = appRouter.createCaller(adminContext as any)
+
+    await caller.asistencia.registrar({ empleadoId, accion: 'entrada' })
+    vi.setSystemTime(new Date('2026-04-10T14:00:00.000Z'))
+    await caller.asistencia.registrar({ empleadoId, accion: 'salida' })
+
+    vi.setSystemTime(new Date('2026-04-10T15:00:00.000Z'))
+    await caller.asistencia.registrar({ empleadoId, accion: 'entrada' })
+    vi.setSystemTime(new Date('2026-04-10T18:00:00.000Z'))
+    await caller.asistencia.registrar({ empleadoId, accion: 'salida' })
+
+    const summary = await caller.asistencia.resumen({ periodo: 'dia' })
+
+    expect(summary.empleados[0].turnos).toHaveLength(2)
+    expect(summary.empleados[0].turnos[0]).toMatchObject({
+      fecha: '2026-04-10',
+      workedSeconds: 7200,
+      turnoAbierto: false,
+    })
+    expect(summary.empleados[0].turnos[1]).toMatchObject({
+      fecha: '2026-04-10',
+      workedSeconds: 10800,
+      turnoAbierto: false,
+    })
+    expect(summary.empleados[0].liquidacion?.segundosTrabajados).toBe(18000)
   })
 
   it('lets an admin create and correct manual attendance with audit trail', async () => {

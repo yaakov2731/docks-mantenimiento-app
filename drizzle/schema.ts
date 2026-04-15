@@ -62,6 +62,10 @@ export const empleados = sqliteTable('empleados', {
   telefono: text('telefono'),
   especialidad: text('especialidad'),
   waId: text('wa_id'),
+  pagoDiario: integer('pago_diario').default(0).notNull(),
+  pagoSemanal: integer('pago_semanal').default(0).notNull(),
+  pagoQuincenal: integer('pago_quincenal').default(0).notNull(),
+  pagoMensual: integer('pago_mensual').default(0).notNull(),
   activo: integer('activo', { mode: 'boolean' }).default(true).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
@@ -171,7 +175,37 @@ export const botQueue = sqliteTable('bot_queue', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   waNumber: text('wa_number').notNull(),
   message: text('message').notNull(),
-  status: text('status', { enum: ['pending', 'sent', 'failed'] }).default('pending').notNull(),
+  status: text('status', { enum: ['pending', 'sent', 'failed', 'dead_letter'] }).default('pending').notNull(),
+  // Retry logic
+  retryCount: integer('retry_count').default(0).notNull(),
+  errorMsg: text('error_msg'),
+  lastAttemptAt: integer('last_attempt_at', { mode: 'timestamp' }),
+  // Heartbeat tracking (para saber si el bot sigue conectado)
+  priority: integer('priority').default(0).notNull(), // 0=normal, 1=alta, 2=urgente
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+// Heartbeat del bot local — registra última vez que el bot hizo polling
+export const botHeartbeat = sqliteTable('bot_heartbeat', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  botVersion: text('bot_version'),
+  pendingCount: integer('pending_count').default(0).notNull(),
+})
+
+// Sesión de conversación por número de WhatsApp
+export const botSession = sqliteTable('bot_session', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  waNumber: text('wa_number').notNull().unique(),
+  userType: text('user_type', { enum: ['employee', 'admin', 'sales'] }).notNull(),
+  userId: integer('user_id').notNull(),
+  userName: text('user_name').notNull(),
+  // Menú activo y datos de contexto
+  currentMenu: text('current_menu').default('main').notNull(),
+  contextData: text('context_data'), // JSON serializado: { tareaId, rondaId, page, step, ... }
+  // Para volver atrás (historial de menús)
+  menuHistory: text('menu_history'), // JSON array de strings: ["main","tareas_lista"]
+  lastActivityAt: integer('last_activity_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
 
@@ -216,13 +250,17 @@ export const rondasOcurrencia = sqliteTable('rondas_ocurrencia', {
   programadoAtLabel: text('programado_at_label'),
   recordatorioEnviadoAt: integer('recordatorio_enviado_at', { mode: 'timestamp' }),
   confirmadoAt: integer('confirmado_at', { mode: 'timestamp' }),
+  inicioRealAt: integer('inicio_real_at', { mode: 'timestamp' }),
+  pausadoAt: integer('pausado_at', { mode: 'timestamp' }),
+  finRealAt: integer('fin_real_at', { mode: 'timestamp' }),
+  tiempoAcumuladoSegundos: integer('tiempo_acumulado_segundos').default(0).notNull(),
   empleadoId: integer('empleado_id').notNull(),
   empleadoNombre: text('empleado_nombre').notNull(),
   empleadoWaId: text('empleado_wa_id').notNull(),
   supervisorWaId: text('supervisor_wa_id'),
   nombreRonda: text('nombre_ronda').notNull(),
   estado: text('estado', {
-    enum: ['pendiente', 'cumplido', 'cumplido_con_observacion', 'vencido', 'cancelado'],
+    enum: ['pendiente', 'en_progreso', 'pausada', 'cumplido', 'cumplido_con_observacion', 'vencido', 'cancelado'],
   }).default('pendiente').notNull(),
   canalConfirmacion: text('canal_confirmacion', { enum: ['whatsapp', 'panel', 'system'] }).default('whatsapp').notNull(),
   nota: text('nota'),

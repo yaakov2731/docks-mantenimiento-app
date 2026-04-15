@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { attendanceChannelLabel, getAttendanceEventDateTime } from './attendancePresentation'
+import { attendanceActionLabel, attendanceChannelLabel, getAttendanceEventDateTime } from './attendancePresentation'
 
 function formatCurrency(value?: number | null) {
   return new Intl.NumberFormat('es-AR', {
@@ -36,6 +36,17 @@ function ratePeriodLabel(value?: string | null) {
   return 'Diario'
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
 export function exportarAsistenciaExcel({
   periodo,
   empleados,
@@ -70,7 +81,9 @@ export function exportarAsistenciaExcel({
   XLSX.utils.book_append_sheet(wb, resumenSheet, 'Resumen')
 
   const empleadosSheet = XLSX.utils.json_to_sheet(
-    empleados.map((empleado: any) => ({
+    empleados.map((empleado: any) => {
+      const currentTurn = (empleado.turnos ?? []).find((turn: any) => turn.turnoAbierto) ?? null
+      return ({
       Empleado: empleado.nombre,
       Especialidad: empleado.especialidad ?? '',
       'Pago diario': Number(empleado.pagoDiario ?? 0),
@@ -85,10 +98,16 @@ export function exportarAsistenciaExcel({
       'Monto tarifa aplicada': Number(empleado.liquidacion?.tarifaMonto ?? 0),
       'Monto tarifa aplicada (formato)': formatCurrency(empleado.liquidacion?.tarifaMonto ?? 0),
       'En turno': empleado.attendance?.onShift ? 'Sí' : 'No',
-      'Ingreso de hoy': formatDateTime(empleado.hoy?.primerIngresoAt),
-      'Salida de hoy': formatDateTime(empleado.hoy?.ultimaSalidaAt),
-      'Última acción': empleado.attendance?.lastAction ?? '',
+      'En almuerzo': empleado.attendance?.onLunch ? 'Sí' : 'No',
+      'Ingreso turno actual': formatDateTime(currentTurn?.entradaAt ?? null),
+      'Inicio almuerzo turno actual': formatDateTime(currentTurn?.inicioAlmuerzoAt ?? null),
+      'Fin almuerzo turno actual': formatDateTime(currentTurn?.finAlmuerzoAt ?? null),
+      'Salida turno actual': currentTurn?.turnoAbierto ? 'Turno abierto' : formatDateTime(currentTurn?.salidaAt ?? null),
+      'Última acción': attendanceActionLabel(empleado.attendance?.lastAction),
       'Último canal': attendanceChannelLabel(empleado.attendance?.lastChannel),
+      'Bruto turno actual': formatSeconds(empleado.attendance?.currentShiftGrossSeconds ?? 0),
+      'Almuerzo turno actual': formatSeconds(empleado.attendance?.currentShiftLunchSeconds ?? 0),
+      'Neto turno actual': formatSeconds(empleado.attendance?.currentShiftSeconds ?? 0),
       'Horas período': formatSeconds(empleado.liquidacion?.segundosTrabajados ?? 0),
       'Días liquidados': empleado.liquidacion?.diasTrabajados ?? 0,
       'Total a pagar': Number(empleado.liquidacion?.totalPagar ?? 0),
@@ -102,7 +121,7 @@ export function exportarAsistenciaExcel({
       'Tareas en curso': empleado.tareasEnCurso ?? 0,
       'Tareas pendientes': (empleado.tareasPendientes ?? 0) + (empleado.tareasPausadas ?? 0),
       'Asignaciones por confirmar': empleado.pendientesConfirmacion ?? 0,
-    }))
+    })})
   )
   XLSX.utils.book_append_sheet(wb, empleadosSheet, 'Liquidación')
 
@@ -113,7 +132,10 @@ export function exportarAsistenciaExcel({
         Fecha: dia.fecha,
         Etiqueta: dia.etiqueta,
         'Horas trabajadas': formatSeconds(dia.workedSeconds ?? 0),
+        'Horas almuerzo': formatSeconds(dia.lunchSeconds ?? 0),
         Entradas: dia.entradas ?? 0,
+        'Inicios almuerzo': dia.iniciosAlmuerzo ?? 0,
+        'Fines almuerzo': dia.finesAlmuerzo ?? 0,
         Salidas: dia.salidas ?? 0,
         'Turno abierto': dia.turnoAbierto ? 'Sí' : 'No',
       }))
@@ -121,10 +143,31 @@ export function exportarAsistenciaExcel({
   )
   XLSX.utils.book_append_sheet(wb, diasSheet, 'Detalle diario')
 
+  const turnosSheet = XLSX.utils.json_to_sheet(
+    empleados.flatMap((empleado: any) =>
+      (empleado.turnos ?? []).map((turno: any, index: number) => ({
+        Empleado: empleado.nombre,
+        Fecha: formatDate(turno.entradaAt ?? null),
+        'Turno #': index + 1,
+        Entrada: formatDateTime(turno.entradaAt ?? null),
+        'Inicio almuerzo': formatDateTime(turno.inicioAlmuerzoAt ?? null),
+        'Fin almuerzo': formatDateTime(turno.finAlmuerzoAt ?? null),
+        Salida: turno.turnoAbierto ? 'Turno abierto' : formatDateTime(turno.salidaAt ?? null),
+        'Tiempo bruto': formatSeconds(turno.grossSeconds ?? 0),
+        Almuerzo: formatSeconds(turno.lunchSeconds ?? 0),
+        'Tiempo neto': formatSeconds(turno.workedSeconds ?? 0),
+        'Canal entrada': attendanceChannelLabel(turno.entradaCanal),
+        'Canal salida': attendanceChannelLabel(turno.salidaCanal),
+        Estado: turno.turnoAbierto ? 'Abierto' : 'Cerrado',
+      }))
+    )
+  )
+  XLSX.utils.book_append_sheet(wb, turnosSheet, 'Turnos')
+
   const eventosSheet = XLSX.utils.json_to_sheet(
     eventos.map((evento: any) => ({
       Empleado: evento.empleadoNombre,
-      Tipo: evento.tipo,
+      Tipo: attendanceActionLabel(evento.tipo),
       Canal: attendanceChannelLabel(evento.canal),
       Fecha: formatDateTime(getAttendanceEventDateTime(evento)?.toString() ?? ''),
       Especialidad: evento.especialidad ?? '',

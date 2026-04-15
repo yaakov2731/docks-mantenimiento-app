@@ -5,11 +5,13 @@ import Login from './pages/Login'
 import Home from './pages/Home'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Asistencia = lazy(() => import('./pages/Asistencia'))
 const Tareas = lazy(() => import('./pages/Tareas'))
 const Historial = lazy(() => import('./pages/Historial'))
 const Empleados = lazy(() => import('./pages/Empleados'))
 const Configuracion = lazy(() => import('./pages/Configuracion'))
 const ImprimirReclamo = lazy(() => import('./pages/ImprimirReclamo'))
+const ImprimirAsistencia = lazy(() => import('./pages/ImprimirAsistencia'))
 const Leads = lazy(() => import('./pages/Leads'))
 const Operaciones = lazy(() => import('./pages/Operaciones'))
 const TareasOperativas = lazy(() => import('./pages/TareasOperativas'))
@@ -46,6 +48,8 @@ export default function App() {
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
       <Route path="/dashboard">{() => <ProtectedRoute component={Dashboard} allowedRoles={['admin', 'employee']} />}</Route>
+      <Route path="/asistencia">{() => <ProtectedRoute component={Asistencia} allowedRoles={['admin']} />}</Route>
+      <Route path="/asistencia/imprimir">{() => <ProtectedRoute component={ImprimirAsistencia} allowedRoles={['admin']} />}</Route>
       <Route path="/operaciones">{() => <ProtectedRoute component={Operaciones} allowedRoles={['admin']} />}</Route>
       <Route path="/tareas-operativas">{() => <ProtectedRoute component={TareasOperativas} allowedRoles={['admin']} />}</Route>
       <Route path="/tareas">{() => <ProtectedRoute component={Tareas} allowedRoles={['admin', 'employee']} />}</Route>
