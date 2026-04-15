@@ -23,7 +23,7 @@ export default function Login() {
       <div className="w-full max-w-4xl flex overflow-hidden rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.12)]">
 
         {/* Left — Brand panel */}
-        <div className="hidden md:flex flex-col justify-between bg-primary text-white p-10 w-[45%] flex-shrink-0">
+        <div className="hidden md:flex flex-col justify-between bg-gradient-to-br from-slate-950 via-blue-950 to-blue-900 text-white p-10 w-[45%] flex-shrink-0">
           <BrandLogo variant="dark" size="md" showTagline />
 
           <div>

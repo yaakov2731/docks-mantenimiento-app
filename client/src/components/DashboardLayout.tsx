@@ -37,7 +37,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
   const visibleNavItems = navItems.filter(item => !userRole || item.roles.includes(userRole))
 
   const Sidebar = () => (
-    <div className="flex flex-col h-full bg-sidebar-bg text-white w-64">
+    <div className="flex flex-col h-full bg-gradient-to-b from-blue-950 to-slate-950 text-white w-64">
 
       {/* Logo */}
       <div className="px-6 pt-7 pb-5 border-b border-white/10">
