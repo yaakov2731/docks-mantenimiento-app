@@ -9,10 +9,10 @@ import { AlertCircle, Clock, CheckCircle2, TrendingUp, X, Building2, PauseCircle
 
 const DashboardCharts = lazy(() => import('../components/dashboard/DashboardCharts'))
 const ESTADOS_ASIGNACION = [
-  { value: 'sin_asignar', label: 'Sin asignar', color: '#94A3B8' },
-  { value: 'pendiente_confirmacion', label: 'Sin confirmar', color: '#EAB308' },
-  { value: 'aceptada', label: 'Aceptada', color: '#22C55E' },
-  { value: 'rechazada', label: 'Rechazada', color: '#EF4444' },
+  { value: 'sin_asignar', label: 'Sin asignar', color: '#6B7280' },
+  { value: 'pendiente_confirmacion', label: 'Sin confirmar', color: '#D97706' },
+  { value: 'aceptada', label: 'Aceptada', color: '#059669' },
+  { value: 'rechazada', label: 'Rechazada', color: '#DC2626' },
 ] as const
 
 function Badge({ value, options }: { value: string; options: readonly { value: string; label: string; color: string }[] }) {
@@ -103,15 +103,15 @@ export default function Dashboard() {
 
       {tareasResumen ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <KpiCard label="Tareas activas" value={tareasResumen.activas} color="#0F6C86" icon={Clock} />
-          <KpiCard label="Pausadas" value={tareasResumen.pausadas} color="#EAB308" icon={PauseCircle} />
-          <KpiCard label="Terminadas hoy" value={tareasResumen.terminadasHoy} color="#22C55E" icon={CheckCircle2} />
-          <KpiCard label="Rechazadas" value={tareasResumen.rechazadasHoy} color="#EF4444" icon={AlertCircle} />
+          <KpiCard label="Tareas activas" value={tareasResumen.activas} color="#2563EB" icon={Clock} />
+          <KpiCard label="Pausadas" value={tareasResumen.pausadas} color="#D97706" icon={PauseCircle} />
+          <KpiCard label="Terminadas hoy" value={tareasResumen.terminadasHoy} color="#059669" icon={CheckCircle2} />
+          <KpiCard label="Rechazadas" value={tareasResumen.rechazadasHoy} color="#DC2626" icon={AlertCircle} />
         </div>
       ) : null}
 
       <div className="surface-panel-strong rounded-[24px] p-4 md:p-5 mb-4 overflow-hidden relative">
-        <div className="absolute inset-y-0 right-0 w-1/3 bg-[radial-gradient(circle_at_center,rgba(15,108,134,0.07),transparent_72%)] pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-1/3 bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.07),transparent_72%)] pointer-events-none" />
         <div className="relative flex flex-col lg:flex-row lg:items-center gap-3">
           <div className="flex-1">
             <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
@@ -125,10 +125,10 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 min-w-[220px]">
-            <div className="rounded-[20px] bg-sidebar-bg p-3.5 text-white shadow-lg">
-              <div className="text-[11px] font-medium text-white/55">Abiertos</div>
+            <div className="rounded-[20px] bg-primary p-3.5 text-white shadow-lg">
+              <div className="text-[11px] font-medium text-white/60">Abiertos</div>
               <div className="mt-2 text-[24px] leading-none font-heading font-semibold">{stats ? stats.abiertos : 0}</div>
-              <div className="mt-1 text-xs text-white/60">Pendientes, en curso y pausados</div>
+              <div className="mt-1 text-xs text-white/70">Pendientes, en curso y pausados</div>
             </div>
             <div className="rounded-[20px] bg-white p-3.5 border border-slate-200 shadow-sm">
               <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
@@ -145,15 +145,15 @@ export default function Dashboard() {
       {/* KPIs */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-9 gap-3 mb-4">
-          <KpiCard label="Total" value={stats.total} color="#0A7EA4" icon={TrendingUp} />
-          <KpiCard label="Pendientes" value={stats.pendientes} color="#EAB308" icon={Clock} />
-          <KpiCard label="En progreso" value={stats.enProgreso} color="#FF6B35" icon={AlertCircle} />
-          <KpiCard label="Pausados" value={stats.pausados} color="#94A3B8" icon={PauseCircle} />
-          <KpiCard label="Completados" value={stats.completados} color="#22C55E" icon={CheckCircle2} />
-          <KpiCard label="Sin confirmar" value={stats.asignacionesPendientes} color="#EAB308" icon={Clock} />
-          <KpiCard label="Aceptadas hoy" value={stats.asignacionesAceptadasHoy} color="#22C55E" icon={CheckCircle2} />
-          <KpiCard label="Rechazadas hoy" value={stats.asignacionesRechazadasHoy} color="#EF4444" icon={AlertCircle} />
-          <KpiCard label="Resolución" value={`${stats.tasaCompletitud}%`} color="#0A7EA4" icon={TrendingUp} />
+          <KpiCard label="Total" value={stats.total} color="#2563EB" icon={TrendingUp} />
+          <KpiCard label="Pendientes" value={stats.pendientes} color="#D97706" icon={Clock} />
+          <KpiCard label="En progreso" value={stats.enProgreso} color="#D97706" icon={AlertCircle} />
+          <KpiCard label="Pausados" value={stats.pausados} color="#6B7280" icon={PauseCircle} />
+          <KpiCard label="Completados" value={stats.completados} color="#059669" icon={CheckCircle2} />
+          <KpiCard label="Sin confirmar" value={stats.asignacionesPendientes} color="#D97706" icon={Clock} />
+          <KpiCard label="Aceptadas hoy" value={stats.asignacionesAceptadasHoy} color="#059669" icon={CheckCircle2} />
+          <KpiCard label="Rechazadas hoy" value={stats.asignacionesRechazadasHoy} color="#DC2626" icon={AlertCircle} />
+          <KpiCard label="Resolución" value={`${stats.tasaCompletitud}%`} color="#2563EB" icon={TrendingUp} />
         </div>
       )}
 

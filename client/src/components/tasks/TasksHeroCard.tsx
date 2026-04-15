@@ -43,7 +43,7 @@ export function TasksHeroCard({
     : tone === 'seguimiento'
       ? 'border border-slate-200 bg-white text-slate-950'
       : tone === 'activo'
-        ? 'bg-[linear-gradient(135deg,#0F6C86,#155E75)] text-white'
+        ? 'bg-[linear-gradient(135deg,#2563EB,#1E40AF)] text-white'
         : 'bg-[linear-gradient(135deg,#14532D,#166534)] text-white'
   const eyebrowClass = tone === 'activo' || tone === 'estable'
     ? 'text-white/70'

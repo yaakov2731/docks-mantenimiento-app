@@ -1,7 +1,7 @@
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { PRIORIDADES } from '@shared/const'
 
-const COLORS_PIE = ['#22C55E', '#EAB308', '#FF6B35', '#EF4444']
+const COLORS_PIE = ['#059669', '#D97706', '#D97706', '#DC2626']
 
 export default function DashboardCharts({
   stats,
@@ -70,7 +70,7 @@ export default function DashboardCharts({
             <XAxis dataKey="categoria" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip />
-            <Bar dataKey="count" fill="#0F6C86" radius={[10, 10, 0, 0]} />
+            <Bar dataKey="count" fill="#2563EB" radius={[10, 10, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

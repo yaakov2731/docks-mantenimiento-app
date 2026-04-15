@@ -25,7 +25,7 @@ export function OperationsHeroCard({ resumen }: { resumen: any }) {
     ? 'border border-rose-200 bg-rose-50 text-rose-950'
     : tone === 'pendiente'
       ? 'border border-amber-200 bg-amber-50 text-amber-950'
-      : 'bg-[linear-gradient(135deg,#0F6C86,#155E75)] text-white'
+      : 'bg-[linear-gradient(135deg,#2563EB,#1E40AF)] text-white'
   const eyebrowClass = tone === 'estable' ? 'text-cyan-100/80' : tone === 'pendiente' ? 'text-amber-600' : 'text-rose-500'
   const bodyClass = tone === 'estable' ? 'text-cyan-50/90' : tone === 'pendiente' ? 'text-amber-900/80' : 'text-rose-950/80'
 

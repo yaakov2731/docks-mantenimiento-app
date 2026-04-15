@@ -6,11 +6,11 @@ import { Phone, Mail, MessageCircle, Calendar, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 const ESTADOS_LEAD = [
-  { value: 'nuevo', label: 'Nuevo', color: '#0A7EA4' },
-  { value: 'contactado', label: 'Contactado', color: '#FF6B35' },
-  { value: 'visito', label: 'Visitó', color: '#EAB308' },
-  { value: 'cerrado', label: 'Cerrado', color: '#22C55E' },
-  { value: 'descartado', label: 'Descartado', color: '#94A3B8' },
+  { value: 'nuevo', label: 'Nuevo', color: '#2563EB' },
+  { value: 'contactado', label: 'Contactado', color: '#D97706' },
+  { value: 'visito', label: 'Visitó', color: '#D97706' },
+  { value: 'cerrado', label: 'Cerrado', color: '#059669' },
+  { value: 'descartado', label: 'Descartado', color: '#6B7280' },
 ] as const
 
 function Badge({ value }: { value: string }) {

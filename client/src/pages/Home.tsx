@@ -57,8 +57,8 @@ export default function Home() {
   /* ── Success screen ── */
   if (step === 'success') {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex flex-col">
-        <header className="bg-[#1E2832] px-6 py-5">
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="bg-primary px-6 py-5">
           <div className="max-w-2xl mx-auto">
             <BrandLogo variant="dark" size="sm" />
           </div>
@@ -68,9 +68,9 @@ export default function Home() {
             <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5">
               <CheckCircle className="w-9 h-9 text-success" />
             </div>
-            <h2 className="font-heading font-bold text-2xl text-[#1E2832]">Reclamo enviado</h2>
+            <h2 className="font-heading font-bold text-2xl text-gray-900">Reclamo enviado</h2>
             <p className="text-gray-500 mt-2 text-sm">Tu reclamo fue registrado correctamente.</p>
-            <div className="mt-6 bg-[#F4F6F8] rounded-xl px-6 py-5">
+            <div className="mt-6 bg-background rounded-xl px-6 py-5">
               <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Número de reclamo</p>
               <p className="text-4xl font-heading font-bold text-primary">
                 #{ticketId?.toString().padStart(4, '0')}
@@ -92,10 +92,10 @@ export default function Home() {
 
   /* ── Form ── */
   return (
-    <div className="min-h-screen bg-[#F4F6F8]">
+    <div className="min-h-screen bg-background">
 
       {/* Header — single dark band */}
-      <header className="bg-[#1E2832] px-6 pt-6 pb-10">
+      <header className="bg-primary px-6 pt-6 pb-10">
         <div className="max-w-2xl mx-auto flex items-start justify-between gap-4">
           <BrandLogo variant="dark" size="md" showTagline />
           <a

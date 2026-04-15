@@ -19,11 +19,11 @@ export default function Login() {
   })
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-4xl flex overflow-hidden rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.12)]">
 
         {/* Left — Brand panel */}
-        <div className="hidden md:flex flex-col justify-between bg-[#1E2832] text-white p-10 w-[45%] flex-shrink-0">
+        <div className="hidden md:flex flex-col justify-between bg-primary text-white p-10 w-[45%] flex-shrink-0">
           <BrandLogo variant="dark" size="md" showTagline />
 
           <div>
@@ -60,7 +60,7 @@ export default function Login() {
 
           <div className="mb-8">
             <p className="text-xs uppercase tracking-widest text-gray-400 font-medium mb-1">Acceso restringido</p>
-            <h1 className="font-heading font-semibold text-xl text-[#1E2832]">Ingreso al panel</h1>
+            <h1 className="font-heading font-semibold text-xl text-gray-900">Ingreso al panel</h1>
           </div>
 
           <form

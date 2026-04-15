@@ -37,25 +37,25 @@ export default function DashboardLayout({ children, title }: { children: React.R
   const visibleNavItems = navItems.filter(item => !userRole || item.roles.includes(userRole))
 
   const Sidebar = () => (
-    <div className="flex flex-col h-full bg-[#1E2832] text-white w-64">
+    <div className="flex flex-col h-full bg-sidebar-bg text-white w-64">
 
       {/* Logo */}
-      <div className="px-6 pt-7 pb-5 border-b border-white/8">
+      <div className="px-6 pt-7 pb-5 border-b border-white/10">
         <BrandLogo variant="dark" size="sm" showTagline />
       </div>
 
       {/* User */}
       {user && (
-        <div className="px-4 py-3 mx-3 mt-4 rounded-xl bg-white/5 border border-white/8">
-          <p className="text-[10px] uppercase tracking-widest text-white/35 font-medium">Conectado como</p>
+        <div className="px-4 py-3 mx-3 mt-4 rounded-lg bg-white/8 border border-white/10 backdrop-blur-sm">
+          <p className="text-[10px] uppercase tracking-widest text-white/40 font-medium">Conectado como</p>
           <p className="text-sm font-semibold text-white mt-0.5 truncate">{user.name}</p>
-          <p className="text-xs text-white/40">{roleLabel[userRole ?? 'employee']}</p>
+          <p className="text-xs text-white/50">{roleLabel[userRole ?? 'employee']}</p>
         </div>
       )}
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        <p className="text-[10px] uppercase tracking-widest text-white/25 px-3 mb-2 font-medium">Navegación</p>
+        <p className="text-[10px] uppercase tracking-widest text-white/30 px-3 mb-2 font-medium">Navegación</p>
         {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = location === href
           return (
@@ -63,13 +63,13 @@ export default function DashboardLayout({ children, title }: { children: React.R
               key={href}
               href={href}
               onClick={() => setOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
                 active
-                  ? 'bg-white text-[#1E2832] font-semibold'
-                  : 'text-white/55 hover:text-white hover:bg-white/8'
+                  ? 'bg-primary text-white font-semibold shadow-lg shadow-primary/20'
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Icon size={16} className={active ? 'text-primary' : ''} />
+              <Icon size={16} className={active ? 'text-white' : ''} />
               {label}
             </Link>
           )
@@ -77,11 +77,11 @@ export default function DashboardLayout({ children, title }: { children: React.R
       </nav>
 
       {/* Logout */}
-      <div className="px-3 py-4 border-t border-white/8">
+      <div className="px-3 py-4 border-t border-white/10">
         <button
           type="button"
           onClick={() => logout.mutate()}
-          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-sm text-white/45 hover:text-white hover:bg-white/8 transition-all"
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200"
         >
           <LogOut size={16} />
           Cerrar sesión
@@ -91,7 +91,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
   )
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F4F6F8]">
+    <div className="flex h-screen overflow-hidden bg-background">
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-shrink-0">
@@ -122,7 +122,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
             {open ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="font-heading font-semibold text-[17px] text-[#1E2832] truncate">
+            <h1 className="font-heading font-semibold text-[17px] text-gray-900 truncate">
               {title ?? 'Dashboard'}
             </h1>
           </div>
