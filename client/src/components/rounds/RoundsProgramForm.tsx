@@ -35,7 +35,7 @@ export function RoundsProgramForm({ empleados, supervisors, onSubmit, isSubmitti
     nombre: 'Control de baños',
     intervaloHoras: '2',
     modoProgramacion: 'semanal' as 'semanal' | 'fecha_especial',
-    diaSemana: '1',
+    diaSemana: String(new Date().getDay()),
     fechaEspecial: '',
     horaInicio: '10:00',
     horaFin: '22:00',
