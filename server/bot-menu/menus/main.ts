@@ -8,6 +8,7 @@ import {
   listOperationalTasksByEmployee,
   getReportes,
   getEmpleadoAttendanceStatus,
+  listUnassignedLeads,
 } from '../../db'
 
 // ─── Empleado ────────────────────────────────────────────────────────────────
@@ -46,7 +47,10 @@ export async function buildEmployeeMainMenu(session: BotSession): Promise<string
 // ─── Admin / Gerente ──────────────────────────────────────────────────────────
 
 export async function buildAdminMainMenu(session: BotSession): Promise<string> {
-  const reportes = await getReportes()
+  const [reportes, leadsLibres] = await Promise.all([
+    getReportes(),
+    listUnassignedLeads(),
+  ])
   const abiertos = reportes.filter(r => !['completado', 'cancelado'].includes(r.estado))
   const urgentes = abiertos.filter(r => r.prioridad === 'urgente' && !r.asignadoId)
 
@@ -54,11 +58,16 @@ export async function buildAdminMainMenu(session: BotSession): Promise<string> {
     ? `📊 ${abiertos.length} abiertos${urgentes.length > 0 ? ` | 🔴 ${urgentes.length} urgente${urgentes.length > 1 ? 's' : ''} sin asignar` : ''}`
     : '✅ Sin reclamos abiertos'
 
+  const leadsResumen = leadsLibres.length > 0
+    ? `🎯 ${leadsLibres.length} lead${leadsLibres.length > 1 ? 's' : ''} sin asignar`
+    : null
+
   return [
     `👔 *${session.userName}* — Panel gerente`,
     `🏢 Docks del Puerto`,
     SEP,
     resumen,
+    leadsResumen,
     SEP,
     `1️⃣  📋 Ver reclamos pendientes`,
     `2️⃣  🔴 Ver urgentes`,
@@ -66,10 +75,11 @@ export async function buildAdminMainMenu(session: BotSession): Promise<string> {
     `4️⃣  📊 Estado general del día`,
     `5️⃣  🚻 Estado rondas de baños`,
     `6️⃣  ⚠️  Tareas vencidas (SLA)`,
-    `7️⃣  🆕 Crear ronda de baños`,
+    `7️⃣  🚻 Gestionar rondas de baños`,
+    `8️⃣  🎯 Asignar lead de alquiler`,
     SEP,
     `0️⃣  ❓ Ayuda`,
-  ].join('\n')
+  ].filter(Boolean).join('\n')
 }
 
 // ─── Ventas ──────────────────────────────────────────────────────────────────
@@ -111,7 +121,7 @@ export function buildHelpMessage(userType: 'employee' | 'admin' | 'sales'): stri
       `📋 *Reclamos:* ver, asignar y gestionar reclamos`,
       `📊 *Estado:* resumen del día y métricas`,
       `⚠️  *SLA:* tareas que superaron el tiempo límite`,
-      `🚻 *Rondas:* crear y asignar rondas de baños`,
+      `🚻 *Rondas:* asignar, reasignar y liberar rondas de baños`,
     )
   } else {
     base.push(
