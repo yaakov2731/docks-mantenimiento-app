@@ -253,6 +253,28 @@ export function roundObservationAlert(params: {
   ].join('\n')
 }
 
+/**
+ * Notificación al empleado cuando se le asigna una ronda desde el panel admin.
+ */
+export function roundAssignment(params: {
+  occurrenceId: number
+  nombreRonda: string
+  horaProgramada: string
+  asignadoPor: string
+}): string {
+  return [
+    `🚻 *Te asignaron una ronda — Docks del Puerto*`,
+    '',
+    `📋 *${params.nombreRonda}*`,
+    `🕒 Hora programada: *${params.horaProgramada}*`,
+    `👤 Asignado por: ${params.asignadoPor}`,
+    '',
+    `Cuando llegue el momento, ingresá al menú del bot y seleccioná *Rondas* para iniciar, registrar y completar el control.`,
+    '',
+    `🔑 ID control: ${params.occurrenceId}`,
+  ].join('\n')
+}
+
 // ─── Templates de Leads ──────────────────────────────────────────────────────
 
 /**

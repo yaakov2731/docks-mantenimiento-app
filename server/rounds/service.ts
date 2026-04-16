@@ -1,5 +1,5 @@
 import { buildOccurrencesForDate, pickScheduleForDate, resolveOccurrenceState, type RoundSchedule } from './engine'
-import { buildRoundReminderMessage } from './messages'
+import { buildRoundReminderMessage, buildRoundAssignmentMessage } from './messages'
 
 export type RoundScheduleRecord = {
   id: number
@@ -32,6 +32,17 @@ export type RoundOccurrenceRecord = {
   tiempoAcumuladoSegundos?: number
   nota?: string | null
   canalConfirmacion?: 'whatsapp' | 'panel' | 'system'
+  responsableProgramadoId?: number | null
+  responsableProgramadoNombre?: string | null
+  responsableProgramadoWaId?: string | null
+  responsableActualId?: number | null
+  responsableActualNombre?: string | null
+  responsableActualWaId?: string | null
+  asignacionEstado?: 'sin_asignar' | 'asignada' | 'en_progreso' | 'completada' | 'vencida'
+  asignadoAt?: Date | null
+  reasignadoAt?: Date | null
+  reasignadoPorUserId?: number | null
+  reasignadoPorNombre?: string | null
   empleadoId: number
   empleadoNombre: string
   empleadoWaId: string
@@ -49,7 +60,7 @@ export type RoundRepository = {
   markOccurrenceOverdue(id: number): Promise<void>
   addOccurrenceEvent(event: {
     occurrenceId: number
-    type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update'
+    type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update' | 'asignacion' | 'reasignacion' | 'liberacion'
     at: Date
     actorType?: 'system' | 'employee' | 'admin'
     actorId?: number | null
@@ -69,6 +80,7 @@ export type RoundRepository = {
     id: number,
     updates: Partial<RoundOccurrenceRecord>
   ): Promise<void>
+  getEmpleadoById?(id: number): Promise<{ id: number; nombre: string; waId?: string | null } | null>
 }
 
 type EngineSchedule = RoundSchedule & {
@@ -111,6 +123,17 @@ export function createRoundsService(repo: RoundRepository) {
             recordatorioEnviadoAt: null,
             confirmadoAt: null,
             escaladoAt: null,
+            responsableProgramadoId: selectedSchedule.record.empleadoId,
+            responsableProgramadoNombre: selectedSchedule.record.empleadoNombre,
+            responsableProgramadoWaId: selectedSchedule.record.empleadoWaId,
+            responsableActualId: selectedSchedule.record.empleadoId,
+            responsableActualNombre: selectedSchedule.record.empleadoNombre,
+            responsableActualWaId: selectedSchedule.record.empleadoWaId,
+            asignacionEstado: 'asignada' as const,
+            asignadoAt: new Date(occurrence.programadoAtIso),
+            reasignadoAt: null,
+            reasignadoPorUserId: null,
+            reasignadoPorNombre: null,
             empleadoId: selectedSchedule.record.empleadoId,
             empleadoNombre: selectedSchedule.record.empleadoNombre,
             empleadoWaId: selectedSchedule.record.empleadoWaId,
@@ -155,7 +178,7 @@ export function createRoundsService(repo: RoundRepository) {
         if (item.recordatorioEnviadoAt) continue
 
         await repo.enqueueBotMessage(
-          item.empleadoWaId,
+          getCurrentResponsibleWaId(item),
           buildRoundReminderMessage({
             occurrenceId: item.id,
             nombreRonda: item.nombreRonda ?? 'Control de banos',
@@ -174,6 +197,145 @@ export function createRoundsService(repo: RoundRepository) {
       return { remindersSent, escalationsSent }
     },
 
+    async assignOccurrence(input: {
+      occurrenceId: number
+      empleadoId: number
+      actor: { id?: number | null; name: string }
+      now?: Date
+    }) {
+      if (!repo.getOccurrenceById || !repo.updateOccurrenceLifecycle || !repo.getEmpleadoById) {
+        throw new Error('Round repository does not support assignment updates')
+      }
+
+      const occurrence = await repo.getOccurrenceById(input.occurrenceId)
+      if (!occurrence) throw new Error('Round occurrence not found')
+      assertRoundCanBeReassigned(occurrence)
+
+      const empleado = await repo.getEmpleadoById(input.empleadoId)
+      if (!empleado) throw new Error('Empleado no encontrado')
+
+      const now = input.now ?? new Date()
+      const nextAssignmentState = occurrence.estado === 'en_progreso'
+        ? 'en_progreso'
+        : 'asignada'
+      const isReassignment = getCurrentResponsibleId(occurrence) !== null
+
+      await repo.updateOccurrenceLifecycle(input.occurrenceId, {
+        responsableActualId: empleado.id,
+        responsableActualNombre: empleado.nombre,
+        responsableActualWaId: empleado.waId ?? null,
+        empleadoId: empleado.id,
+        empleadoNombre: empleado.nombre,
+        empleadoWaId: empleado.waId ?? '',
+        asignacionEstado: nextAssignmentState,
+        asignadoAt: occurrence.asignadoAt ?? now,
+        reasignadoAt: isReassignment ? now : occurrence.reasignadoAt ?? null,
+        reasignadoPorUserId: isReassignment ? input.actor.id ?? null : occurrence.reasignadoPorUserId ?? null,
+        reasignadoPorNombre: isReassignment ? input.actor.name : occurrence.reasignadoPorNombre ?? null,
+      })
+      await repo.addOccurrenceEvent({
+        occurrenceId: input.occurrenceId,
+        type: isReassignment ? 'reasignacion' : 'asignacion',
+        at: now,
+        actorType: 'admin',
+        actorId: input.actor.id ?? null,
+        actorName: input.actor.name,
+        description: isReassignment
+          ? `Ronda reasignada a ${empleado.nombre}`
+          : `Ronda asignada a ${empleado.nombre}`,
+        metadata: {
+          source: 'admin-assignment',
+          action: isReassignment ? 'reasignacion' : 'asignacion',
+          previousResponsibleId: getCurrentResponsibleId(occurrence),
+          nextResponsibleId: empleado.id,
+        },
+      })
+
+      // Notificar al empleado por WhatsApp si tiene waId
+      if (empleado.waId) {
+        await repo.enqueueBotMessage(
+          empleado.waId,
+          buildRoundAssignmentMessage({
+            occurrenceId: input.occurrenceId,
+            nombreRonda: occurrence.nombreRonda ?? 'Control operativo',
+            horaProgramada: occurrence.programadoAtLabel ?? 'horario programado',
+            asignadoPor: input.actor.name,
+          })
+        )
+      }
+
+      return {
+        ...occurrence,
+        responsableActualId: empleado.id,
+        responsableActualNombre: empleado.nombre,
+        responsableActualWaId: empleado.waId ?? null,
+        empleadoId: empleado.id,
+        empleadoNombre: empleado.nombre,
+        empleadoWaId: empleado.waId ?? '',
+        asignacionEstado: nextAssignmentState,
+        asignadoAt: occurrence.asignadoAt ?? now,
+        reasignadoAt: isReassignment ? now : occurrence.reasignadoAt ?? null,
+        reasignadoPorUserId: isReassignment ? input.actor.id ?? null : occurrence.reasignadoPorUserId ?? null,
+        reasignadoPorNombre: isReassignment ? input.actor.name : occurrence.reasignadoPorNombre ?? null,
+      }
+    },
+
+    async releaseOccurrence(input: {
+      occurrenceId: number
+      actor: { id?: number | null; name: string }
+      now?: Date
+    }) {
+      if (!repo.getOccurrenceById || !repo.updateOccurrenceLifecycle) {
+        throw new Error('Round repository does not support assignment updates')
+      }
+
+      const occurrence = await repo.getOccurrenceById(input.occurrenceId)
+      if (!occurrence) throw new Error('Round occurrence not found')
+      assertRoundCanBeReassigned(occurrence)
+
+      const now = input.now ?? new Date()
+      await repo.updateOccurrenceLifecycle(input.occurrenceId, {
+        responsableActualId: null,
+        responsableActualNombre: null,
+        responsableActualWaId: null,
+        empleadoId: 0,
+        empleadoNombre: 'Sin asignar',
+        empleadoWaId: '',
+        asignacionEstado: 'sin_asignar',
+        reasignadoAt: now,
+        reasignadoPorUserId: input.actor.id ?? null,
+        reasignadoPorNombre: input.actor.name,
+      })
+      await repo.addOccurrenceEvent({
+        occurrenceId: input.occurrenceId,
+        type: 'liberacion',
+        at: now,
+        actorType: 'admin',
+        actorId: input.actor.id ?? null,
+        actorName: input.actor.name,
+        description: 'Ronda liberada para reasignación',
+        metadata: {
+          source: 'admin-assignment',
+          action: 'liberacion',
+          previousResponsibleId: getCurrentResponsibleId(occurrence),
+        },
+      })
+
+      return {
+        ...occurrence,
+        responsableActualId: null,
+        responsableActualNombre: null,
+        responsableActualWaId: null,
+        empleadoId: 0,
+        empleadoNombre: 'Sin asignar',
+        empleadoWaId: '',
+        asignacionEstado: 'sin_asignar' as const,
+        reasignadoAt: now,
+        reasignadoPorUserId: input.actor.id ?? null,
+        reasignadoPorNombre: input.actor.name,
+      }
+    },
+
     async registerWhatsappReply(input: {
       occurrenceId: number
       empleadoId: number
@@ -186,7 +348,7 @@ export function createRoundsService(repo: RoundRepository) {
 
       const occurrence = await repo.getOccurrenceById(input.occurrenceId)
       if (!occurrence) throw new Error('Round occurrence not found')
-      if (occurrence.empleadoId !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
+      if (getCurrentResponsibleId(occurrence) !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
       if (occurrence.estado !== 'pendiente') throw new Error('Round occurrence is no longer pending')
 
       const note = normalizeNote(input.note)
@@ -225,7 +387,7 @@ export function createRoundsService(repo: RoundRepository) {
 
       const occurrence = await repo.getOccurrenceById(input.occurrenceId)
       if (!occurrence) throw new Error('Round occurrence not found')
-      if (occurrence.empleadoId !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
+      if (getCurrentResponsibleId(occurrence) !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
       if (occurrence.estado !== 'pendiente' && occurrence.estado !== 'pausada') {
         throw new Error('Round occurrence cannot be started from its current state')
       }
@@ -235,6 +397,7 @@ export function createRoundsService(repo: RoundRepository) {
         estado: 'en_progreso',
         inicioRealAt: now,
         pausadoAt: null,
+        asignacionEstado: 'en_progreso',
       })
       await repo.addOccurrenceEvent({
         occurrenceId: input.occurrenceId,
@@ -242,7 +405,7 @@ export function createRoundsService(repo: RoundRepository) {
         at: now,
         actorType: 'employee',
         actorId: input.empleadoId,
-        actorName: occurrence.empleadoNombre,
+        actorName: getCurrentResponsibleName(occurrence),
         description: occurrence.estado === 'pausada' ? 'Ronda reanudada' : 'Ronda iniciada',
         metadata: { source: 'round-start' },
       })
@@ -263,7 +426,7 @@ export function createRoundsService(repo: RoundRepository) {
 
       const occurrence = await repo.getOccurrenceById(input.occurrenceId)
       if (!occurrence) throw new Error('Round occurrence not found')
-      if (occurrence.empleadoId !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
+      if (getCurrentResponsibleId(occurrence) !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
       if (occurrence.estado !== 'en_progreso') {
         throw new Error('Round occurrence is not in progress')
       }
@@ -282,7 +445,7 @@ export function createRoundsService(repo: RoundRepository) {
         at: now,
         actorType: 'employee',
         actorId: input.empleadoId,
-        actorName: occurrence.empleadoNombre,
+        actorName: getCurrentResponsibleName(occurrence),
         description: 'Ronda pausada',
         metadata: { source: 'round-pause' },
       })
@@ -303,7 +466,7 @@ export function createRoundsService(repo: RoundRepository) {
 
       const occurrence = await repo.getOccurrenceById(input.occurrenceId)
       if (!occurrence) throw new Error('Round occurrence not found')
-      if (occurrence.empleadoId !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
+      if (getCurrentResponsibleId(occurrence) !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
       if (occurrence.estado !== 'en_progreso' && occurrence.estado !== 'pausada') {
         throw new Error('Round occurrence cannot be finished from its current state')
       }
@@ -322,6 +485,7 @@ export function createRoundsService(repo: RoundRepository) {
         confirmadoAt: now,
         canalConfirmacion: 'whatsapp',
         nota: normalizeNote(input.note),
+        asignacionEstado: 'completada',
       })
       await repo.addOccurrenceEvent({
         occurrenceId: input.occurrenceId,
@@ -329,7 +493,7 @@ export function createRoundsService(repo: RoundRepository) {
         at: now,
         actorType: 'employee',
         actorId: input.empleadoId,
-        actorName: occurrence.empleadoNombre,
+        actorName: getCurrentResponsibleName(occurrence),
         description: input.note?.trim()
           ? `Ronda finalizada: ${input.note.trim()}`
           : 'Ronda finalizada',
@@ -356,7 +520,7 @@ export function createRoundsService(repo: RoundRepository) {
 
       const occurrence = await repo.getOccurrenceById(input.occurrenceId)
       if (!occurrence) throw new Error('Round occurrence not found')
-      if (occurrence.empleadoId !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
+      if (getCurrentResponsibleId(occurrence) !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
 
       const now = input.now ?? new Date()
       const accumulated = occurrence.estado === 'en_progreso'
@@ -373,6 +537,7 @@ export function createRoundsService(repo: RoundRepository) {
         confirmadoAt: now,
         canalConfirmacion: 'whatsapp',
         nota: note,
+        asignacionEstado: 'completada',
       })
       await repo.addOccurrenceEvent({
         occurrenceId: input.occurrenceId,
@@ -380,7 +545,7 @@ export function createRoundsService(repo: RoundRepository) {
         at: now,
         actorType: 'employee',
         actorId: input.empleadoId,
-        actorName: occurrence.empleadoNombre,
+        actorName: getCurrentResponsibleName(occurrence),
         description: note
           ? `Ronda finalizada con observacion: ${note}`
           : 'Ronda finalizada con observacion',
@@ -407,7 +572,7 @@ export function createRoundsService(repo: RoundRepository) {
 
       const occurrence = await repo.getOccurrenceById(input.occurrenceId)
       if (!occurrence) throw new Error('Round occurrence not found')
-      if (occurrence.empleadoId !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
+      if (getCurrentResponsibleId(occurrence) !== input.empleadoId) throw new Error('Round occurrence does not belong to employee')
 
       const now = input.now ?? new Date()
       const note = normalizeNote(input.note)
@@ -424,6 +589,7 @@ export function createRoundsService(repo: RoundRepository) {
         confirmadoAt: now,
         canalConfirmacion: 'whatsapp',
         nota: note,
+        asignacionEstado: 'vencida',
       })
       await repo.addOccurrenceEvent({
         occurrenceId: input.occurrenceId,
@@ -431,7 +597,7 @@ export function createRoundsService(repo: RoundRepository) {
         at: now,
         actorType: 'employee',
         actorId: input.empleadoId,
-        actorName: occurrence.empleadoNombre,
+        actorName: getCurrentResponsibleName(occurrence),
         description: note
           ? `Empleado no pudo completar la ronda: ${note}`
           : 'Empleado no pudo completar la ronda',
@@ -519,6 +685,26 @@ function resolveReplyOption(option: '1' | '2' | '3', note: string | null) {
       }
     default:
       throw new Error(`Unsupported WhatsApp reply option: ${option}`)
+  }
+}
+
+function getCurrentResponsibleId(occurrence: RoundOccurrenceRecord) {
+  return occurrence.responsableActualId ?? occurrence.empleadoId ?? null
+}
+
+function getCurrentResponsibleName(occurrence: RoundOccurrenceRecord) {
+  return occurrence.responsableActualNombre ?? occurrence.empleadoNombre
+}
+
+function getCurrentResponsibleWaId(occurrence: RoundOccurrenceRecord) {
+  const waId = occurrence.responsableActualWaId ?? occurrence.empleadoWaId
+  if (!waId) throw new Error('Round occurrence has no assigned WhatsApp recipient')
+  return waId
+}
+
+function assertRoundCanBeReassigned(occurrence: RoundOccurrenceRecord) {
+  if (['cumplido', 'cumplido_con_observacion', 'vencido', 'cancelado'].includes(occurrence.estado)) {
+    throw new Error('Round occurrence cannot be reassigned from its current state')
   }
 }
 

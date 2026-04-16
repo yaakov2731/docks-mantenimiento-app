@@ -1,4 +1,4 @@
-import { roundReminder, roundOverdue, roundObservationAlert } from '../messages/templates'
+import { roundReminder, roundOverdue, roundObservationAlert, roundAssignment } from '../messages/templates'
 
 export function buildRoundReminderMessage(input: {
   occurrenceId: number
@@ -26,4 +26,13 @@ export function buildRoundObservationAlertMessage(input: {
   nota: string
 }): string {
   return roundObservationAlert(input)
+}
+
+export function buildRoundAssignmentMessage(input: {
+  occurrenceId: number
+  nombreRonda: string
+  horaProgramada: string
+  asignadoPor: string
+}): string {
+  return roundAssignment(input)
 }
