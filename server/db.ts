@@ -220,6 +220,17 @@ export async function initDb() {
       pausado_at INTEGER,
       fin_real_at INTEGER,
       tiempo_acumulado_segundos INTEGER NOT NULL DEFAULT 0,
+      responsable_programado_id INTEGER,
+      responsable_programado_nombre TEXT,
+      responsable_programado_wa_id TEXT,
+      responsable_actual_id INTEGER,
+      responsable_actual_nombre TEXT,
+      responsable_actual_wa_id TEXT,
+      asignacion_estado TEXT NOT NULL DEFAULT 'asignada',
+      asignado_at INTEGER,
+      reasignado_at INTEGER,
+      reasignado_por_user_id INTEGER,
+      reasignado_por_nombre TEXT,
       empleado_id INTEGER NOT NULL,
       empleado_nombre TEXT NOT NULL,
       empleado_wa_id TEXT NOT NULL,
@@ -311,6 +322,17 @@ export async function initDb() {
     `ALTER TABLE rondas_ocurrencia ADD COLUMN pausado_at INTEGER`,
     `ALTER TABLE rondas_ocurrencia ADD COLUMN fin_real_at INTEGER`,
     `ALTER TABLE rondas_ocurrencia ADD COLUMN tiempo_acumulado_segundos INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_programado_id INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_programado_nombre TEXT`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_programado_wa_id TEXT`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_actual_id INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_actual_nombre TEXT`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN responsable_actual_wa_id TEXT`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN asignacion_estado TEXT NOT NULL DEFAULT 'asignada'`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN asignado_at INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN reasignado_at INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN reasignado_por_user_id INTEGER`,
+    `ALTER TABLE rondas_ocurrencia ADD COLUMN reasignado_por_nombre TEXT`,
   ]
   for (const sql of alterStmts) {
     try {
@@ -1333,15 +1355,86 @@ export async function getBathroomRoundTasksForEmployee(empleadoId: number) {
   return rows.map(toOperationalTaskRecord)
 }
 
-export async function getUnassignedBathroomRoundTasks() {
-  const rows = await db.select().from(schema.tareasOperativas)
-    .where(and(
-      eq(schema.tareasOperativas.tipoTrabajo, 'ronda_banos'),
-      isNull(schema.tareasOperativas.empleadoId)
-    ))
-    .orderBy(desc(schema.tareasOperativas.createdAt))
+export async function iniciarTrabajoTareaOperativa(taskId: number) {
+  const task = await getOperationalTaskById(taskId)
+  if (!task) throw new Error('Tarea operativa no encontrada')
+  if (task.estado !== 'pendiente_confirmacion') throw new Error('La tarea debe estar pendiente de confirmación para iniciarse')
 
-  return rows.map(toOperationalTaskRecord)
+  const now = new Date()
+  await persistOperationalTaskChange(taskId, {
+    estado: 'en_progreso',
+    trabajoIniciadoAt: now,
+    pausadoAt: null,
+  }, [{
+    tareaId: taskId,
+    tipo: 'inicio',
+    actorTipo: 'employee',
+    actorId: task.empleadoId,
+    actorNombre: task.empleadoNombre,
+    descripcion: 'Trabajo iniciado',
+  }])
+}
+
+export async function pausarTrabajoTareaOperativa(taskId: number) {
+  const task = await getOperationalTaskById(taskId)
+  if (!task) throw new Error('Tarea operativa no encontrada')
+  if (task.estado !== 'en_progreso') throw new Error('La tarea debe estar en progreso para pausarse')
+
+  const now = new Date()
+  const trabajoAcumulado = getOperationalTaskTiempoTrabajadoSegundosAt(task, now)
+
+  await persistOperationalTaskChange(taskId, {
+    estado: 'pausada',
+    pausadoAt: now,
+    trabajoAcumuladoSegundos: trabajoAcumulado,
+  }, [{
+    tareaId: taskId,
+    tipo: 'pausa',
+    actorTipo: 'employee',
+    actorId: task.empleadoId,
+    actorNombre: task.empleadoNombre,
+    descripcion: 'Trabajo pausado',
+  }])
+}
+
+export async function reanudarTrabajoTareaOperativa(taskId: number) {
+  const task = await getOperationalTaskById(taskId)
+  if (!task) throw new Error('Tarea operativa no encontrada')
+  if (task.estado !== 'pausada') throw new Error('La tarea debe estar pausada para reanudarse')
+
+  await persistOperationalTaskChange(taskId, {
+    estado: 'en_progreso',
+    pausadoAt: null,
+  }, [{
+    tareaId: taskId,
+    tipo: 'reanudar',
+    actorTipo: 'employee',
+    actorId: task.empleadoId,
+    actorNombre: task.empleadoNombre,
+    descripcion: 'Trabajo reanudado',
+  }])
+}
+
+export async function completarTrabajoTareaOperativa(taskId: number) {
+  const task = await getOperationalTaskById(taskId)
+  if (!task) throw new Error('Tarea operativa no encontrada')
+  if (task.estado !== 'en_progreso') throw new Error('La tarea debe estar en progreso para completarse')
+
+  const now = new Date()
+  const trabajoAcumulado = getOperationalTaskTiempoTrabajadoSegundosAt(task, now)
+
+  await persistOperationalTaskChange(taskId, {
+    estado: 'terminada',
+    terminadoAt: now,
+    trabajoAcumuladoSegundos: trabajoAcumulado,
+  }, [{
+    tareaId: taskId,
+    tipo: 'terminacion',
+    actorTipo: 'employee',
+    actorId: task.empleadoId,
+    actorNombre: task.empleadoNombre,
+    descripcion: 'Trabajo completado',
+  }])
 }
 
 export async function assignBathroomRoundTask(taskId: number, empleadoId: number, empleadoNombre: string, empleadoWaId?: string) {
@@ -1630,7 +1723,7 @@ export async function getRoundOverviewForDashboard(dateKey = toBuenosAiresDateKe
       ? {
           id: nextPending.id,
           hora: nextPending.programadoAtLabel ?? formatTimeLabel(nextPending.programadoAt),
-          responsable: nextPending.empleadoNombre,
+          responsable: nextPending.responsableActualNombre ?? nextPending.empleadoNombre,
         }
       : null,
   }
@@ -1672,6 +1765,17 @@ export async function createOccurrences(rows: Array<{
   empleadoId: number
   empleadoNombre: string
   empleadoWaId: string
+  responsableProgramadoId?: number | null
+  responsableProgramadoNombre?: string | null
+  responsableProgramadoWaId?: string | null
+  responsableActualId?: number | null
+  responsableActualNombre?: string | null
+  responsableActualWaId?: string | null
+  asignacionEstado?: 'sin_asignar' | 'asignada' | 'en_progreso' | 'completada' | 'vencida'
+  asignadoAt?: Date | null
+  reasignadoAt?: Date | null
+  reasignadoPorUserId?: number | null
+  reasignadoPorNombre?: string | null
   supervisorWaId?: string | null
   nombreRonda: string
 }>) {
@@ -1687,6 +1791,17 @@ export async function createOccurrences(rows: Array<{
     recordatorioEnviadoAt: row.recordatorioEnviadoAt,
     confirmadoAt: row.confirmadoAt,
     escaladoAt: row.escaladoAt,
+    responsableProgramadoId: row.responsableProgramadoId ?? row.empleadoId,
+    responsableProgramadoNombre: row.responsableProgramadoNombre ?? row.empleadoNombre,
+    responsableProgramadoWaId: normalizeOptionalWaNumber(row.responsableProgramadoWaId ?? row.empleadoWaId),
+    responsableActualId: row.responsableActualId ?? row.empleadoId,
+    responsableActualNombre: row.responsableActualNombre ?? row.empleadoNombre,
+    responsableActualWaId: normalizeOptionalWaNumber(row.responsableActualWaId ?? row.empleadoWaId),
+    asignacionEstado: row.asignacionEstado ?? 'asignada',
+    asignadoAt: row.asignadoAt ?? row.programadoAt,
+    reasignadoAt: row.reasignadoAt ?? null,
+    reasignadoPorUserId: row.reasignadoPorUserId ?? null,
+    reasignadoPorNombre: row.reasignadoPorNombre ?? null,
     empleadoId: row.empleadoId,
     empleadoNombre: row.empleadoNombre,
     empleadoWaId: normalizeWaNumber(row.empleadoWaId),
@@ -1722,10 +1837,29 @@ export async function getOccurrenceById(id: number) {
   return getRoundOccurrenceById(id)
 }
 
+export async function listRoundOccurrencesForEmployee(
+  empleadoId: number,
+  dateKey = toBuenosAiresDateKey(new Date())
+) {
+  const rows = await db.select().from(schema.rondasOcurrencia).where(eq(schema.rondasOcurrencia.fechaOperativa, dateKey))
+  return rows
+    .filter((occurrence) =>
+      Number(occurrence.responsableActualId ?? occurrence.empleadoId ?? 0) === empleadoId &&
+      !['cumplido', 'cumplido_con_observacion', 'vencido', 'cancelado'].includes(occurrence.estado)
+    )
+    .sort((a, b) => toMs(a.programadoAt) - toMs(b.programadoAt))
+    .map((occurrence) => ({
+      ...toRoundOccurrenceRecord(occurrence),
+      estado: occurrence.estado,
+      canalConfirmacion: occurrence.canalConfirmacion,
+      nota: occurrence.nota,
+    }))
+}
+
 export async function updateRoundOccurrenceStatus(
   id: number,
   data: {
-    estado: 'pendiente' | 'en_progreso' | 'pausada' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
+    estado?: 'pendiente' | 'en_progreso' | 'pausada' | 'cumplido' | 'cumplido_con_observacion' | 'vencido' | 'cancelado'
     confirmadoAt?: Date | null
     canalConfirmacion?: 'whatsapp' | 'panel' | 'system'
     nota?: string | null
@@ -1734,12 +1868,26 @@ export async function updateRoundOccurrenceStatus(
     pausadoAt?: Date | null
     finRealAt?: Date | null
     tiempoAcumuladoSegundos?: number
+    responsableProgramadoId?: number | null
+    responsableProgramadoNombre?: string | null
+    responsableProgramadoWaId?: string | null
+    responsableActualId?: number | null
+    responsableActualNombre?: string | null
+    responsableActualWaId?: string | null
+    asignacionEstado?: 'sin_asignar' | 'asignada' | 'en_progreso' | 'completada' | 'vencida'
+    asignadoAt?: Date | null
+    reasignadoAt?: Date | null
+    reasignadoPorUserId?: number | null
+    reasignadoPorNombre?: string | null
+    empleadoId?: number
+    empleadoNombre?: string
+    empleadoWaId?: string
   }
 ) {
   const updates: Record<string, unknown> = {
-    estado: data.estado,
     updatedAt: new Date(),
   }
+  if (data.estado !== undefined) updates.estado = data.estado
   if (data.confirmadoAt !== undefined) updates.confirmadoAt = data.confirmadoAt
   if (data.canalConfirmacion !== undefined) updates.canalConfirmacion = data.canalConfirmacion
   if (data.nota !== undefined) updates.nota = data.nota
@@ -1748,6 +1896,20 @@ export async function updateRoundOccurrenceStatus(
   if (data.pausadoAt !== undefined) updates.pausadoAt = data.pausadoAt
   if (data.finRealAt !== undefined) updates.finRealAt = data.finRealAt
   if (data.tiempoAcumuladoSegundos !== undefined) updates.tiempoAcumuladoSegundos = data.tiempoAcumuladoSegundos
+  if (data.responsableProgramadoId !== undefined) updates.responsableProgramadoId = data.responsableProgramadoId
+  if (data.responsableProgramadoNombre !== undefined) updates.responsableProgramadoNombre = data.responsableProgramadoNombre
+  if (data.responsableProgramadoWaId !== undefined) updates.responsableProgramadoWaId = data.responsableProgramadoWaId
+  if (data.responsableActualId !== undefined) updates.responsableActualId = data.responsableActualId
+  if (data.responsableActualNombre !== undefined) updates.responsableActualNombre = data.responsableActualNombre
+  if (data.responsableActualWaId !== undefined) updates.responsableActualWaId = data.responsableActualWaId
+  if (data.asignacionEstado !== undefined) updates.asignacionEstado = data.asignacionEstado
+  if (data.asignadoAt !== undefined) updates.asignadoAt = data.asignadoAt
+  if (data.reasignadoAt !== undefined) updates.reasignadoAt = data.reasignadoAt
+  if (data.reasignadoPorUserId !== undefined) updates.reasignadoPorUserId = data.reasignadoPorUserId
+  if (data.reasignadoPorNombre !== undefined) updates.reasignadoPorNombre = data.reasignadoPorNombre
+  if (data.empleadoId !== undefined) updates.empleadoId = data.empleadoId
+  if (data.empleadoNombre !== undefined) updates.empleadoNombre = data.empleadoNombre
+  if (data.empleadoWaId !== undefined) updates.empleadoWaId = data.empleadoWaId
   await db.update(schema.rondasOcurrencia).set(updates as any).where(eq(schema.rondasOcurrencia.id, id)).run()
 }
 
@@ -1797,7 +1959,7 @@ export async function markOccurrenceOverdue(id: number) {
 
 export async function createRoundEvent(event: {
   occurrenceId: number
-  type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update'
+  type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update' | 'asignacion' | 'reasignacion' | 'liberacion'
   at?: Date
   actorType?: 'system' | 'employee' | 'admin'
   actorId?: number | null
@@ -1819,7 +1981,7 @@ export async function createRoundEvent(event: {
 
 export async function addOccurrenceEvent(event: {
   occurrenceId: number
-  type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update'
+  type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update' | 'asignacion' | 'reasignacion' | 'liberacion'
   at: Date
   actorType?: 'system' | 'employee' | 'admin'
   actorId?: number | null
@@ -1887,6 +2049,12 @@ export async function getLeads(filters?: { estado?: string }) {
 export async function getLeadById(id: number) {
   const rows = await db.select().from(schema.leads).where(eq(schema.leads.id, id))
   return rows[0] ?? null
+}
+export async function listUnassignedLeads() {
+  const all = await getLeads()
+  return all.filter(
+    (l) => !l.asignadoId && !['cerrado', 'descartado'].includes(l.estado)
+  )
 }
 export async function actualizarLead(id: number, data: Partial<typeof schema.leads.$inferInsert>) {
   await db.update(schema.leads).set({ ...data, updatedAt: new Date() } as any).where(eq(schema.leads.id, id)).run()
@@ -2035,6 +2203,14 @@ function getOperationalTaskTiempoTrabajadoSegundos(task: any) {
   if (!task.trabajoIniciadoAt) return acumulado
   const iniciadoAt = new Date(task.trabajoIniciadoAt).getTime()
   const adicional = Math.max(0, Math.floor((Date.now() - iniciadoAt) / 1000))
+  return acumulado + adicional
+}
+
+function getOperationalTaskTiempoTrabajadoSegundosAt(task: any, now: Date) {
+  const acumulado = Number(task.trabajoAcumuladoSegundos ?? 0)
+  if (!task.trabajoIniciadoAt) return acumulado
+  const iniciadoAt = new Date(task.trabajoIniciadoAt).getTime()
+  const adicional = Math.max(0, Math.floor((now.getTime() - iniciadoAt) / 1000))
   return acumulado + adicional
 }
 
@@ -2370,6 +2546,17 @@ function toRoundOccurrenceRecord(occurrence: schema.RondaOcurrencia) {
     escaladoAt: toNullableDate(occurrence.escaladoAt),
     nota: occurrence.nota ?? null,
     canalConfirmacion: occurrence.canalConfirmacion,
+    responsableProgramadoId: occurrence.responsableProgramadoId ?? occurrence.empleadoId,
+    responsableProgramadoNombre: occurrence.responsableProgramadoNombre ?? occurrence.empleadoNombre,
+    responsableProgramadoWaId: occurrence.responsableProgramadoWaId ?? occurrence.empleadoWaId,
+    responsableActualId: occurrence.responsableActualId ?? occurrence.empleadoId,
+    responsableActualNombre: occurrence.responsableActualNombre ?? occurrence.empleadoNombre,
+    responsableActualWaId: occurrence.responsableActualWaId ?? occurrence.empleadoWaId,
+    asignacionEstado: occurrence.asignacionEstado ?? 'asignada',
+    asignadoAt: toNullableDate(occurrence.asignadoAt),
+    reasignadoAt: toNullableDate(occurrence.reasignadoAt),
+    reasignadoPorUserId: occurrence.reasignadoPorUserId ?? null,
+    reasignadoPorNombre: occurrence.reasignadoPorNombre ?? null,
     empleadoId: occurrence.empleadoId,
     empleadoNombre: occurrence.empleadoNombre,
     empleadoWaId: occurrence.empleadoWaId,
@@ -2386,7 +2573,7 @@ function toNullableDate(value: Date | string | number | null) {
   return value ? toDate(value) : null
 }
 
-function describeRoundEvent(type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update') {
+function describeRoundEvent(type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update' | 'asignacion' | 'reasignacion' | 'liberacion') {
   switch (type) {
     case 'recordatorio': return 'Recordatorio enviado'
     case 'confirmacion': return 'Control confirmado'
@@ -2394,6 +2581,9 @@ function describeRoundEvent(type: 'recordatorio' | 'confirmacion' | 'observacion
     case 'vencimiento': return 'Control vencido por falta de respuesta'
     case 'escalacion': return 'Incidente escalado a supervisor'
     case 'admin_update': return 'Actualizacion administrativa'
+    case 'asignacion': return 'Ronda asignada'
+    case 'reasignacion': return 'Ronda reasignada'
+    case 'liberacion': return 'Ronda liberada'
     default: return 'Evento de ronda'
   }
 }
