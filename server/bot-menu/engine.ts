@@ -46,7 +46,29 @@ import {
   handleCambiarPrioridad, handleCancelarReclamo,
   buildEstadoGeneral, buildEstadoRondas, buildSLAVencidos,
 } from './menus/admin/reclamos'
-import { buildAdminRondasMenu, handleAdminRondas, buildAdminRondasUnassigned, handleAdminRondasUnassigned, buildAdminRondasAssign, handleAdminRondasAssign, buildAdminRondasCreate, handleAdminRondasCreate, handleAdminRondasCreateCustom, handleAdminRondasCreateLocation, buildAdminRondasByEmployee, handleAdminRondasByEmployee } from './menus/admin/rondas'
+import {
+  buildAdminRondasMenu,
+  handleAdminRondas,
+  buildAdminRondasUnassigned,
+  handleAdminRondasUnassigned,
+  buildAdminRondaDetalle,
+  handleAdminRondaDetalle,
+  buildAdminRondasAssign,
+  handleAdminRondasAssign,
+  buildAdminRondasCreate,
+  handleAdminRondasCreate,
+  handleAdminRondasCreateCustom,
+  handleAdminRondasCreateLocation,
+  buildAdminRondasByEmployee,
+  handleAdminRondasByEmployee,
+} from './menus/admin/rondas'
+import {
+  buildAdminLeadsSinAsignar,
+  handleAdminLeadsSinAsignar,
+  handleAdminLeadDetalle,
+  handleAdminLeadElegirVendedor,
+  handleAdminLeadConfirmar,
+} from './menus/admin/leads'
 
 // Sales
 import {
@@ -201,6 +223,10 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
       if (input === '5') { return buildEstadoRondas() }
       if (input === '6') { return buildSLAVencidos() }
       if (input === '7') { await navigateTo(session, 'admin_rondas', { page: 1 }); return buildAdminRondasMenu({ ...session, currentMenu: 'admin_rondas', contextData: { page: 1 } }) }
+      if (input === '8') {
+        await navigateTo(session, 'admin_leads_sin_asignar', { page: 1 })
+        return buildAdminLeadsSinAsignar({ ...session, currentMenu: 'admin_leads_sin_asignar', contextData: { page: 1 } })
+      }
       if (input === '0') return buildHelpMessage('admin')
       return invalidMenuOption(await buildAdminMainMenu(session))
     }
@@ -214,11 +240,16 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'admin_cancelar_reclamo') return handleCancelarReclamo(session, input)
     if (currentMenu === 'admin_rondas') return handleAdminRondas(session, input)
     if (currentMenu === 'admin_rondas_unassigned') return handleAdminRondasUnassigned(session, input)
+    if (currentMenu === 'admin_ronda_detalle') return handleAdminRondaDetalle(session, input)
     if (currentMenu === 'admin_rondas_assign') return handleAdminRondasAssign(session, input)
     if (currentMenu === 'admin_rondas_create') return handleAdminRondasCreate(session, input)
     if (currentMenu === 'admin_rondas_create_custom') return handleAdminRondasCreateCustom(session, input)
     if (currentMenu === 'admin_rondas_create_location') return handleAdminRondasCreateLocation(session, input)
     if (currentMenu === 'admin_rondas_by_employee') return handleAdminRondasByEmployee(session, input)
+    if (currentMenu === 'admin_leads_sin_asignar') return handleAdminLeadsSinAsignar(session, input)
+    if (currentMenu === 'admin_lead_detalle') return handleAdminLeadDetalle(session, input)
+    if (currentMenu === 'admin_lead_elegir_vendedor') return handleAdminLeadElegirVendedor(session, input)
+    if (currentMenu === 'admin_lead_confirmar') return handleAdminLeadConfirmar(session, input)
   }
 
   // ── VENTAS ────────────────────────────────────────────────────────────────────
@@ -277,6 +308,17 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
         const { getReporteById } = await import('../db')
         const r = await getReporteById(reporteId as number)
         if (r) return buildAdminReclamoDetalle(r)
+      }
+    }
+    if (menuName === 'admin_rondas') return buildAdminRondasMenu(session)
+    if (menuName === 'admin_rondas_unassigned') return buildAdminRondasUnassigned(session)
+    if (menuName === 'admin_leads_sin_asignar') return buildAdminLeadsSinAsignar(session)
+    if (menuName === 'admin_ronda_detalle') {
+      const { rondaId } = session.contextData
+      if (rondaId) {
+        const { getRoundOccurrenceById } = await import('../db')
+        const occurrence = await getRoundOccurrenceById(Number(rondaId))
+        if (occurrence) return buildAdminRondaDetalle(occurrence)
       }
     }
   }
