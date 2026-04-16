@@ -4,7 +4,7 @@ type Resumen = {
   activas: number
   cumplidos: number
   vencidos: number
-  estadoGeneral: 'atrasado' | 'activo' | 'pendiente' | 'estable'
+  estadoGeneral: string
   proximoControl: { hora: string; responsable: string } | null
 }
 

@@ -27,9 +27,10 @@ type RoundsProgramFormProps = {
     supervisorUserId: string
     checklistObjetivo: string
   }) => void
+  isSubmitting?: boolean
 }
 
-export function RoundsProgramForm({ empleados, supervisors, onSubmit }: RoundsProgramFormProps) {
+export function RoundsProgramForm({ empleados, supervisors, onSubmit, isSubmitting }: RoundsProgramFormProps) {
   const [state, setState] = useState({
     nombre: 'Control de baños',
     intervaloHoras: '2',
@@ -168,7 +169,9 @@ export function RoundsProgramForm({ empleados, supervisors, onSubmit }: RoundsPr
           placeholder="Checklist objetivo"
         />
 
-        <Button onClick={handleSubmit}>Guardar programación</Button>
+        <Button onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? 'Guardando...' : 'Guardar programación'}
+        </Button>
       </div>
     </div>
   )
