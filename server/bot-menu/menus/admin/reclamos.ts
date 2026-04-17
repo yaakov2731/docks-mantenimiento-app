@@ -71,20 +71,25 @@ async function getReclamosPendientes() {
 
 // ─── Lista reclamos pendientes ────────────────────────────────────────────────
 
-export async function buildReclamosPendientes(session: BotSession, filtro?: 'urgentes'): Promise<string> {
+export async function buildReclamosPendientes(session: BotSession, filtro?: 'urgentes' | 'sin_asignar'): Promise<string> {
   let todos = await getReclamosPendientes()
   if (filtro === 'urgentes') todos = todos.filter(r => r.prioridad === 'urgente' && !r.asignadoId)
+  if (filtro === 'sin_asignar') todos = todos.filter(r => !r.asignadoId)
 
   const page = session.contextData.page ?? 1
   const paged = paginate(todos, page, PAGE_SIZE)
 
   if (todos.length === 0) {
-    const msg = filtro === 'urgentes' ? '✅ No hay urgentes sin asignar.' : '✅ No hay reclamos pendientes.'
+    const msg = filtro === 'urgentes' ? '✅ No hay urgentes sin asignar.'
+      : filtro === 'sin_asignar' ? '✅ No hay reclamos sin asignar.'
+      : '✅ No hay reclamos pendientes.'
     return `📋 *Reclamos*\n${SEP}\n${msg}\n${SEP}\n0️⃣  Volver`
   }
 
   const titulo = filtro === 'urgentes'
     ? `🔴 *Urgentes sin asignar* (${todos.length})`
+    : filtro === 'sin_asignar'
+    ? `👷 *Sin asignar* (${todos.length})`
     : `📋 *Reclamos pendientes* (${todos.length})`
 
   const lines = [titulo, SEP]
@@ -109,10 +114,11 @@ export async function buildReclamosPendientes(session: BotSession, filtro?: 'urg
 export async function handleReclamosPendientes(
   session: BotSession,
   input: string,
-  filtro?: 'urgentes'
+  filtro?: 'urgentes' | 'sin_asignar'
 ): Promise<string> {
   let todos = await getReclamosPendientes()
   if (filtro === 'urgentes') todos = todos.filter(r => r.prioridad === 'urgente' && !r.asignadoId)
+  if (filtro === 'sin_asignar') todos = todos.filter(r => !r.asignadoId)
 
   const page = session.contextData.page ?? 1
   const paged = paginate(todos, page, PAGE_SIZE)
