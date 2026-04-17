@@ -239,18 +239,19 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'main') {
       if (input === '1') { await navigateTo(session, 'admin_reclamos', { page: 1 }); return buildReclamosPendientes({ ...session, currentMenu: 'admin_reclamos', contextData: { page: 1 } }) }
       if (input === '2') { await navigateTo(session, 'admin_urgentes', { page: 1 }); return buildReclamosPendientes({ ...session, currentMenu: 'admin_urgentes', contextData: { page: 1 } }, 'urgentes') }
-      if (input === '3') { await navigateTo(session, 'admin_reclamos', { page: 1 }); return buildReclamosPendientes({ ...session, currentMenu: 'admin_reclamos', contextData: { page: 1 } }) }
-      if (input === '4') { return buildEstadoGeneral(session) }
-      if (input === '5') { return buildEstadoRondas() }
-      if (input === '6') { return buildSLAVencidos() }
-      if (input === '7') { await navigateTo(session, 'admin_rondas', { page: 1 }); return buildAdminRondasMenu({ ...session, currentMenu: 'admin_rondas', contextData: { page: 1 } }) }
-      if (input === '8') {
+      if (input === '3') { await navigateTo(session, 'admin_info', {}); return buildEstadoGeneral(session) }
+      if (input === '4') { await navigateTo(session, 'admin_info', {}); return buildEstadoRondas() }
+      if (input === '5') { await navigateTo(session, 'admin_info', {}); return buildSLAVencidos() }
+      if (input === '6') { await navigateTo(session, 'admin_rondas', { page: 1 }); return buildAdminRondasMenu({ ...session, currentMenu: 'admin_rondas', contextData: { page: 1 } }) }
+      if (input === '7') {
         await navigateTo(session, 'admin_leads_sin_asignar', { page: 1 })
         return buildAdminLeadsSinAsignar({ ...session, currentMenu: 'admin_leads_sin_asignar', contextData: { page: 1 } })
       }
       if (input === '0') return buildHelpMessage('admin')
       return invalidMenuOption(await buildAdminMainMenu(session))
     }
+
+    if (currentMenu === 'admin_info') return null  // pressing any key goes back to main
 
     if (currentMenu === 'admin_reclamos') return handleReclamosPendientes(session, input)
     if (currentMenu === 'admin_urgentes')  return handleReclamosPendientes(session, input, 'urgentes')
