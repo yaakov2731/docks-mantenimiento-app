@@ -98,7 +98,7 @@ export function buildPublicAlquilerP2(): string {
     `🏪 *Consulta de alquiler*`,
     SEP,
     `¿Qué tipo de local estás buscando?`,
-    `(ej: _local de 50m² para gastronomía_, _oficina en planta alta_, etc.)`,
+    `(ej: _local de 50m²_, _oficina en planta alta_, etc.)`,
     SEP,
     `0️⃣  Volver`,
   ].join('\n')
