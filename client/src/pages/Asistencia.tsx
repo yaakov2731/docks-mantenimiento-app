@@ -190,10 +190,9 @@ function renderAttendanceDayCell(day: any) {
         {worked > 0 ? '✔' : '•'} {worked > 0 ? <WorkingTime seconds={worked} /> : 'Registro'}
       </div>
       <div className="flex flex-wrap gap-1 text-[10px] text-slate-500">
-        {day.entradas ? <span className="rounded-full bg-slate-100 px-1.5">E {day.entradas}</span> : null}
-        {day.salidas ? <span className="rounded-full bg-slate-100 px-1.5">S {day.salidas}</span> : null}
-        {day.iniciosAlmuerzo ? <span className="rounded-full bg-slate-100 px-1.5">I {day.iniciosAlmuerzo}</span> : null}
-        {day.finesAlmuerzo ? <span className="rounded-full bg-slate-100 px-1.5">F {day.finesAlmuerzo}</span> : null}
+        {(day.entradas ?? 0) > 1 ? <span title="Entradas múltiples" className="rounded-full bg-amber-100 text-amber-700 px-1.5">×{day.entradas} ent.</span> : null}
+        {(day.salidas ?? 0) > 1 ? <span title="Salidas múltiples" className="rounded-full bg-amber-100 text-amber-700 px-1.5">×{day.salidas} sal.</span> : null}
+        {(day.iniciosAlmuerzo ?? 0) > 0 && (day.finesAlmuerzo ?? 0) === 0 ? <span title="Almuerzo sin cierre" className="rounded-full bg-orange-100 text-orange-700 px-1.5">alm. abierto</span> : null}
       </div>
     </div>
   )
@@ -342,9 +341,9 @@ export default function Asistencia() {
               <Button
                 variant="secondary"
                 disabled={!canExport}
-                onClick={() => {
+                onClick={async () => {
                   if (!resumen.data) return
-                  exportarAsistenciaExcel({
+                  await exportarAsistenciaExcel({
                     periodo: resumen.data.periodo,
                     empleados: resumen.data.empleados,
                     eventos: resumen.data.eventos,
