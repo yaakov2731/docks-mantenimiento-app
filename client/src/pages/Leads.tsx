@@ -2,7 +2,7 @@ import { useState } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
-import { Phone, Mail, MessageCircle, Calendar, X } from 'lucide-react'
+import { Phone, Mail, MessageCircle, Calendar, X, Trash2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 const ESTADOS_LEAD = [
@@ -32,6 +32,9 @@ export default function Leads() {
   const { data: leads = [], refetch } = trpc.leads.listar.useQuery({ estado: filterEstado || undefined })
   const { data: lead } = trpc.leads.obtener.useQuery({ id: selected! }, { enabled: !!selected })
   const { data: comerciales = [] } = trpc.usuarios.listarComerciales.useQuery()
+  const eliminar = trpc.leads.eliminar.useMutation({
+    onSuccess: () => { setSelected(null); refetch() },
+  })
   const actualizar = trpc.leads.actualizar.useMutation({
     onSuccess: (result) => {
       refetch()
@@ -89,11 +92,24 @@ export default function Leads() {
           <div key={l.id} className="bg-white rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
             onClick={() => setSelected(l.id)}>
             <div className="flex items-start justify-between mb-2">
-              <div>
+              <div className="min-w-0 flex-1">
                 <h3 className="font-medium text-sm">{l.nombre}</h3>
                 {l.rubro && <p className="text-xs text-gray-500">{l.rubro}</p>}
               </div>
-              <Badge value={l.estado} />
+              <div className="flex items-center gap-1.5 ml-2">
+                <Badge value={l.estado} />
+                <button
+                  className="p-1 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                  title="Eliminar lead"
+                  onClick={e => {
+                    e.stopPropagation()
+                    if (!window.confirm(`¿Eliminar el lead de "${l.nombre}"? Esta acción no se puede deshacer.`)) return
+                    eliminar.mutate({ id: l.id })
+                  }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
             <div className="space-y-1 text-xs text-gray-500">
               {l.telefono && <div className="flex items-center gap-1.5"><Phone size={11}/>{l.telefono}</div>}
@@ -121,7 +137,19 @@ export default function Leads() {
                   {lead.fuente === 'whatsapp' && <span className="text-xs text-gray-400">📱 WhatsApp</span>}
                 </div>
               </div>
-              <button onClick={() => setSelected(null)}><X size={20} className="text-gray-400"/></button>
+              <div className="flex items-center gap-2">
+                <button
+                  className="p-1.5 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                  title="Eliminar lead"
+                  onClick={() => {
+                    if (!window.confirm(`¿Eliminar el lead de "${lead.nombre}"? Esta acción no se puede deshacer.`)) return
+                    eliminar.mutate({ id: lead.id })
+                  }}
+                >
+                  <Trash2 size={16} />
+                </button>
+                <button onClick={() => setSelected(null)}><X size={20} className="text-gray-400"/></button>
+              </div>
             </div>
 
             <div className="p-5 space-y-4">
