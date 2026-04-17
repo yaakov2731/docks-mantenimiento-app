@@ -23,6 +23,7 @@ import {
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead,
   createRoundTemplate, saveRoundSchedule, getRoundOverviewForDashboard, getRoundTimeline,
+  deleteRoundOccurrence, reprogramarRoundOccurrence,
   createOperationalTask, createOperationalTaskFromReporte, getOperationalTaskById, listOperationalTasks, listOperationalTasksByEmployee, getOperationalTasksOverview,
   deleteOperationalTasks,
   enqueueBotMessage,
@@ -771,6 +772,63 @@ export const appRouter = router({
     timeline: protectedProcedure
       .input(z.object({ fechaOperativa: z.string() }))
       .query(({ input }) => getRoundTimeline(input.fechaOperativa)),
+
+    asignarOcurrencia: protectedProcedure
+      .input(z.object({
+        occurrenceId: z.number(),
+        empleadoId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        return roundsService.assignOccurrence({
+          occurrenceId: input.occurrenceId,
+          empleadoId: input.empleadoId,
+          actor: {
+            id: ctx.user.id,
+            name: ctx.user.name,
+          },
+        })
+      }),
+
+    liberarOcurrencia: protectedProcedure
+      .input(z.object({
+        occurrenceId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        return roundsService.releaseOccurrence({
+          occurrenceId: input.occurrenceId,
+          actor: {
+            id: ctx.user.id,
+            name: ctx.user.name,
+          },
+        })
+      }),
+
+    eliminarOcurrencia: protectedProcedure
+      .input(z.object({ occurrenceId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        await deleteRoundOccurrence(input.occurrenceId)
+      }),
+
+    reprogramarOcurrencia: protectedProcedure
+      .input(z.object({
+        occurrenceId: z.number(),
+        programadoAt: z.string(), // ISO datetime string
+        fechaOperativa: z.string(), // YYYY-MM-DD
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        const date = new Date(input.programadoAt)
+        const label = date.toLocaleTimeString('es-AR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+          timeZone: 'America/Argentina/Buenos_Aires',
+        })
+        await reprogramarRoundOccurrence(input.occurrenceId, date, input.fechaOperativa, label)
+      }),
   }),
 
   tareasOperativas: router({

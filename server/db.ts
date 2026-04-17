@@ -1957,6 +1957,28 @@ export async function markOccurrenceOverdue(id: number) {
   } as any).where(eq(schema.rondasOcurrencia.id, id)).run()
 }
 
+export async function deleteRoundOccurrence(id: number) {
+  await db.delete(schema.rondasEvento).where(eq(schema.rondasEvento.ocurrenciaId, id)).run()
+  await db.delete(schema.rondasOcurrencia).where(eq(schema.rondasOcurrencia.id, id)).run()
+}
+
+export async function reprogramarRoundOccurrence(
+  id: number,
+  newProgramadoAt: Date,
+  newFechaOperativa: string,
+  newLabel: string,
+) {
+  await db.update(schema.rondasOcurrencia).set({
+    programadoAt: newProgramadoAt,
+    programadoAtLabel: newLabel,
+    fechaOperativa: newFechaOperativa,
+    estado: 'pendiente',
+    recordatorioEnviadoAt: null,
+    escaladoAt: null,
+    updatedAt: new Date(),
+  } as any).where(eq(schema.rondasOcurrencia.id, id)).run()
+}
+
 export async function createRoundEvent(event: {
   occurrenceId: number
   type: 'recordatorio' | 'confirmacion' | 'observacion' | 'vencimiento' | 'escalacion' | 'admin_update' | 'asignacion' | 'reasignacion' | 'liberacion'

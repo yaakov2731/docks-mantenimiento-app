@@ -17,17 +17,27 @@ const SORT_ORDER: Record<string, number> = {
   cumplido: 6,
 }
 
+function todayDatetimeLocal() {
+  const now = new Date()
+  const offset = now.getTimezoneOffset() * 60000
+  return new Date(now.getTime() - offset).toISOString().slice(0, 16)
+}
+
 export function RoundsTimeline({
   items,
   empleados,
   onAssign,
   onRelease,
+  onDelete,
+  onReschedule,
   isLoading,
 }: {
   items: any[]
   empleados: Employee[]
   onAssign: (occurrenceId: number, empleadoId: number) => Promise<void>
   onRelease: (occurrenceId: number) => Promise<void>
+  onDelete?: (occurrenceId: number) => Promise<void>
+  onReschedule?: (occurrenceId: number, programadoAt: string, fechaOperativa: string) => Promise<void>
   isLoading?: boolean
   /** @deprecated — per-row loading is now handled internally */
   assigning?: boolean
@@ -36,6 +46,8 @@ export function RoundsTimeline({
 }) {
   const [selectedEmployees, setSelectedEmployees] = useState<Record<number, string>>({})
   const [loadingId, setLoadingId] = useState<number | null>(null)
+  const [rescheduleId, setRescheduleId] = useState<number | null>(null)
+  const [rescheduleValue, setRescheduleValue] = useState('')
 
   const sorted = [...items].sort((a, b) => {
     const ao = SORT_ORDER[a.estado] ?? 99
@@ -186,7 +198,7 @@ export function RoundsTimeline({
                         </div>
                       </div>
 
-                      {/* Status badge + delay */}
+                      {/* Status badge + actions */}
                       <div className="flex flex-col items-end gap-1.5">
                         <span
                           className="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold"
@@ -199,6 +211,84 @@ export function RoundsTimeline({
                             +{item.minutosTarde} min
                           </span>
                         ) : null}
+
+                        {/* Admin actions */}
+                        <div className="mt-1 flex flex-col gap-1">
+                          {onReschedule && rescheduleId !== item.id && (
+                            <button
+                              type="button"
+                              className="rounded-[10px] border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                              disabled={isThisLoading}
+                              onClick={() => {
+                                setRescheduleId(item.id)
+                                setRescheduleValue(todayDatetimeLocal())
+                              }}
+                            >
+                              Reprogramar
+                            </button>
+                          )}
+                          {onDelete && (
+                            <button
+                              type="button"
+                              className="rounded-[10px] border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-600 hover:bg-rose-100 disabled:opacity-50"
+                              disabled={isThisLoading}
+                              onClick={async () => {
+                                if (!window.confirm('¿Eliminar esta ronda? La acción no se puede deshacer.')) return
+                                setLoadingId(item.id)
+                                try {
+                                  await onDelete(item.id)
+                                } finally {
+                                  setLoadingId(null)
+                                }
+                              }}
+                            >
+                              Eliminar
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Inline reschedule panel */}
+                        {rescheduleId === item.id && (
+                          <div className="mt-1 flex flex-col gap-1.5 rounded-[12px] border border-amber-200 bg-amber-50 p-2.5 text-[11px]">
+                            <span className="font-medium text-amber-800">Nueva fecha y hora</span>
+                            <input
+                              type="datetime-local"
+                              className="rounded-[8px] border border-amber-300 bg-white px-2 py-1 text-[11px] text-slate-700"
+                              value={rescheduleValue}
+                              onChange={(e) => setRescheduleValue(e.target.value)}
+                            />
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                className="flex-1 rounded-[8px] bg-amber-600 px-2 py-1 font-medium text-white disabled:opacity-50"
+                                disabled={!rescheduleValue || isThisLoading}
+                                onClick={async () => {
+                                  if (!rescheduleValue || !onReschedule) return
+                                  const dt = new Date(rescheduleValue)
+                                  const fechaOperativa = dt.toLocaleDateString('en-CA', {
+                                    timeZone: 'America/Argentina/Buenos_Aires',
+                                  })
+                                  setLoadingId(item.id)
+                                  try {
+                                    await onReschedule(item.id, dt.toISOString(), fechaOperativa)
+                                    setRescheduleId(null)
+                                  } finally {
+                                    setLoadingId(null)
+                                  }
+                                }}
+                              >
+                                {isThisLoading ? '...' : 'Confirmar'}
+                              </button>
+                              <button
+                                type="button"
+                                className="rounded-[8px] border border-amber-300 bg-white px-2 py-1 text-amber-700"
+                                onClick={() => setRescheduleId(null)}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -42,6 +42,16 @@ export default function Operaciones() {
       await Promise.all([refetchResumen(), refetchTimeline()])
     },
   })
+  const deleteOccurrence = trpc.rondas.eliminarOcurrencia.useMutation({
+    onSuccess: async () => {
+      await Promise.all([refetchResumen(), refetchTimeline()])
+    },
+  })
+  const rescheduleOccurrence = trpc.rondas.reprogramarOcurrencia.useMutation({
+    onSuccess: async () => {
+      await Promise.all([refetchResumen(), refetchTimeline()])
+    },
+  })
 
   const supervisors = useMemo(
     () => usuarios.filter((user: any) => user.role === 'admin'),
@@ -89,6 +99,12 @@ export default function Operaciones() {
           }}
           onRelease={async (occurrenceId) => {
             await releaseOccurrence.mutateAsync({ occurrenceId })
+          }}
+          onDelete={async (occurrenceId) => {
+            await deleteOccurrence.mutateAsync({ occurrenceId })
+          }}
+          onReschedule={async (occurrenceId, programadoAt, fechaOperativa) => {
+            await rescheduleOccurrence.mutateAsync({ occurrenceId, programadoAt, fechaOperativa })
           }}
         />
 
