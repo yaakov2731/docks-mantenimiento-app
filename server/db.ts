@@ -2072,6 +2072,9 @@ export async function getLeadById(id: number) {
   const rows = await db.select().from(schema.leads).where(eq(schema.leads.id, id))
   return rows[0] ?? null
 }
+export async function deleteLeadById(id: number) {
+  await db.delete(schema.leads).where(eq(schema.leads.id, id)).run()
+}
 export async function listUnassignedLeads() {
   const all = await getLeads()
   return all.filter(
@@ -2080,6 +2083,32 @@ export async function listUnassignedLeads() {
 }
 export async function actualizarLead(id: number, data: Partial<typeof schema.leads.$inferInsert>) {
   await db.update(schema.leads).set({ ...data, updatedAt: new Date() } as any).where(eq(schema.leads.id, id)).run()
+}
+
+export async function crearTareaOperativaManual(data: {
+  titulo: string
+  ubicacion: string
+  prioridad: 'baja' | 'media' | 'alta' | 'urgente'
+  empleadoId: number
+  empleadoNombre: string
+  empleadoWaId?: string | null
+}): Promise<number> {
+  const rows = await db.insert(schema.tareasOperativas).values({
+    origen: 'manual',
+    tipoTrabajo: 'general',
+    titulo: data.titulo,
+    descripcion: data.titulo,
+    ubicacion: data.ubicacion,
+    prioridad: data.prioridad,
+    estado: 'pendiente_confirmacion',
+    empleadoId: data.empleadoId,
+    empleadoNombre: data.empleadoNombre,
+    empleadoWaId: data.empleadoWaId ?? null,
+    asignadoAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as any).returning({ id: schema.tareasOperativas.id })
+  return rows[0].id
 }
 
 export async function limpiarDatosDemo() {

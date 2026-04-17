@@ -77,6 +77,7 @@ export async function buildAdminMainMenu(session: BotSession): Promise<string> {
     `6️⃣  ⚠️  Tareas vencidas (SLA)`,
     `7️⃣  🚻 Gestionar rondas de baños`,
     `8️⃣  🎯 Asignar lead de alquiler`,
+    `9️⃣  📋 Asignar tarea a empleado`,
     SEP,
     `0️⃣  ❓ Ayuda`,
   ].filter(Boolean).join('\n')

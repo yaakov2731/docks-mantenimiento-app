@@ -69,6 +69,16 @@ import {
   handleAdminLeadElegirVendedor,
   handleAdminLeadConfirmar,
 } from './menus/admin/leads'
+import {
+  buildNuevaTareaP1,
+  handleNuevaTareaP1,
+  buildNuevaTareaP2,
+  handleNuevaTareaP2,
+  buildNuevaTareaP3,
+  handleNuevaTareaP3,
+  buildNuevaTareaConfirmar,
+  handleNuevaTareaConfirmar,
+} from './menus/admin/tasks'
 
 // Sales
 import {
@@ -248,11 +258,19 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
         await navigateTo(session, 'admin_leads_sin_asignar', { page: 1 })
         return buildAdminLeadsSinAsignar({ ...session, currentMenu: 'admin_leads_sin_asignar', contextData: { page: 1 } })
       }
+      if (input === '9') {
+        await navigateTo(session, 'admin_nueva_tarea_p1', { page: 1 })
+        return buildNuevaTareaP1({ ...session, currentMenu: 'admin_nueva_tarea_p1', contextData: { page: 1 } })
+      }
       if (input === '0') return buildHelpMessage('admin')
       return invalidMenuOption(await buildAdminMainMenu(session))
     }
 
-    if (currentMenu === 'admin_info') return null  // pressing any key goes back to main
+    if (currentMenu === 'admin_info') return null
+    if (currentMenu === 'admin_nueva_tarea_p1')        return handleNuevaTareaP1(session, input)
+    if (currentMenu === 'admin_nueva_tarea_p2')        return handleNuevaTareaP2(session, input)
+    if (currentMenu === 'admin_nueva_tarea_p3')        return handleNuevaTareaP3(session, input)
+    if (currentMenu === 'admin_nueva_tarea_confirmar') return handleNuevaTareaConfirmar(session, input)
 
     if (currentMenu === 'admin_reclamos')     return handleReclamosPendientes(session, input)
     if (currentMenu === 'admin_urgentes')     return handleReclamosPendientes(session, input, 'urgentes')
@@ -350,6 +368,10 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
     if (menuName === 'admin_rondas') return buildAdminRondasMenu(session)
     if (menuName === 'admin_rondas_unassigned') return buildAdminRondasUnassigned(session)
     if (menuName === 'admin_leads_sin_asignar') return buildAdminLeadsSinAsignar(session)
+    if (menuName === 'admin_nueva_tarea_p1')    return buildNuevaTareaP1(session)
+    if (menuName === 'admin_nueva_tarea_p2')    return buildNuevaTareaP2(session.contextData.tareaEmpleadoNombre as string)
+    if (menuName === 'admin_nueva_tarea_p3')    return buildNuevaTareaP3()
+    if (menuName === 'admin_nueva_tarea_confirmar') return buildNuevaTareaConfirmar(session)
     if (menuName === 'admin_ronda_detalle') {
       const { rondaId } = session.contextData
       if (rondaId) {
