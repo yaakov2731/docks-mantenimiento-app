@@ -80,6 +80,17 @@ import {
   buildEstadoLeads,
 } from './menus/sales/leads'
 
+// Público (no registrados)
+import {
+  buildPublicMainMenu, handlePublicMain,
+  buildPublicAlquilerP1, handlePublicAlquilerP1,
+  buildPublicAlquilerP2, handlePublicAlquilerP2,
+  buildPublicReclamoP1, handlePublicReclamoP1,
+  buildPublicReclamoP2, handlePublicReclamoP2,
+  buildPublicMensajeP1, handlePublicMensajeP1,
+  buildPublicMensajeP2, handlePublicMensajeP2,
+} from './menus/public/comercial'
+
 // ── DB helpers para identificación ───────────────────────────────────────────
 import { getEmpleadoByWaId, getUsers } from '../db'
 
@@ -100,13 +111,7 @@ function normalizeWa(waNumber: string): string {
 async function identifyUser(waNumber: string): Promise<{ userType: UserType; userId: number; userName: string } | null> {
   const normalized = normalizeWa(waNumber)
 
-  // 1. ¿Es empleado?
-  const empleado = await getEmpleadoByWaId(waNumber)
-  if (empleado) {
-    return { userType: 'employee', userId: empleado.id, userName: empleado.nombre }
-  }
-
-  // 2. ¿Es usuario del panel con waId? (admin o sales)
+  // 1. ¿Es usuario del panel con waId? (admin o sales — tiene precedencia sobre empleado)
   const users = await getUsers()
   const panelUser = users.find((u: any) => {
     if (!u.waId || !u.activo) return false
@@ -115,6 +120,12 @@ async function identifyUser(waNumber: string): Promise<{ userType: UserType; use
   if (panelUser) {
     const userType: UserType = panelUser.role === 'admin' ? 'admin' : 'sales'
     return { userType, userId: panelUser.id, userName: panelUser.name }
+  }
+
+  // 2. ¿Es empleado?
+  const empleado = await getEmpleadoByWaId(waNumber)
+  if (empleado) {
+    return { userType: 'employee', userId: empleado.id, userName: empleado.nombre }
   }
 
   return null
@@ -132,7 +143,17 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
   // Sin sesión → identificar usuario y crear
   if (!session) {
     const user = await identifyUser(waNumber)
-    if (!user) return MSG_NO_REGISTRADO
+
+    if (!user) {
+      // Usuario no registrado → menú comercial público
+      session = await createSession({
+        waNumber: normalized,
+        userType: 'public',
+        userId: 0,
+        userName: 'Visitante',
+      })
+      return buildPublicMainMenu()
+    }
 
     session = await createSession({
       waNumber: normalized,
@@ -273,6 +294,17 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'sales_nuevo_lead_confirmar') return handleNuevoLeadConfirmar(session, input)
   }
 
+  // ── PÚBLICO (no registrado) ───────────────────────────────────────────────────
+  if (userType === 'public') {
+    if (currentMenu === 'main') return handlePublicMain(session, input)
+    if (currentMenu === 'public_alquiler_p1') return handlePublicAlquilerP1(session, input)
+    if (currentMenu === 'public_alquiler_p2') return handlePublicAlquilerP2(session, input)
+    if (currentMenu === 'public_reclamo_p1')  return handlePublicReclamoP1(session, input)
+    if (currentMenu === 'public_reclamo_p2')  return handlePublicReclamoP2(session, input)
+    if (currentMenu === 'public_mensaje_p1')  return handlePublicMensajeP1(session, input)
+    if (currentMenu === 'public_mensaje_p2')  return handlePublicMensajeP2(session, input)
+  }
+
   // Menú desconocido → reset al principal
   await resetToMain(session)
   return buildMainMenu(session)
@@ -283,6 +315,7 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
 async function buildMainMenu(session: BotSession): Promise<string> {
   if (session.userType === 'employee') return buildEmployeeMainMenu(session)
   if (session.userType === 'admin')    return buildAdminMainMenu(session)
+  if (session.userType === 'public')   return buildPublicMainMenu()
   return buildSalesMainMenu(session)
 }
 
@@ -325,6 +358,15 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
 
   if (userType === 'sales') {
     if (menuName === 'sales_leads') return buildLeadsLista(session)
+  }
+
+  if (userType === 'public') {
+    if (menuName === 'public_alquiler_p1') return buildPublicAlquilerP1()
+    if (menuName === 'public_alquiler_p2') return buildPublicAlquilerP2()
+    if (menuName === 'public_reclamo_p1')  return buildPublicReclamoP1()
+    if (menuName === 'public_reclamo_p2')  return buildPublicReclamoP2()
+    if (menuName === 'public_mensaje_p1')  return buildPublicMensajeP1()
+    if (menuName === 'public_mensaje_p2')  return buildPublicMensajeP2()
   }
 
   return buildMainMenu(session)

@@ -11,7 +11,7 @@ import { readEnv } from '../_core/env'
 const client = createClient({ url: readEnv('TURSO_URL')!, authToken: readEnv('TURSO_TOKEN')! })
 const db = drizzle(client, { schema })
 
-export type UserType = 'employee' | 'admin' | 'sales'
+export type UserType = 'employee' | 'admin' | 'sales' | 'public'
 
 export type MenuContext = {
   tareaId?: number

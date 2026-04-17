@@ -99,7 +99,7 @@ export function buildSalesMainMenu(session: BotSession): string {
 
 // ─── Ayuda por tipo ──────────────────────────────────────────────────────────
 
-export function buildHelpMessage(userType: 'employee' | 'admin' | 'sales'): string {
+export function buildHelpMessage(userType: 'employee' | 'admin' | 'sales' | 'public'): string {
   const base = [
     `❓ *Ayuda — Docks del Puerto*`,
     SEP,
