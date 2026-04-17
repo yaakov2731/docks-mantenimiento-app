@@ -14,7 +14,22 @@ import { BotSession, navigateTo, navigateBack } from '../../session'
 import { SEP, confirmMsg, errorMsg } from '../../shared/guards'
 import { crearLead, getUsers, enqueueBotMessage } from '../../../db'
 
-// ─── Menú principal público ────────────────────────────────────────────────────
+// ─── Helper: formato profesional de número argentino ────────────────────────
+
+function fmtPhone(waId: string): string {
+  const d = waId.replace(/\D/g, '')
+  if (d.startsWith('549') && d.length === 13) {
+    const area = d.slice(3, 5)
+    const num  = d.slice(5)
+    return `+54 9 ${area} ${num.slice(0, 4)}-${num.slice(4)}`
+  }
+  if (d.startsWith('54') && d.length === 12) {
+    return `+54 ${d.slice(2, 4)} ${d.slice(4, 8)}-${d.slice(8)}`
+  }
+  return `+${d}`
+}
+
+// ─── Menú principal público ──────────────────────────────────────────────────
 
 export function buildPublicMainMenu(): string {
   return [
@@ -54,14 +69,13 @@ export async function handlePublicMain(session: BotSession, input: string): Prom
   return `❓ *Opción no válida.* Ingresá el número de la opción:\n\n${buildPublicMainMenu()}`
 }
 
-// ─── Flujo: Consulta de alquiler ──────────────────────────────────────────────
+// ─── Flujo: Consulta de alquiler ─────────────────────────────────────────────
 
 export function buildPublicAlquilerP1(): string {
   return [
     `🏪 *Consulta de alquiler*`,
     SEP,
-    `Por favor, escribí tu *nombre completo* y tu *número de teléfono*`,
-    `(podés ponerlos juntos en un mensaje, ej: _Ana García — 11 2345-6789_)`,
+    `Por favor, ¿cuál es tu *nombre completo*?`,
     SEP,
     `0️⃣  Volver`,
   ].join('\n')
@@ -69,8 +83,8 @@ export function buildPublicAlquilerP1(): string {
 
 export async function handlePublicAlquilerP1(session: BotSession, input: string): Promise<string | null> {
   if (input === '0') return null
-  if (input.trim().length < 3) {
-    return `⚠️ Por favor ingresá tu nombre y contacto.\n\n${buildPublicAlquilerP1()}`
+  if (input.trim().length < 2) {
+    return `⚠️ Por favor ingresá tu nombre.\n\n${buildPublicAlquilerP1()}`
   }
   await navigateTo(session, 'public_alquiler_p2', {
     pendingText: true,
@@ -83,8 +97,8 @@ export function buildPublicAlquilerP2(): string {
   return [
     `🏪 *Consulta de alquiler*`,
     SEP,
-    `¿Cuál es tu consulta o tipo de local que te interesa?`,
-    `(ej: _Busco local de 50m² para gastronomía_)`,
+    `¿Qué tipo de local estás buscando?`,
+    `(ej: _local de 50m² para gastronomía_, _oficina en planta alta_, etc.)`,
     SEP,
     `0️⃣  Volver`,
   ].join('\n')
@@ -93,29 +107,40 @@ export function buildPublicAlquilerP2(): string {
 export async function handlePublicAlquilerP2(session: BotSession, input: string): Promise<string | null> {
   if (input === '0') return null
   if (input.trim().length < 3) {
-    return `⚠️ Por favor describí tu consulta.\n\n${buildPublicAlquilerP2()}`
+    return `⚠️ Por favor describí qué estás buscando.\n\n${buildPublicAlquilerP2()}`
   }
 
   const { publicNombre } = session.contextData as Record<string, any>
+  const nombre = String(publicNombre ?? 'Sin nombre')
+  const phone  = fmtPhone(session.waNumber)
+
   try {
     const leadId = await crearLead({
-      nombre: String(publicNombre ?? 'Sin nombre'),
-      telefono: String(publicNombre ?? ''),
+      nombre,
+      telefono: session.waNumber,
       waId: session.waNumber,
       rubro: 'alquiler',
       mensaje: input.trim(),
       fuente: 'whatsapp',
       estado: 'nuevo',
     })
-    await notifyAdmins(
-      `🏪 *Nueva consulta de alquiler* (#${leadId})\n` +
-      `👤 ${publicNombre}\n📱 ${session.waNumber}\n💬 ${input.trim()}`
-    )
+
+    await notifyAdmins([
+      `🏪 *Nueva consulta de alquiler*`,
+      `🏢 Docks del Puerto`,
+      SEP,
+      `👤 *${nombre}*`,
+      `📞 ${phone}`,
+      `💬 _"${input.trim()}"_`,
+      SEP,
+      `_Lead #${leadId} · WhatsApp · ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}_`,
+    ].join('\n'))
+
     await navigateTo(session, 'main', {})
     return [
       `✅ *¡Consulta registrada!*`,
       SEP,
-      `Recibimos tu consulta de alquiler.`,
+      `Gracias *${nombre}*, recibimos tu consulta de alquiler.`,
       `Un miembro de nuestro equipo comercial se va a comunicar con vos a la brevedad.`,
       ``,
       `📞 También podés escribirnos nuevamente cuando quieras.`,
@@ -127,13 +152,13 @@ export async function handlePublicAlquilerP2(session: BotSession, input: string)
   }
 }
 
-// ─── Flujo: Reclamo de locatario ──────────────────────────────────────────────
+// ─── Flujo: Reclamo de locatario ─────────────────────────────────────────────
 
 export function buildPublicReclamoP1(): string {
   return [
     `📢 *Reclamo de locatario*`,
     SEP,
-    `Por favor, escribí tu *nombre* y el *número de tu local*`,
+    `Por favor, ¿cuál es tu *nombre* y el *número de tu local*?`,
     `(ej: _Carlos Rodríguez — Local 214_)`,
     SEP,
     `0️⃣  Volver`,
@@ -170,19 +195,31 @@ export async function handlePublicReclamoP2(session: BotSession, input: string):
   }
 
   const { publicNombre } = session.contextData as Record<string, any>
+  const nombre = String(publicNombre ?? 'Sin nombre')
+  const phone  = fmtPhone(session.waNumber)
+
   try {
     const leadId = await crearLead({
-      nombre: String(publicNombre ?? 'Sin nombre'),
+      nombre,
+      telefono: session.waNumber,
       waId: session.waNumber,
       rubro: 'reclamo_locatario',
       mensaje: input.trim(),
       fuente: 'whatsapp',
       estado: 'nuevo',
     })
-    await notifyAdmins(
-      `📢 *Nuevo reclamo de locatario* (#${leadId})\n` +
-      `👤 ${publicNombre}\n📱 ${session.waNumber}\n🔧 ${input.trim()}`
-    )
+
+    await notifyAdmins([
+      `📢 *Reclamo de locatario*`,
+      `🏢 Docks del Puerto`,
+      SEP,
+      `👤 *${nombre}*`,
+      `📞 ${phone}`,
+      `🔧 _"${input.trim()}"_`,
+      SEP,
+      `_Lead #${leadId} · WhatsApp · ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}_`,
+    ].join('\n'))
+
     await navigateTo(session, 'main', {})
     return [
       `✅ *¡Reclamo registrado!*`,
@@ -227,7 +264,7 @@ export function buildPublicMensajeP2(nombre?: string): string {
   return [
     `✉️  *Dejar un mensaje*`,
     SEP,
-    `Hola${nombre ? ` ${nombre}` : ''}! ¿Qué querés contarnos?`,
+    `Hola${nombre ? ` *${nombre}*` : ''}! ¿Qué querés contarnos?`,
     `(Escribí tu mensaje y lo recibimos enseguida)`,
     SEP,
     `0️⃣  Volver`,
@@ -241,24 +278,36 @@ export async function handlePublicMensajeP2(session: BotSession, input: string):
   }
 
   const { publicNombre } = session.contextData as Record<string, any>
+  const nombre = String(publicNombre ?? 'Sin nombre')
+  const phone  = fmtPhone(session.waNumber)
+
   try {
     const leadId = await crearLead({
-      nombre: String(publicNombre ?? 'Sin nombre'),
+      nombre,
+      telefono: session.waNumber,
       waId: session.waNumber,
       rubro: 'consulta',
       mensaje: input.trim(),
       fuente: 'whatsapp',
       estado: 'nuevo',
     })
-    await notifyAdmins(
-      `✉️ *Nuevo mensaje* (#${leadId})\n` +
-      `👤 ${publicNombre}\n📱 ${session.waNumber}\n💬 ${input.trim()}`
-    )
+
+    await notifyAdmins([
+      `✉️ *Nuevo mensaje de contacto*`,
+      `🏢 Docks del Puerto`,
+      SEP,
+      `👤 *${nombre}*`,
+      `📞 ${phone}`,
+      `💬 _"${input.trim()}"_`,
+      SEP,
+      `_Lead #${leadId} · WhatsApp · ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}_`,
+    ].join('\n'))
+
     await navigateTo(session, 'main', {})
     return [
       `✅ *¡Mensaje recibido!*`,
       SEP,
-      `Gracias ${publicNombre}. Le vamos a dar respuesta a la brevedad.`,
+      `Gracias *${nombre}*. Le vamos a dar respuesta a la brevedad.`,
       ``,
       `📞 Si necesitás algo más, escribinos cuando quieras.`,
       SEP,
