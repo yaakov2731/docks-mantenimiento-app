@@ -1,6 +1,5 @@
 import { Suspense, lazy, type ComponentType } from 'react'
 import { Switch, Route, Redirect } from 'wouter'
-import { Analytics } from '@vercel/analytics/react'
 import { trpc } from './lib/trpc'
 import Login from './pages/Login'
 import Home from './pages/Home'
@@ -46,7 +45,6 @@ function ProtectedRoute({
 export default function App() {
   return (
     <>
-    <Analytics />
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
