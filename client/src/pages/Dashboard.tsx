@@ -5,7 +5,7 @@ import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
 import WorkingTime from '../components/WorkingTime'
 import { ESTADOS, PRIORIDADES } from '@shared/const'
-import { AlertCircle, Clock, CheckCircle2, TrendingUp, X, Building2, PauseCircle } from 'lucide-react'
+import { AlertCircle, Clock, CheckCircle2, TrendingUp, X, PauseCircle } from 'lucide-react'
 
 const DashboardCharts = lazy(() => import('../components/dashboard/DashboardCharts'))
 const ESTADOS_ASIGNACION = [
@@ -17,8 +17,16 @@ const ESTADOS_ASIGNACION = [
 
 function Badge({ value, options }: { value: string; options: readonly { value: string; label: string; color: string }[] }) {
   const opt = options.find(o => o.value === value)
+  const color = opt?.color ?? '#64748B'
   return (
-    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${opt?.color}20`, color: opt?.color }}>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '3px 9px', borderRadius: 6,
+      fontSize: 11, fontWeight: 500,
+      background: `${color}18`, color,
+      border: `1px solid ${color}30`,
+    }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, display: 'inline-block' }} />
       {opt?.label ?? value}
     </span>
   )
@@ -26,42 +34,39 @@ function Badge({ value, options }: { value: string; options: readonly { value: s
 
 function KpiCard({ label, value, color, icon: Icon }: any) {
   return (
-    <div className="surface-panel rounded-[22px] p-4 border border-slate-200 min-h-[104px]" style={{ borderTop: `3px solid ${color}` }}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-medium text-slate-500 leading-tight max-w-[9rem]">{label}</p>
-          <p className="text-[26px] leading-none font-heading font-semibold mt-2" style={{ color }}>{value}</p>
-        </div>
-        <div className="p-2.5 rounded-xl flex-shrink-0" style={{ backgroundColor: `${color}10` }}>
-          <Icon size={18} style={{ color }} />
-        </div>
+    <div style={{
+      background: '#fff', border: '1px solid var(--border)',
+      borderRadius: 16, padding: 16,
+      boxShadow: 'var(--shadow-card)',
+      transition: 'box-shadow 0.2s, transform 0.2s',
+    }}
+    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(15,23,42,0.08)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)' }}
+    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-card)'; (e.currentTarget as HTMLElement).style.transform = '' }}
+    >
+      <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10, background: `${color}14` }}>
+        <Icon size={16} style={{ color }} />
       </div>
+      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)', lineHeight: 1.4 }}>{label}</div>
+      <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 30, fontWeight: 700, lineHeight: 1, margin: '6px 0 0', color }}>{value}</div>
     </div>
   )
 }
 
-function TeamMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: ReactNode
-  tone: 'blue' | 'amber' | 'green' | 'rose' | 'slate' | 'cyan'
-}) {
-  const tones = {
-    blue: 'bg-sky-50 text-sky-700 border-sky-100',
-    amber: 'bg-amber-50 text-amber-700 border-amber-100',
-    green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    rose: 'bg-rose-50 text-rose-700 border-rose-100',
-    slate: 'bg-slate-100 text-slate-700 border-slate-200',
-    cyan: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-  }
+const TONE_STYLES: Record<string, { background: string; color: string }> = {
+  blue:  { background: '#EFF6FF', color: '#2563EB' },
+  amber: { background: '#FFFBEB', color: '#D97706' },
+  green: { background: '#ECFDF5', color: '#059669' },
+  rose:  { background: '#FFF1F2', color: '#DC2626' },
+  slate: { background: '#F8FAFC', color: '#475569' },
+  cyan:  { background: '#ECFEFF', color: '#0891B2' },
+}
 
+function TeamMetric({ label, value, tone }: { label: string; value: ReactNode; tone: keyof typeof TONE_STYLES }) {
+  const s = TONE_STYLES[tone]
   return (
-    <div className={`rounded-[18px] border px-3 py-3 min-h-[78px] flex flex-col justify-between ${tones[tone]}`}>
-      <div className="text-[11px] font-medium leading-tight opacity-75">{label}</div>
-      <div className="mt-2 font-heading text-[22px] leading-none font-semibold">{value}</div>
+    <div style={{ borderRadius: 10, padding: '9px 10px', background: s.background, color: s.color }}>
+      <div style={{ fontSize: 9.5, fontWeight: 500, opacity: 0.65, lineHeight: 1.2 }}>{label}</div>
+      <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 20, fontWeight: 700, marginTop: 3, lineHeight: 1 }}>{value}</div>
     </div>
   )
 }
@@ -118,33 +123,43 @@ export default function Dashboard() {
         </div>
       ) : null}
 
-      <div className="surface-panel-strong rounded-[24px] p-4 md:p-5 mb-4 overflow-hidden relative">
-        <div className="absolute inset-y-0 right-0 w-1/3 bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.07),transparent_72%)] pointer-events-none" />
-        <div className="relative flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="flex-1">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
-              Resumen ejecutivo
-            </div>
-            <h2 className="mt-2.5 font-heading text-[18px] md:text-[24px] leading-tight font-semibold text-sidebar-bg">
-              Seguimiento operativo de mantenimiento en tiempo real
-            </h2>
-            <p className="mt-2 max-w-2xl text-[13px] text-slate-600">
-              Monitoreá reclamos, prioridades, avance del equipo y atención a locatarios desde un panel más claro y ejecutivo.
-            </p>
+      {/* Hero card */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0F172A 0%, #162032 40%, #1a2e50 100%)',
+        borderRadius: 22, padding: 28,
+        position: 'relative', overflow: 'hidden',
+        marginBottom: 18,
+        display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap',
+      }}>
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 280, height: 280, background: 'radial-gradient(circle, rgba(37,99,235,0.20) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -30, left: '30%', width: 200, height: 200, background: 'radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+        <div style={{ flex: 1, minWidth: 260, position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(37,99,235,0.20)', border: '1px solid rgba(37,99,235,0.35)', color: '#93C5FD', fontSize: 10, fontWeight: 600, padding: '3px 10px', borderRadius: 999, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            En vivo
           </div>
-          <div className="grid grid-cols-2 gap-3 min-w-[220px]">
-            <div className="rounded-[20px] bg-primary p-3.5 text-white shadow-lg">
-              <div className="text-[11px] font-medium text-white/60">Abiertos</div>
-              <div className="mt-2 text-[24px] leading-none font-heading font-semibold">{stats ? stats.abiertos : 0}</div>
-              <div className="mt-1 text-xs text-white/70">Pendientes, en curso y pausados</div>
+          <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, color: '#fff', lineHeight: 1.3, marginBottom: 6 }}>
+            Seguimiento operativo<br />en tiempo real
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', lineHeight: 1.6, maxWidth: 480 }}>
+            Monitoreá reclamos, prioridades y el rendimiento del equipo desde un panel ejecutivo centralizado.
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, position: 'relative', zIndex: 1, flexWrap: 'wrap' }}>
+          <div style={{ background: 'rgba(37,99,235,0.25)', border: '1px solid rgba(37,99,235,0.35)', borderRadius: 16, padding: '16px 20px', minWidth: 140 }}>
+            <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' }}>Abiertos</div>
+            <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 32, fontWeight: 700, lineHeight: 1, marginTop: 4, color: '#fff' }}>{stats ? stats.abiertos : 0}</div>
+            <div style={{ fontSize: 11, marginTop: 3, color: 'rgba(255,255,255,0.45)' }}>Activos ahora</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 16, padding: '16px 20px' }}>
+              <div style={{ fontSize: 9.5, fontWeight: 500, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>RESOLUCIÓN</div>
+              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, color: '#10B981', lineHeight: 1, marginTop: 3 }}>{stats?.tasaCompletitud ?? 0}%</div>
             </div>
-            <div className="rounded-[20px] bg-white p-3.5 border border-slate-200 shadow-sm">
-              <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
-                <Building2 size={14} />
-                Cobertura
-              </div>
-              <div className="mt-2 text-[24px] leading-none font-heading font-semibold text-primary">{empleados.length}</div>
-              <div className="mt-1 text-xs text-slate-500">Empleados registrados</div>
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 16, padding: '16px 20px' }}>
+              <div style={{ fontSize: 9.5, fontWeight: 500, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>EMPLEADOS</div>
+              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, color: '#fff', lineHeight: 1, marginTop: 3 }}>{empleados.length}</div>
             </div>
           </div>
         </div>
@@ -166,36 +181,35 @@ export default function Dashboard() {
       )}
 
       {stats?.rankingEmpleadosHoy?.length > 0 && (
-        <div className="surface-panel rounded-[22px] p-4 mb-4">
-          <div className="flex items-start justify-between gap-4 mb-4">
+        <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 22, padding: 20, marginBottom: 18, boxShadow: 'var(--shadow-card-strong)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 14 }}>
             <div>
-              <h3 className="font-heading font-semibold text-base text-gray-800">Rendimiento del equipo hoy</h3>
-              <p className="text-[13px] text-slate-500">Control diario de carga operativa, respuestas de asignación y tiempo efectivo trabajado.</p>
+              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>Rendimiento del equipo</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Carga operativa, respuestas y horas trabajadas hoy</div>
             </div>
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {stats.rankingEmpleadosHoy.map((empleado: any, index: number) => (
-              <div key={empleado.empleadoId} className="rounded-[18px] border border-slate-200 bg-white p-3.5 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
+            {stats.rankingEmpleadosHoy.map((empleado: any) => (
+              <div key={empleado.empleadoId} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 18, padding: 16, boxShadow: 'var(--shadow-card)', transition: 'box-shadow 0.2s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(15,23,42,0.08)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-card)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 2 }}>
                   <div>
-                    <div className="text-[10px] font-medium text-slate-400">Puesto #{index + 1}</div>
-                    <div className="mt-1 font-heading text-base font-semibold text-slate-800">{empleado.nombre}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 500, marginBottom: 2 }}>Operativo</div>
+                    <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{empleado.nombre}</div>
                   </div>
-                  <div className="h-9 w-9 rounded-xl bg-cyan-50 text-cyan-700 flex items-center justify-center font-heading font-semibold text-sm">
+                  <div style={{ width: 38, height: 38, borderRadius: 11, background: '#ECFEFF', color: '#0891B2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 15, flexShrink: 0 }}>
                     {empleado.nombre?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-3.5 auto-rows-fr">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7, marginTop: 12 }}>
                   <TeamMetric label="Activas" value={empleado.tareasActivas} tone="blue" />
-                  <TeamMetric label="Sin confirmar" value={empleado.pendientesConfirmacion} tone="amber" />
+                  <TeamMetric label="Sin conf." value={empleado.pendientesConfirmacion} tone="amber" />
                   <TeamMetric label="Cerradas" value={empleado.completadasHoy} tone="green" />
                   <TeamMetric label="Aceptadas" value={empleado.aceptadasHoy} tone="cyan" />
-                  <TeamMetric label="Rechazadas" value={empleado.rechazadasHoy} tone="rose" />
-                  <TeamMetric
-                    label="Horas hoy"
-                    value={<WorkingTime seconds={empleado.horasTrabajadasHoySegundos} />}
-                    tone="slate"
-                  />
+                  <TeamMetric label="Rechaz." value={empleado.rechazadasHoy} tone="rose" />
+                  <TeamMetric label="Horas" value={<WorkingTime seconds={empleado.horasTrabajadasHoySegundos} />} tone="slate" />
                 </div>
               </div>
             ))}
@@ -207,7 +221,7 @@ export default function Dashboard() {
       {stats && stats.abiertos > 0 && (
         <Suspense
           fallback={
-            <div className="surface-panel rounded-[22px] p-5 mb-4 text-sm text-slate-500">
+            <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 22, padding: 20, marginBottom: 18, fontSize: 13, color: 'var(--text-3)' }}>
               Cargando gráficos operativos...
             </div>
           }
@@ -217,82 +231,79 @@ export default function Dashboard() {
       )}
 
       {stats && stats.abiertos === 0 && stats.total > 0 && (
-        <div className="surface-panel rounded-[22px] p-7 mb-4 text-center">
-          <CheckCircle2 className="mx-auto mb-3 text-success" size={36} />
-          <h3 className="font-heading text-lg font-semibold text-sidebar-bg">No hay reclamos abiertos</h3>
-          <p className="mt-2 text-[13px] text-slate-500">
+        <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 22, padding: '28px 20px', marginBottom: 18, textAlign: 'center', boxShadow: 'var(--shadow-card)' }}>
+          <CheckCircle2 style={{ margin: '0 auto 12px', color: 'var(--success)' }} size={36} />
+          <h3 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--text-1)' }}>No hay reclamos abiertos</h3>
+          <p style={{ marginTop: 8, fontSize: 13, color: 'var(--text-3)' }}>
             Todos los reclamos vigentes están resueltos o cerrados. La tasa de resolución actual es {stats.tasaCompletitud}%.
           </p>
         </div>
       )}
 
       {/* Filters + Table */}
-      <div className="surface-panel rounded-[22px] overflow-hidden">
-        <div className="p-4 border-b border-black/5 flex flex-wrap gap-3 items-center bg-white/70">
-          <input
-            value={filters.busqueda}
-            onChange={e => setFilters(f => ({ ...f, busqueda: e.target.value }))}
-            placeholder="Buscar locatario, local, título..."
-            className="border border-gray-200 rounded-2xl px-4 py-2.5 text-[13px] flex-1 min-w-48 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
+      <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-card-strong)' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: '#FAFBFC' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
+            <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input
+              value={filters.busqueda}
+              onChange={e => setFilters(f => ({ ...f, busqueda: e.target.value }))}
+              placeholder="Buscar locatario, local o categoría…"
+              style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '7px 14px 7px 34px', fontSize: 12, fontFamily: 'inherit', background: '#fff', outline: 'none', transition: 'all 0.15s', width: '100%', color: 'var(--text-1)' }}
+            />
+          </div>
           <select value={filters.estado} onChange={e => setFilters(f => ({ ...f, estado: e.target.value }))}
-            className="border border-gray-200 rounded-2xl px-4 py-2.5 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-primary/30">
+            style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '7px 14px', fontSize: 12, fontFamily: 'inherit', background: '#fff', outline: 'none', color: 'var(--text-1)', cursor: 'pointer' }}>
             <option value="">Todos los estados</option>
             {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
           </select>
           <select value={filters.prioridad} onChange={e => setFilters(f => ({ ...f, prioridad: e.target.value }))}
-            className="border border-gray-200 rounded-2xl px-4 py-2.5 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-primary/30">
+            style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '7px 14px', fontSize: 12, fontFamily: 'inherit', background: '#fff', outline: 'none', color: 'var(--text-1)', cursor: 'pointer' }}>
             <option value="">Todas las prioridades</option>
             {PRIORIDADES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50/80 text-slate-500 text-[11px]">
-              <tr>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead>
+              <tr style={{ background: '#F8FAFC' }}>
                 {['#','Locatario','Local','Categoría','Prioridad','Estado','Asignado','Recepción','Tiempo','Fecha','Acciones'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
+                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-black/5">
+            <tbody>
               {reportes.length === 0 ? (
-                <tr><td colSpan={11} className="text-center py-12 text-gray-400">No hay reclamos</td></tr>
+                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 32, color: 'var(--text-3)', fontSize: 13 }}>No hay reclamos</td></tr>
               ) : reportes.map(r => (
-                <tr key={r.id} className="hover:bg-white/70 cursor-pointer transition-colors" onClick={() => setSelected(r.id)}>
-                  <td className="px-4 py-3 font-mono text-gray-400 text-xs">#{r.id.toString().padStart(4,'0')}</td>
-                  <td className="px-4 py-3 font-medium text-slate-800">{r.locatario}</td>
-                  <td className="px-4 py-3 text-gray-600">{r.local}</td>
-                  <td className="px-4 py-3 text-gray-600 capitalize">{r.categoria}</td>
-                  <td className="px-4 py-3"><Badge value={r.prioridad} options={PRIORIDADES} /></td>
-                  <td className="px-4 py-3"><Badge value={r.estado} options={ESTADOS} /></td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{r.asignadoA ?? '—'}</td>
-                  <td className="px-4 py-3"><Badge value={(r as any).asignacionEstado ?? 'sin_asignar'} options={ESTADOS_ASIGNACION} /></td>
-                  <td className="px-4 py-3 text-gray-600 text-xs font-medium">
-                    <WorkingTime
-                      seconds={(r as any).tiempoTrabajadoSegundos}
-                      isRunning={r.estado === 'en_progreso'}
-                    />
+                <tr key={r.id} style={{ transition: 'background 0.12s', cursor: 'pointer' }}
+                  onClick={() => setSelected(r.id)}
+                  onMouseEnter={e => { Array.from((e.currentTarget as HTMLElement).cells).forEach(td => (td as HTMLElement).style.background = '#F8FAFC') }}
+                  onMouseLeave={e => { Array.from((e.currentTarget as HTMLElement).cells).forEach(td => (td as HTMLElement).style.background = '') }}
+                >
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>#{r.id.toString().padStart(4,'0')}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', fontWeight: 600, color: 'var(--text-1)' }}>{r.locatario}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', color: 'var(--text-2)' }}>{r.local}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', color: 'var(--text-2)', textTransform: 'capitalize' }}>{r.categoria}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)' }}><Badge value={r.prioridad} options={PRIORIDADES} /></td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)' }}><Badge value={r.estado} options={ESTADOS} /></td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', color: 'var(--text-2)', fontSize: 12 }}>{r.asignadoA ?? '—'}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)' }}><Badge value={(r as any).asignacionEstado ?? 'sin_asignar'} options={ESTADOS_ASIGNACION} /></td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', color: 'var(--text-2)', fontSize: 12, fontWeight: 500 }}>
+                    <WorkingTime seconds={(r as any).tiempoTrabajadoSegundos} isRunning={r.estado === 'en_progreso'} />
                   </td>
-                  <td className="px-4 py-3 text-gray-400 text-xs">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : ''}</td>
-                  <td className="px-4 py-3 flex items-center gap-2">
-                    <button className="text-primary text-xs hover:underline" onClick={e => { e.stopPropagation(); window.open(`/imprimir?id=${r.id}`, '_blank') }}>
-                      Imprimir
-                    </button>
-                    {isAdmin ? (
-                      <button
-                        className="text-red-600 text-xs hover:underline"
-                        onClick={e => {
-                          e.stopPropagation()
-                          if (window.confirm('¿Eliminar este reclamo demo? Esta acción no se puede deshacer.')) {
-                            eliminarReporte.mutate({ id: r.id })
-                          }
-                        }}
-                      >
-                        Eliminar
-                      </button>
-                    ) : null}
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', color: 'var(--text-3)', fontSize: 12 }}>{r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : ''}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button style={{ fontSize: 11, color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={e => { e.stopPropagation(); window.open(`/imprimir?id=${r.id}`, '_blank') }}>Imprimir</button>
+                      {isAdmin && (
+                        <button style={{ fontSize: 11, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                          onClick={e => { e.stopPropagation(); if (window.confirm('¿Eliminar este reclamo demo? Esta acción no se puede deshacer.')) { eliminarReporte.mutate({ id: r.id }) } }}>
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -303,50 +314,51 @@ export default function Dashboard() {
 
       {/* Detail Dialog */}
       {selected && reporte && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-0 md:p-4" onClick={() => setSelected(null)}>
-          <div className="surface-panel-strong w-full md:max-w-2xl md:rounded-[32px] rounded-t-[32px] max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="p-5 border-b border-black/5 flex items-start gap-3">
-              <div className="flex-1">
-                <div className="text-xs text-gray-400 font-mono mb-1">#{reporte.id.toString().padStart(4,'0')}</div>
-                <h2 className="font-heading font-bold text-lg">{reporte.titulo}</h2>
-                <div className="flex gap-2 mt-2 flex-wrap">
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 0 0' }}
+          className="md:items-center md:p-6"
+          onClick={() => setSelected(null)}>
+          <div style={{ background: '#fff', width: '100%', maxWidth: 600, borderRadius: '24px 24px 0 0', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-modal)' }}
+            className="md:rounded-[24px]"
+            onClick={e => e.stopPropagation()}>
+
+            {/* Modal header */}
+            <div style={{ padding: '22px 22px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 14, position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderRadius: '24px 24px 0 0' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace', fontWeight: 500, marginBottom: 5 }}>#{reporte.id.toString().padStart(4,'0')} · {reporte.local}</div>
+                <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>{reporte.titulo}</h2>
+                <div style={{ display: 'flex', gap: 6, marginTop: 9, flexWrap: 'wrap', alignItems: 'center' }}>
                   <Badge value={reporte.prioridad} options={PRIORIDADES} />
                   <Badge value={reporte.estado} options={ESTADOS} />
-                  <span className="text-xs text-gray-500">{reporte.local} — {reporte.planta === 'baja' ? 'Planta Baja' : 'Planta Alta'}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{reporte.planta === 'baja' ? 'Planta Baja' : 'Planta Alta'}</span>
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
+              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 6, borderRadius: 8, transition: 'all 0.15s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#F1F5F9' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}>
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div>
-                <div className="text-xs text-gray-400 uppercase font-medium mb-1">Descripción</div>
-                <p className="text-sm text-gray-700">{reporte.descripcion}</p>
+                <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', marginBottom: 6 }}>Descripción</div>
+                <p style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.65 }}>{reporte.descripcion}</p>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><span className="text-gray-400">Locatario:</span> {reporte.locatario}</div>
-                <div><span className="text-gray-400">Categoría:</span> {reporte.categoria}</div>
-                {reporte.contacto && <div><span className="text-gray-400">Tel:</span> {reporte.contacto}</div>}
-                {reporte.asignadoA && <div><span className="text-gray-400">Asignado a:</span> {reporte.asignadoA}</div>}
-                <div>
-                  <span className="text-gray-400">Recepción:</span>{' '}
-                  <Badge value={(reporte as any).asignacionEstado ?? 'sin_asignar'} options={ESTADOS_ASIGNACION} />
-                </div>
-                {(reporte as any).asignacionRespondidaAt && (
-                  <div><span className="text-gray-400">Respuesta:</span> {new Date((reporte as any).asignacionRespondidaAt).toLocaleString('es-AR')}</div>
-                )}
-                <div>
-                  <span className="text-gray-400">Tiempo trabajado:</span>{' '}
-                  <WorkingTime
-                    seconds={(reporte as any).tiempoTrabajadoSegundos}
-                    isRunning={reporte.estado === 'en_progreso'}
-                    className="font-medium text-slate-700"
-                  />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, background: '#F8FAFC', borderRadius: 14, padding: '14px 16px' }}>
+                <div><div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)', marginBottom: 3 }}>Locatario</div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{reporte.locatario}</div></div>
+                <div><div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)', marginBottom: 3 }}>Categoría</div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', textTransform: 'capitalize' }}>{reporte.categoria}</div></div>
+                {reporte.contacto && <div><div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)', marginBottom: 3 }}>Teléfono</div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{reporte.contacto}</div></div>}
+                {reporte.asignadoA && <div><div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)', marginBottom: 3 }}>Asignado a</div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{reporte.asignadoA}</div></div>}
+                <div><div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)', marginBottom: 3 }}>Recepción</div><Badge value={(reporte as any).asignacionEstado ?? 'sin_asignar'} options={ESTADOS_ASIGNACION} /></div>
+                <div><div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)', marginBottom: 3 }}>Tiempo trabajado</div>
+                  <WorkingTime seconds={(reporte as any).tiempoTrabajadoSegundos} isRunning={reporte.estado === 'en_progreso'} className="font-medium" />
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex flex-wrap gap-2 pt-2 border-t">
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', marginBottom: 10 }}>Acciones</div>
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
                 {reporte.estado !== 'completado' && (
                   <>
                     <Button size="sm" variant="success" onClick={() => cambiarEstado.mutate({ id: reporte.id, estado: 'completado' })} loading={cambiarEstado.isLoading}>
@@ -376,58 +388,31 @@ export default function Dashboard() {
                   Imprimir A4
                 </Button>
                 {isAdmin ? (
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => {
-                      if (window.confirm('¿Eliminar este reclamo demo? Esta acción no se puede deshacer.')) {
-                        eliminarReporte.mutate({ id: reporte.id })
-                      }
-                    }}
-                    loading={eliminarReporte.isLoading}
-                  >
+                  <Button size="sm" variant="destructive"
+                    onClick={() => { if (window.confirm('¿Eliminar este reclamo demo? Esta acción no se puede deshacer.')) { eliminarReporte.mutate({ id: reporte.id }) } }}
+                    loading={eliminarReporte.isLoading}>
                     Eliminar reclamo
                   </Button>
                 ) : null}
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  loading={crearTareaDesdeReclamo.isLoading}
-                  onClick={() => crearTareaDesdeReclamo.mutate({
-                    reporteId: reporte.id,
-                    tipoTrabajo: reporte.categoria,
-                    empleadoId: empleadoSeleccionado?.id,
-                  })}
-                >
+                <Button size="sm" variant="secondary" loading={crearTareaDesdeReclamo.isLoading}
+                  onClick={() => crearTareaDesdeReclamo.mutate({ reporteId: reporte.id, tipoTrabajo: reporte.categoria, empleadoId: empleadoSeleccionado?.id })}>
                   Crear trabajo operativo
                 </Button>
+              </div>
               </div>
 
               {/* Assign */}
               {empleados.length > 0 && reporte.estado !== 'completado' && (
-                <div className="flex gap-2">
+                <div style={{ display: 'flex', gap: 8 }}>
                   <select value={assigningTo} onChange={e => setAssigningTo(e.target.value)}
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                    style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontFamily: 'inherit', background: '#fff', color: 'var(--text-1)', outline: 'none' }}>
                     <option value="">Asignar a empleado...</option>
                     {empleados.map((empleado: any) => (
-                      <option key={empleado.id} value={empleado.id}>
-                        {empleado.nombre}{empleado.waId ? '' : ' · sin WhatsApp'}
-                      </option>
+                      <option key={empleado.id} value={empleado.id}>{empleado.nombre}{empleado.waId ? '' : ' · sin WhatsApp'}</option>
                     ))}
                   </select>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={!empleadoSeleccionado}
-                    onClick={() => {
-                      if (!empleadoSeleccionado) return
-                      asignar.mutate({
-                        id: reporte.id,
-                        empleadoId: empleadoSeleccionado.id,
-                        empleadoNombre: empleadoSeleccionado.nombre,
-                      })
-                    }}
-                  >
+                  <Button size="sm" variant="secondary" disabled={!empleadoSeleccionado}
+                    onClick={() => { if (!empleadoSeleccionado) return; asignar.mutate({ id: reporte.id, empleadoId: empleadoSeleccionado.id, empleadoNombre: empleadoSeleccionado.nombre }) }}>
                     Asignar
                   </Button>
                 </div>
@@ -435,14 +420,10 @@ export default function Dashboard() {
 
               {/* Note */}
               {showNota ? (
-                <div className="flex gap-2">
-                  <input value={nota} onChange={e => setNota(e.target.value)}
-                    placeholder="Escribí una nota..."
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                  <Button size="sm" disabled={!nota} onClick={() => agregarNota.mutate({ id: reporte.id, nota })} loading={agregarNota.isLoading}>
-                    Guardar
-                  </Button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={nota} onChange={e => setNota(e.target.value)} placeholder="Escribí una nota..."
+                    style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontFamily: 'inherit', background: '#fff', outline: 'none' }} />
+                  <Button size="sm" disabled={!nota} onClick={() => agregarNota.mutate({ id: reporte.id, nota })} loading={agregarNota.isLoading}>Guardar</Button>
                   <Button size="sm" variant="ghost" onClick={() => setShowNota(false)}>Cancelar</Button>
                 </div>
               ) : (
@@ -452,16 +433,14 @@ export default function Dashboard() {
               {/* History */}
               {(reporte as any).actualizaciones?.length > 0 && (
                 <div>
-                  <div className="text-xs text-gray-400 uppercase font-medium mb-3">Historial</div>
-                  <div className="space-y-2">
+                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', marginBottom: 10 }}>Historial</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {(reporte as any).actualizaciones.map((a: any) => (
-                      <div key={a.id} className="flex gap-3 text-sm">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
-                        <div>
-                          <span className="font-medium">{a.usuarioNombre}</span>
-                          <span className="text-gray-400"> · </span>
-                          <span className="text-gray-600">{a.descripcion}</span>
-                          <div className="text-xs text-gray-400">{a.createdAt ? new Date(a.createdAt).toLocaleString('es-AR') : ''}</div>
+                      <div key={a.id} style={{ display: 'flex', gap: 12 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', marginTop: 5, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12.5, color: 'var(--text-1)' }}><strong>{a.usuarioNombre}</strong> <span style={{ color: 'var(--text-3)' }}>{a.descripcion}</span></div>
+                          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{a.createdAt ? new Date(a.createdAt).toLocaleString('es-AR') : ''}</div>
                         </div>
                       </div>
                     ))}

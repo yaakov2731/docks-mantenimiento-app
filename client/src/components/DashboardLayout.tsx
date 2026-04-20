@@ -5,6 +5,7 @@ import BrandLogo from './BrandLogo'
 import {
   LayoutDashboard, ClipboardList, History, Users,
   Settings, LogOut, Menu, Home, UserCheck, X, ClipboardCheck, Wrench, Clock3,
+  CreditCard,
 } from 'lucide-react'
 
 type PanelRole = 'admin' | 'employee' | 'sales'
@@ -20,6 +21,7 @@ const navItems = [
   { href: '/historial',     label: 'Historial',          icon: History,         roles: ['admin', 'employee'] as PanelRole[] },
   { href: '/empleados',     label: 'Empleados',          icon: Users,           roles: ['admin'] as PanelRole[] },
   { href: '/configuracion', label: 'Configuración',      icon: Settings,        roles: ['admin'] as PanelRole[] },
+  { href: '/liquidaciones', label: 'Liquidaciones',      icon: CreditCard,      roles: ['admin'] as PanelRole[] },
 ]
 
 const roleLabel: Record<PanelRole, string> = {
@@ -36,26 +38,52 @@ export default function DashboardLayout({ children, title }: { children: React.R
   const userRole = (user as { role?: PanelRole } | undefined)?.role
   const visibleNavItems = navItems.filter(item => !userRole || item.roles.includes(userRole))
 
-  const Sidebar = () => (
-    <div className="flex flex-col h-full bg-gradient-to-b from-blue-950 to-slate-950 text-white w-64">
+  const SidebarContent = () => (
+    <div
+      className="flex flex-col h-full text-white overflow-hidden"
+      style={{
+        width: 232,
+        background: 'var(--sidebar-bg)',
+        borderRight: '1px solid rgba(255,255,255,0.06)',
+        position: 'relative',
+      }}
+    >
+      {/* Glow */}
+      <div style={{
+        position: 'absolute', top: -80, right: -60, width: 220, height: 220,
+        background: 'radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
 
       {/* Logo */}
-      <div className="px-6 pt-7 pb-5 border-b border-white/10">
+      <div style={{ padding: '22px 20px 18px' }}>
         <BrandLogo variant="dark" size="sm" showTagline />
       </div>
 
-      {/* User */}
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '0 14px' }} />
+
+      {/* User card */}
       {user && (
-        <div className="px-4 py-3 mx-3 mt-4 rounded-lg bg-white/8 border border-white/10 backdrop-blur-sm">
-          <p className="text-[10px] uppercase tracking-widest text-white/40 font-medium">Conectado como</p>
-          <p className="text-sm font-semibold text-white mt-0.5 truncate">{user.name}</p>
-          <p className="text-xs text-white/50">{roleLabel[userRole ?? 'employee']}</p>
+        <div style={{
+          margin: '12px 10px 4px',
+          padding: '10px 12px',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 11,
+        }}>
+          <div style={{ fontSize: 9, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.28)' }}>
+            Conectado como
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginTop: 2 }}>{user.name}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>{roleLabel[userRole ?? 'employee']}</div>
         </div>
       )}
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        <p className="text-[10px] uppercase tracking-widest text-white/30 px-3 mb-2 font-medium">Navegación</p>
+      <nav style={{ flex: 1, padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 1, overflowY: 'auto' }}>
+        <div style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.22)', padding: '8px 10px 4px' }}>
+          Navegación
+        </div>
         {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = location === href
           return (
@@ -63,13 +91,24 @@ export default function DashboardLayout({ children, title }: { children: React.R
               key={href}
               href={href}
               onClick={() => setOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-                active
-                  ? 'bg-primary text-white font-semibold shadow-lg shadow-primary/20'
-                  : 'text-white/60 hover:text-white hover:bg-white/10'
-              }`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8.5px 10px', borderRadius: 9,
+                fontSize: 13, textDecoration: 'none',
+                transition: 'all 0.16s',
+                userSelect: 'none',
+                ...(active
+                  ? {
+                      background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                      color: '#fff', fontWeight: 600,
+                      boxShadow: '0 4px 16px rgba(37,99,235,0.35), inset 0 1px 0 rgba(255,255,255,0.12)',
+                    }
+                  : { color: 'rgba(255,255,255,0.45)' }),
+              }}
+              onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.85)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)' } }}
+              onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)'; (e.currentTarget as HTMLElement).style.background = '' } }}
             >
-              <Icon size={16} className={active ? 'text-white' : ''} />
+              <Icon size={15} style={{ opacity: active ? 1 : 0.7, flexShrink: 0 }} />
               {label}
             </Link>
           )
@@ -77,13 +116,22 @@ export default function DashboardLayout({ children, title }: { children: React.R
       </nav>
 
       {/* Logout */}
-      <div className="px-3 py-4 border-t border-white/10">
+      <div style={{ padding: 10, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
         <button
           type="button"
           onClick={() => logout.mutate()}
-          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '9px 10px', borderRadius: 9,
+            fontSize: 13, color: 'rgba(255,255,255,0.32)',
+            cursor: 'pointer', width: '100%',
+            background: 'none', border: 'none',
+            fontFamily: 'inherit', transition: 'all 0.16s',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.65)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.32)'; (e.currentTarget as HTMLElement).style.background = '' }}
         >
-          <LogOut size={16} />
+          <LogOut size={15} />
           Cerrar sesión
         </button>
       </div>
@@ -91,54 +139,72 @@ export default function DashboardLayout({ children, title }: { children: React.R
   )
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--background)' }}>
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-shrink-0">
-        <Sidebar />
+        <SidebarContent />
       </aside>
 
       {/* Mobile drawer */}
       {open && (
         <div className="fixed inset-0 z-40 md:hidden flex">
-          <div className="flex-shrink-0">
-            <Sidebar />
-          </div>
+          <SidebarContent />
           <div className="flex-1 bg-black/40" onClick={() => setOpen(false)} />
         </div>
       )}
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
-        {/* Top bar */}
-        <header className="bg-white border-b border-gray-100 px-4 md:px-5 py-3.5 flex items-center gap-3 flex-shrink-0">
+        {/* Topbar */}
+        <header style={{
+          background: '#fff',
+          borderBottom: '1px solid var(--border)',
+          height: 52, padding: '0 20px',
+          display: 'flex', alignItems: 'center', gap: 12,
+          flexShrink: 0,
+          boxShadow: '0 1px 0 var(--border)',
+        }}>
           <button
             type="button"
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="md:hidden"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: 8, color: 'var(--text-2)' }}
             onClick={() => setOpen(!open)}
             aria-label="Abrir menú"
           >
             {open ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="font-heading font-semibold text-[17px] text-gray-900 truncate">
-              {title ?? 'Dashboard'}
-            </h1>
-          </div>
+          <h1 style={{
+            fontFamily: 'Poppins, sans-serif',
+            fontSize: 16, fontWeight: 600,
+            color: 'var(--text-1)', flex: 1,
+          }}>
+            {title ?? 'Dashboard'}
+          </h1>
           <a
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-2 text-xs text-gray-500 hover:text-primary border border-gray-200 rounded-lg px-3 py-2 transition-colors"
+            className="hidden sm:flex"
+            style={{
+              alignItems: 'center', gap: 6,
+              fontSize: 12, color: 'var(--text-3)',
+              border: '1px solid var(--border)',
+              borderRadius: 8, padding: '5px 12px',
+              textDecoration: 'none', transition: 'all 0.15s',
+              background: '#fff',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--primary)'; (e.currentTarget as HTMLElement).style.borderColor = '#BFDBFE'; (e.currentTarget as HTMLElement).style.background = '#EFF6FF' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.background = '#fff' }}
           >
-            <Home size={13} />
+            <Home size={12} />
             Ver formulario
           </a>
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-5">
+        <main style={{ flex: 1, overflowY: 'auto', padding: 20, background: 'var(--background)' }}>
           {children}
         </main>
       </div>
