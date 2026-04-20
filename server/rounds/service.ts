@@ -251,9 +251,9 @@ export function createRoundsService(repo: RoundRepository) {
         },
       })
 
-      // Notificar al empleado por WhatsApp si tiene waId
+      // Notificar al empleado por WhatsApp (no bloquea — la asignación ya fue grabada)
       if (empleado.waId) {
-        await repo.enqueueBotMessage(
+        repo.enqueueBotMessage(
           empleado.waId,
           buildRoundAssignmentMessage({
             occurrenceId: input.occurrenceId,
@@ -261,7 +261,7 @@ export function createRoundsService(repo: RoundRepository) {
             horaProgramada: occurrence.programadoAtLabel ?? 'horario programado',
             asignadoPor: input.actor.name,
           })
-        )
+        ).catch((err: unknown) => console.error('[RoundsService] enqueueBotMessage failed:', err))
       }
 
       return {

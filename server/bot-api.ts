@@ -547,6 +547,71 @@ botRouter.post('/admin/:id/reporte/:reporteId/asignar', authBot, async (req, res
   }
 })
 
+botRouter.post('/admin/:id/ronda/:occurrenceId/asignar', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    const occurrenceId = parseId(req.params.occurrenceId)
+    const empleadoId = Number(req.body?.empleadoId)
+
+    if (!adminId || !occurrenceId || !Number.isFinite(empleadoId)) {
+      return res.status(400).json({ error: 'adminId, occurrenceId y empleadoId son requeridos' })
+    }
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const empleado = await getEmpleadoById(empleadoId)
+    if (!empleado) return res.status(404).json({ error: 'Empleado no encontrado' })
+
+    const occurrence = await roundsService.assignOccurrence({
+      occurrenceId,
+      empleadoId,
+      actor: {
+        id: admin.id,
+        name: admin.name,
+      },
+    })
+
+    return res.json({ success: true, occurrence })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo asignar la ronda'
+    if (message.includes('not found') || message.includes('no encontrado')) {
+      return res.status(404).json({ error: message })
+    }
+    return res.status(400).json({ error: message })
+  }
+})
+
+botRouter.post('/admin/:id/ronda/:occurrenceId/liberar', authBot, async (req, res) => {
+  try {
+    const adminId = parseId(req.params.id)
+    const occurrenceId = parseId(req.params.occurrenceId)
+
+    if (!adminId || !occurrenceId) {
+      return res.status(400).json({ error: 'adminId y occurrenceId son requeridos' })
+    }
+
+    const admin = await getAdminBotUserById(adminId)
+    if (!admin) return res.status(404).json({ error: 'Admin no encontrado' })
+
+    const occurrence = await roundsService.releaseOccurrence({
+      occurrenceId,
+      actor: {
+        id: admin.id,
+        name: admin.name,
+      },
+    })
+
+    return res.json({ success: true, occurrence })
+  } catch (error: any) {
+    const message = error?.message ?? 'No se pudo liberar la ronda'
+    if (message.includes('not found') || message.includes('no encontrado')) {
+      return res.status(404).json({ error: message })
+    }
+    return res.status(400).json({ error: message })
+  }
+})
+
 botRouter.post('/rondas/ocurrencia/:id/responder', authBot, async (req, res) => {
   try {
     const occurrenceId = Number(req.params.id)
@@ -1520,10 +1585,20 @@ botRouter.post('/mensaje-entrante', authBot, async (req, res) => {
     if (!message)  return res.status(400).json({ error: 'message es requerido' })
     if (message.length > 1000) return res.status(400).json({ error: 'message demasiado largo' })
 
+    console.log(`[bot/mensaje-entrante] request ${JSON.stringify({
+      waNumber,
+      message,
+    })}`)
+
     // Registrar heartbeat implícito
     registerBotHeartbeat({ pendingCount: 0 }).catch(() => {})
 
     const reply = await handleIncomingMessage(waNumber, message)
+    console.log(`[bot/mensaje-entrante] reply ${JSON.stringify({
+      waNumber,
+      message,
+      replyPreview: reply.slice(0, 160),
+    })}`)
     return res.json({ reply })
   } catch (e: any) {
     console.error('[bot/mensaje-entrante]', e)

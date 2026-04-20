@@ -68,9 +68,23 @@ async function ejecutarAsistencia(
   session: BotSession,
   accion: 'entrada' | 'salida' | 'inicio_almuerzo' | 'fin_almuerzo'
 ): Promise<string> {
+  console.log(`[bot/asistencia] action:start ${JSON.stringify({
+    waNumber: session.waNumber,
+    empleadoId: session.userId,
+    userName: session.userName,
+    accion,
+  })}`)
   const result = await registerEmpleadoAttendance(session.userId, accion, 'whatsapp')
 
   if (!result.success) {
+    console.log(`[bot/asistencia] action:blocked ${JSON.stringify({
+      waNumber: session.waNumber,
+      empleadoId: session.userId,
+      userName: session.userName,
+      accion,
+      code: result.code,
+      status: result.status,
+    })}`)
     const mensajesError: Record<string, string> = {
       ALREADY_ON_SHIFT:   'Ya tenés un turno activo. Primero registrá la salida del turno anterior.',
       NO_OPEN_SHIFT:      'No tenés un turno activo. Primero registrá la entrada.',
@@ -87,6 +101,13 @@ async function ejecutarAsistencia(
   }
 
   const status = result.status
+  console.log(`[bot/asistencia] action:success ${JSON.stringify({
+    waNumber: session.waNumber,
+    empleadoId: session.userId,
+    userName: session.userName,
+    accion,
+    status,
+  })}`)
   const ahora = new Date().toLocaleTimeString('es-AR', {
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires',
   })

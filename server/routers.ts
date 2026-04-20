@@ -21,7 +21,7 @@ import {
   ATTENDANCE_ACTIONS, getEmpleadoAttendanceStatus, getEmpleadoAttendanceEvents, registerEmpleadoAttendance,
   createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
-  crearLead, getLeads, getLeadById, actualizarLead,
+  crearLead, getLeads, getLeadById, actualizarLead, deleteLeadById,
   createRoundTemplate, saveRoundSchedule, getRoundOverviewForDashboard, getRoundTimeline,
   deleteRoundOccurrence, reprogramarRoundOccurrence,
   createOperationalTask, createOperationalTaskFromReporte, getOperationalTaskById, listOperationalTasks, listOperationalTasksByEmployee, getOperationalTasksOverview,
@@ -227,17 +227,44 @@ function buildConfiguredLiquidacion(params: {
   segundosTrabajados: number
   dailyBuckets: any[]
 }) {
-  const tarifaMonto = Math.max(0, getExactRateForPeriod(params.empleado, params.periodo))
   const hasWorkedPeriod = params.diasTrabajados > 0 || params.segundosTrabajados > 0
+  const tarifaExacta = Math.max(0, getExactRateForPeriod(params.empleado, params.periodo))
+  const tarifaDiaria = Math.max(0, Number(params.empleado.pagoDiario ?? 0))
+
+  if (tarifaExacta > 0) {
+    return {
+      diasTrabajados: params.diasTrabajados,
+      segundosTrabajados: params.segundosTrabajados,
+      promedioSegundosPorDia: params.diasTrabajados > 0 ? Math.floor(params.segundosTrabajados / params.diasTrabajados) : 0,
+      tarifaPeriodo: params.periodo,
+      tarifaMonto: tarifaExacta,
+      totalPagar: hasWorkedPeriod ? tarifaExacta : 0,
+      tarifaOrigen: 'configurado',
+      dias: params.dailyBuckets,
+    }
+  }
+
+  if (params.periodo !== 'dia' && tarifaDiaria > 0) {
+    return {
+      diasTrabajados: params.diasTrabajados,
+      segundosTrabajados: params.segundosTrabajados,
+      promedioSegundosPorDia: params.diasTrabajados > 0 ? Math.floor(params.segundosTrabajados / params.diasTrabajados) : 0,
+      tarifaPeriodo: 'dia',
+      tarifaMonto: tarifaDiaria,
+      totalPagar: hasWorkedPeriod ? tarifaDiaria * params.diasTrabajados : 0,
+      tarifaOrigen: 'derivado',
+      dias: params.dailyBuckets,
+    }
+  }
 
   return {
     diasTrabajados: params.diasTrabajados,
     segundosTrabajados: params.segundosTrabajados,
     promedioSegundosPorDia: params.diasTrabajados > 0 ? Math.floor(params.segundosTrabajados / params.diasTrabajados) : 0,
     tarifaPeriodo: params.periodo,
-    tarifaMonto,
-    totalPagar: hasWorkedPeriod ? tarifaMonto : 0,
-    tarifaOrigen: tarifaMonto > 0 ? 'configurado' : 'sin_configurar',
+    tarifaMonto: 0,
+    totalPagar: 0,
+    tarifaOrigen: 'sin_configurar',
     dias: params.dailyBuckets,
   }
 }
@@ -732,6 +759,14 @@ export const appRouter = router({
         }
 
         return { success: true, notificationSent, notificationWarning }
+      }),
+
+    eliminar: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        await deleteLeadById(input.id)
+        return { success: true }
       }),
   }),
 

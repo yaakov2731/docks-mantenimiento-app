@@ -137,6 +137,39 @@ describe('attendance router', () => {
     expect(summary.resumenEquipo.totalPagar).toBe(90000)
   })
 
+  it('derives weekly payroll from daily rate when only daily pay is configured', async () => {
+    await crearEmpleado({
+      nombre: 'Juan',
+      pagoDiario: 15000,
+      pagoSemanal: 0,
+      pagoQuincenal: 0,
+      pagoMensual: 0,
+    } as any)
+    const [empleado] = await getEmpleados()
+    const caller = appRouter.createCaller(adminContext as any)
+
+    await caller.asistencia.registrar({
+      empleadoId: empleado.id,
+      accion: 'entrada',
+    })
+    vi.setSystemTime(new Date('2026-04-10T18:00:00.000Z'))
+    await caller.asistencia.registrar({
+      empleadoId: empleado.id,
+      accion: 'salida',
+    })
+
+    const summary = await caller.asistencia.resumen({ periodo: 'semana' })
+
+    expect(summary.empleados[0].liquidacion).toMatchObject({
+      diasTrabajados: 1,
+      tarifaPeriodo: 'dia',
+      tarifaMonto: 15000,
+      totalPagar: 15000,
+      tarifaOrigen: 'derivado',
+    })
+    expect(summary.resumenEquipo.totalPagar).toBe(15000)
+  })
+
   it('updates employee name and payroll amounts from the admin router', async () => {
     await crearEmpleado({ nombre: 'Juan' } as any)
     const [empleado] = await getEmpleados()

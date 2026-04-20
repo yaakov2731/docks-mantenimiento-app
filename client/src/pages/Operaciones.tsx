@@ -36,10 +36,16 @@ export default function Operaciones() {
     onSuccess: async () => {
       await Promise.all([refetchResumen(), refetchTimeline()])
     },
+    onError: (err) => {
+      alert(`Error al asignar: ${err.message}`)
+    },
   })
   const releaseOccurrence = trpc.rondas.liberarOcurrencia.useMutation({
     onSuccess: async () => {
       await Promise.all([refetchResumen(), refetchTimeline()])
+    },
+    onError: (err) => {
+      alert(`Error al liberar: ${err.message}`)
     },
   })
   const deleteOccurrence = trpc.rondas.eliminarOcurrencia.useMutation({

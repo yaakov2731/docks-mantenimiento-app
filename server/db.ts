@@ -12,7 +12,15 @@ if (!TURSO_URL || !TURSO_TOKEN) {
   throw new Error('TURSO_URL and TURSO_TOKEN env vars are required')
 }
 
-const client = createClient({ url: TURSO_URL, authToken: TURSO_TOKEN })
+const DB_TIMEOUT_MS = 20_000
+
+function fetchWithTimeout(input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), DB_TIMEOUT_MS)
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(id))
+}
+
+const client = createClient({ url: TURSO_URL, authToken: TURSO_TOKEN, fetch: fetchWithTimeout })
 export const db = drizzle(client, { schema })
 
 // --- Init tables ---
@@ -353,6 +361,14 @@ function assertNotFutureAttendanceDate(fechaHora: Date) {
 export const ATTENDANCE_ACTIONS = ['entrada', 'inicio_almuerzo', 'fin_almuerzo', 'salida'] as const
 export type AttendanceAction = typeof ATTENDANCE_ACTIONS[number]
 
+function logAttendanceDebug(message: string, payload?: Record<string, unknown>) {
+  if (payload) {
+    console.log(`[attendance] ${message} ${JSON.stringify(payload)}`)
+    return
+  }
+  console.log(`[attendance] ${message}`)
+}
+
 function getAttendanceEventTime(evento: { timestamp?: Date | number | null; createdAt?: Date | number | null }) {
   return toMs(evento.timestamp ?? evento.createdAt)
 }
@@ -531,30 +547,78 @@ export async function registerEmpleadoAttendance(
   canal: 'whatsapp' | 'panel' | 'manual_admin' = 'panel',
   nota?: string
 ) {
+  logAttendanceDebug('register:start', {
+    empleadoId,
+    tipo,
+    canal,
+    nota: nota ?? null,
+  })
   const current = await getEmpleadoAttendanceStatus(empleadoId)
 
   if (tipo === 'entrada' && current.onShift) {
+    logAttendanceDebug('register:blocked', {
+      empleadoId,
+      tipo,
+      canal,
+      code: 'already_on_shift',
+      current,
+    })
     return { success: false, code: 'already_on_shift' as const, status: current }
   }
 
   if (tipo === 'inicio_almuerzo') {
     if (!current.onShift) {
+      logAttendanceDebug('register:blocked', {
+        empleadoId,
+        tipo,
+        canal,
+        code: 'not_on_shift',
+        current,
+      })
       return { success: false, code: 'not_on_shift' as const, status: current }
     }
     if (current.onLunch) {
+      logAttendanceDebug('register:blocked', {
+        empleadoId,
+        tipo,
+        canal,
+        code: 'already_on_lunch',
+        current,
+      })
       return { success: false, code: 'already_on_lunch' as const, status: current }
     }
   }
 
   if (tipo === 'fin_almuerzo' && !current.onLunch) {
+    logAttendanceDebug('register:blocked', {
+      empleadoId,
+      tipo,
+      canal,
+      code: 'not_on_lunch',
+      current,
+    })
     return { success: false, code: 'not_on_lunch' as const, status: current }
   }
 
   if (tipo === 'salida') {
     if (!current.onShift) {
+      logAttendanceDebug('register:blocked', {
+        empleadoId,
+        tipo,
+        canal,
+        code: 'not_on_shift',
+        current,
+      })
       return { success: false, code: 'not_on_shift' as const, status: current }
     }
     if (current.onLunch) {
+      logAttendanceDebug('register:blocked', {
+        empleadoId,
+        tipo,
+        canal,
+        code: 'on_lunch',
+        current,
+      })
       return { success: false, code: 'on_lunch' as const, status: current }
     }
   }
@@ -566,6 +630,11 @@ export async function registerEmpleadoAttendance(
     canal,
     nota,
   }).run()
+  logAttendanceDebug('register:event_inserted', {
+    empleadoId,
+    tipo,
+    canal,
+  })
 
   await syncLegacyAttendanceMirror({
     empleadoId,
@@ -574,10 +643,18 @@ export async function registerEmpleadoAttendance(
     nota,
   })
 
+  const status = await getEmpleadoAttendanceStatus(empleadoId)
+  logAttendanceDebug('register:success', {
+    empleadoId,
+    tipo,
+    canal,
+    status,
+  })
+
   return {
     success: true,
     code: 'ok' as const,
-    status: await getEmpleadoAttendanceStatus(empleadoId),
+    status,
   }
 }
 
@@ -2530,17 +2607,37 @@ async function syncLegacyAttendanceMirror(params: {
     .sort((left, right) => new Date(right.entradaAt as any).getTime() - new Date(left.entradaAt as any).getTime())[0] ?? null
 
   if (params.tipo === 'entrada') {
-    if (open) return
+    if (open) {
+      logAttendanceDebug('legacy_sync:skip_open_exists', {
+        empleadoId: params.empleadoId,
+        tipo: params.tipo,
+        canal: params.canal,
+        openId: open.id,
+      })
+      return
+    }
     await db.insert(schema.marcacionesEmpleados).values({
       empleadoId: params.empleadoId,
       entradaAt: new Date(),
       fuente: mapAttendanceChannelToLegacyFuente(params.canal),
       notaEntrada: params.nota?.trim() || null,
     } as any).run()
+    logAttendanceDebug('legacy_sync:entry_inserted', {
+      empleadoId: params.empleadoId,
+      tipo: params.tipo,
+      canal: params.canal,
+    })
     return
   }
 
-  if (!open) return
+  if (!open) {
+    logAttendanceDebug('legacy_sync:no_open_shift', {
+      empleadoId: params.empleadoId,
+      tipo: params.tipo,
+      canal: params.canal,
+    })
+    return
+  }
 
   const now = new Date()
   const entradaMs = new Date(open.entradaAt as any).getTime()
@@ -2551,6 +2648,13 @@ async function syncLegacyAttendanceMirror(params: {
     notaSalida: params.nota?.trim() || null,
     updatedAt: now,
   } as any).where(eq(schema.marcacionesEmpleados.id, open.id)).run()
+  logAttendanceDebug('legacy_sync:exit_updated', {
+    empleadoId: params.empleadoId,
+    tipo: params.tipo,
+    canal: params.canal,
+    openId: open.id,
+    duracionSegundos,
+  })
 }
 
 function normalizeOptionalWaNumber(value?: string | null) {

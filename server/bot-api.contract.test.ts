@@ -53,6 +53,8 @@ const roundsServiceMock = vi.hoisted(() => ({
   startOccurrence: vi.fn(),
   pauseOccurrence: vi.fn(),
   finishOccurrence: vi.fn(),
+  assignOccurrence: vi.fn(),
+  releaseOccurrence: vi.fn(),
 }))
 
 vi.mock('./db', () => dbMock)
@@ -67,6 +69,9 @@ vi.mock('./tasks/service', () => ({
 }))
 vi.mock('./rounds/service', () => ({
   createRoundsService: vi.fn(() => roundsServiceMock),
+}))
+vi.mock('./bot-menu/engine', () => ({
+  handleIncomingMessage: vi.fn(async () => 'ok'),
 }))
 
 describe('bot api compatibility contract', () => {
@@ -592,6 +597,65 @@ describe('bot api compatibility contract', () => {
         id: 7,
         nombre: 'Diego',
       },
+    })
+  })
+
+  it('assigns and releases a round occurrence from the admin bot flow using the shared service', async () => {
+    dbMock.getUsers.mockResolvedValue([
+      { id: 1, name: 'Gerente', role: 'admin', activo: true, waId: '5491110000000' },
+    ])
+    dbMock.getEmpleadoById.mockResolvedValue({
+      id: 8,
+      nombre: 'Bea',
+      waId: '5491222222222',
+      activo: true,
+    })
+    roundsServiceMock.assignOccurrence.mockResolvedValue({
+      id: 501,
+      estado: 'pausada',
+      responsableActualId: 8,
+      responsableActualNombre: 'Bea',
+      asignacionEstado: 'asignada',
+      tiempoAcumuladoSegundos: 540,
+    })
+    roundsServiceMock.releaseOccurrence.mockResolvedValue({
+      id: 501,
+      estado: 'pausada',
+      responsableActualId: null,
+      responsableActualNombre: null,
+      asignacionEstado: 'sin_asignar',
+      tiempoAcumuladoSegundos: 540,
+    })
+
+    const assigned = await requestJson('/api/bot/admin/1/ronda/501/asignar', {
+      method: 'POST',
+      body: { empleadoId: 8 },
+    })
+    const released = await requestJson('/api/bot/admin/1/ronda/501/liberar', {
+      method: 'POST',
+      body: {},
+    })
+
+    expect(assigned.status).toBe(200)
+    expect(released.status).toBe(200)
+    expect(roundsServiceMock.assignOccurrence).toHaveBeenCalledWith({
+      occurrenceId: 501,
+      empleadoId: 8,
+      actor: { id: 1, name: 'Gerente' },
+    })
+    expect(roundsServiceMock.releaseOccurrence).toHaveBeenCalledWith({
+      occurrenceId: 501,
+      actor: { id: 1, name: 'Gerente' },
+    })
+    expect(assigned.body.occurrence).toMatchObject({
+      id: 501,
+      responsableActualId: 8,
+      asignacionEstado: 'asignada',
+    })
+    expect(released.body.occurrence).toMatchObject({
+      id: 501,
+      responsableActualId: null,
+      asignacionEstado: 'sin_asignar',
     })
   })
 })

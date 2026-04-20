@@ -11,6 +11,13 @@ function fmtCurrency(value?: number | null) {
   }).format(Number(value ?? 0))
 }
 
+export function formatExcelMoneyDisplay(value?: number | null) {
+  return `$ ${Number(value ?? 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
 function fmtDateTime(value?: string | null) {
   if (!value) return ''
   const d = new Date(value)
@@ -37,6 +44,51 @@ function ratePeriodLabel(value?: string | null) {
   if (value === 'quincena') return 'Quincenal'
   if (value === 'mes') return 'Mensual'
   return 'Diario'
+}
+
+export function resolveExportPayroll(emp: any) {
+  const liquidacion = emp?.liquidacion ?? {}
+  const diasTrabajados = Math.max(0, Number(liquidacion.diasTrabajados ?? 0))
+  const segundosTrabajados = Math.max(0, Number(liquidacion.segundosTrabajados ?? 0))
+  const tarifaPeriodo = liquidacion.tarifaPeriodo ?? 'dia'
+  const tarifaMonto = Math.max(0, Number(liquidacion.tarifaMonto ?? 0))
+  const totalPagar = Math.max(0, Number(liquidacion.totalPagar ?? 0))
+  const tarifaOrigen = liquidacion.tarifaOrigen ?? null
+
+  if (totalPagar > 0 || diasTrabajados === 0) {
+    return {
+      ...liquidacion,
+      diasTrabajados,
+      segundosTrabajados,
+      tarifaPeriodo,
+      tarifaMonto,
+      totalPagar,
+      tarifaOrigen,
+    }
+  }
+
+  const pagoDiario = Math.max(0, Number(emp?.pagoDiario ?? 0))
+  if (pagoDiario > 0) {
+    return {
+      ...liquidacion,
+      diasTrabajados,
+      segundosTrabajados,
+      tarifaPeriodo: 'dia',
+      tarifaMonto: pagoDiario,
+      totalPagar: pagoDiario * diasTrabajados,
+      tarifaOrigen: 'derivado',
+    }
+  }
+
+  return {
+    ...liquidacion,
+    diasTrabajados,
+    segundosTrabajados,
+    tarifaPeriodo,
+    tarifaMonto,
+    totalPagar,
+    tarifaOrigen,
+  }
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -247,6 +299,7 @@ function addCalendarSheet(wb: ExcelJS.Workbook, periodo: any, empleados: any[]) 
   // ── employee rows ──
   let dataRow = 5
   for (const emp of empleados) {
+    const payroll = resolveExportPayroll(emp)
     const dailyMap = new Map((emp.liquidacion?.dias ?? []).map((d: any) => [d.fecha, d]))
     const row = ws.getRow(dataRow)
     row.height = 26
@@ -298,7 +351,7 @@ function addCalendarSheet(wb: ExcelJS.Workbook, periodo: any, empleados: any[]) 
 
     // Total horas
     const totalCell = ws.getCell(dataRow, totalHsCol)
-    totalCell.value = fmtSeconds(emp.liquidacion?.segundosTrabajados ?? 0)
+    totalCell.value = fmtSeconds(payroll.segundosTrabajados ?? 0)
     totalCell.style = {
       font: { bold: true, size: 10, color: { argb: 'FF78350F' }, name: 'Calibri' },
       fill: solidFill(YELLOW_TOTAL),
@@ -308,7 +361,7 @@ function addCalendarSheet(wb: ExcelJS.Workbook, periodo: any, empleados: any[]) 
 
     // Días
     const diasCell = ws.getCell(dataRow, diasCol)
-    diasCell.value = emp.liquidacion?.diasTrabajados ?? 0
+    diasCell.value = payroll.diasTrabajados ?? 0
     diasCell.style = {
       font: { bold: true, size: 10, color: { argb: 'FF78350F' }, name: 'Calibri' },
       fill: solidFill(YELLOW_TOTAL),
@@ -318,8 +371,7 @@ function addCalendarSheet(wb: ExcelJS.Workbook, periodo: any, empleados: any[]) 
 
     // Monto
     const montoCell = ws.getCell(dataRow, montoCol)
-    montoCell.value = Number(emp.liquidacion?.totalPagar ?? 0)
-    montoCell.numFmt = '"$"#,##0'
+    montoCell.value = formatExcelMoneyDisplay(payroll.totalPagar ?? 0)
     montoCell.style = {
       font: { bold: true, size: 10, color: { argb: 'FF166534' }, name: 'Calibri' },
       fill: solidFill(isClosed ? { argb: 'FFD1FAE5' } : YELLOW_TOTAL),
@@ -361,7 +413,7 @@ function addCalendarSheet(wb: ExcelJS.Workbook, periodo: any, empleados: any[]) 
   }
 
   // Total hs (sum all employees)
-  const grandTotalSecs = empleados.reduce((sum, emp) => sum + (emp.liquidacion?.segundosTrabajados ?? 0), 0)
+  const grandTotalSecs = empleados.reduce((sum, emp) => sum + Number(resolveExportPayroll(emp).segundosTrabajados ?? 0), 0)
   const grandTotalCell = ws.getCell(dataRow, totalHsCol)
   grandTotalCell.value = fmtSeconds(grandTotalSecs)
   grandTotalCell.style = {
@@ -371,7 +423,7 @@ function addCalendarSheet(wb: ExcelJS.Workbook, periodo: any, empleados: any[]) 
     border: mediumBorder({ argb: 'FFB45309' }),
   }
 
-  const grandDias = empleados.reduce((sum, emp) => sum + (emp.liquidacion?.diasTrabajados ?? 0), 0)
+  const grandDias = empleados.reduce((sum, emp) => sum + Number(resolveExportPayroll(emp).diasTrabajados ?? 0), 0)
   const grandDiasCell = ws.getCell(dataRow, diasCol)
   grandDiasCell.value = grandDias
   grandDiasCell.style = {
@@ -381,10 +433,9 @@ function addCalendarSheet(wb: ExcelJS.Workbook, periodo: any, empleados: any[]) 
     border: mediumBorder({ argb: 'FFB45309' }),
   }
 
-  const grandMonto = empleados.reduce((sum, emp) => sum + Number(emp.liquidacion?.totalPagar ?? 0), 0)
+  const grandMonto = empleados.reduce((sum, emp) => sum + Number(resolveExportPayroll(emp).totalPagar ?? 0), 0)
   const grandMontoCell = ws.getCell(dataRow, montoCol)
-  grandMontoCell.value = grandMonto
-  grandMontoCell.numFmt = '"$"#,##0'
+  grandMontoCell.value = formatExcelMoneyDisplay(grandMonto)
   grandMontoCell.style = {
     font: { bold: true, size: 11, color: { argb: 'FF14532D' }, name: 'Calibri' },
     fill: solidFill({ argb: 'FF4ADE80' }),
@@ -467,14 +518,15 @@ function addLiquidacionSheet(wb: ExcelJS.Workbook, empleados: any[]) {
   hdr.alignment = { horizontal: 'center', vertical: 'middle' } as any
 
   empleados.forEach((emp: any, idx: number) => {
+    const payroll = resolveExportPayroll(emp)
     const r = ws.addRow({
       nombre: emp.nombre,
       esp: emp.especialidad ?? '',
-      tarifa: ratePeriodLabel(emp.liquidacion?.tarifaPeriodo),
-      monto_tarifa: Number(emp.liquidacion?.tarifaMonto ?? 0),
-      horas: fmtSeconds(emp.liquidacion?.segundosTrabajados ?? 0),
-      dias: emp.liquidacion?.diasTrabajados ?? 0,
-      total: Number(emp.liquidacion?.totalPagar ?? 0),
+      tarifa: ratePeriodLabel(payroll.tarifaPeriodo),
+      monto_tarifa: formatExcelMoneyDisplay(payroll.tarifaMonto ?? 0),
+      horas: fmtSeconds(payroll.segundosTrabajados ?? 0),
+      dias: payroll.diasTrabajados ?? 0,
+      total: formatExcelMoneyDisplay(payroll.totalPagar ?? 0),
       cerrado: emp.cierre ? 'Sí' : 'No',
       cer_por: emp.cierre?.cerradoPorNombre ?? '',
       fecha_cie: fmtDateTime(emp.cierre?.closedAt),
@@ -483,8 +535,6 @@ function addLiquidacionSheet(wb: ExcelJS.Workbook, empleados: any[]) {
       fecha_pag: fmtDateTime(emp.cierre?.pagadoAt),
     })
     r.height = 18
-    r.getCell('monto_tarifa').numFmt = '"$"#,##0'
-    r.getCell('total').numFmt = '"$"#,##0'
     const fill = solidFill(idx % 2 === 0 ? { argb: 'FFFAFAFA' } : { argb: 'FFFFFFFF' }) as any
     r.eachCell(cell => {
       cell.fill = fill
@@ -657,15 +707,29 @@ export async function exportarAsistenciaExcel({
   resumenEquipo: any
   cierre?: any
 }) {
+  const empleadosNormalizados = empleados.map((emp) => ({
+    ...emp,
+    liquidacion: {
+      ...(emp.liquidacion ?? {}),
+      ...resolveExportPayroll(emp),
+    },
+  }))
+  const resumenEquipoNormalizado = {
+    ...(resumenEquipo ?? {}),
+    horasPeriodoSegundos: empleadosNormalizados.reduce((sum, emp) => sum + Number(emp.liquidacion?.segundosTrabajados ?? 0), 0),
+    diasLiquidados: empleadosNormalizados.reduce((sum, emp) => sum + Number(emp.liquidacion?.diasTrabajados ?? 0), 0),
+    totalPagar: empleadosNormalizados.reduce((sum, emp) => sum + Number(emp.liquidacion?.totalPagar ?? 0), 0),
+  }
+
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Docks del Puerto'
   wb.created = new Date()
 
-  addCalendarSheet(wb, periodo, empleados)
-  addResumenSheet(wb, periodo, resumenEquipo, cierre)
-  addLiquidacionSheet(wb, empleados)
-  addDetalleDiarioSheet(wb, empleados)
-  addTurnosSheet(wb, empleados)
+  addCalendarSheet(wb, periodo, empleadosNormalizados)
+  addResumenSheet(wb, periodo, resumenEquipoNormalizado, cierre)
+  addLiquidacionSheet(wb, empleadosNormalizados)
+  addDetalleDiarioSheet(wb, empleadosNormalizados)
+  addTurnosSheet(wb, empleadosNormalizados)
   addMovimientosSheet(wb, eventos)
 
   const buffer = await wb.xlsx.writeBuffer()

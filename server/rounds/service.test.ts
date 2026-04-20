@@ -41,6 +41,17 @@ type FakeOccurrence = {
   empleadoId: number
   empleadoNombre: string
   empleadoWaId: string
+  responsableProgramadoId?: number | null
+  responsableProgramadoNombre?: string | null
+  responsableProgramadoWaId?: string | null
+  responsableActualId?: number | null
+  responsableActualNombre?: string | null
+  responsableActualWaId?: string | null
+  asignacionEstado?: 'sin_asignar' | 'asignada' | 'en_progreso' | 'completada' | 'vencida'
+  asignadoAt?: Date | null
+  reasignadoAt?: Date | null
+  reasignadoPorUserId?: number | null
+  reasignadoPorNombre?: string | null
   supervisorWaId: string
   nombreRonda: string
 }
@@ -121,6 +132,32 @@ function createFakeRepo(initial: { templates?: FakeTemplate[]; schedules?: FakeS
     async getOccurrenceById(id: number) {
       return occurrences.find((item) => item.id === id) ?? null
     },
+    async getEmpleadoById(id: number) {
+      const byOccurrence = occurrences.find((item) =>
+        item.responsableActualId === id ||
+        item.responsableProgramadoId === id ||
+        item.empleadoId === id
+      )
+      if (!byOccurrence) {
+        if (id === 8) {
+          return { id: 8, nombre: 'Bea', waId: '5491222222222' }
+        }
+        return null
+      }
+      return {
+        id,
+        nombre: byOccurrence.responsableActualId === id
+          ? byOccurrence.responsableActualNombre ?? byOccurrence.empleadoNombre
+          : byOccurrence.responsableProgramadoId === id
+            ? byOccurrence.responsableProgramadoNombre ?? byOccurrence.empleadoNombre
+            : byOccurrence.empleadoNombre,
+        waId: byOccurrence.responsableActualId === id
+          ? byOccurrence.responsableActualWaId ?? byOccurrence.empleadoWaId
+          : byOccurrence.responsableProgramadoId === id
+            ? byOccurrence.responsableProgramadoWaId ?? byOccurrence.empleadoWaId
+            : byOccurrence.empleadoWaId,
+      }
+    },
     async markOccurrenceReply(
       id: number,
       estado: 'cumplido' | 'cumplido_con_observacion' | 'vencido',
@@ -154,17 +191,18 @@ describe('rounds orchestration service', () => {
       })
     ).toBe(
       [
-        '*Control de banos*',
-        'Control programado para las 14:00.',
+        '🚻 *Control de banos — Docks del Puerto*',
         '',
-        'Respondé:',
-        '1. Iniciar ronda',
-        '2. Pausar ronda',
-        '3. Finalizar ronda',
-        '4. Finalizada con observacion',
-        '5. No pude hacerla',
+        '⏰ Control programado para las *14:00*',
         '',
-        'ID control: 123',
+        'Completá el control y respondé:',
+        '✅ 1. Iniciar ronda',
+        '⏸️ 2. Pausar ronda',
+        '🏁 3. Finalizar ronda',
+        '⚠️ 4. Finalizada con observación',
+        '❌ 5. No pude realizarla',
+        '',
+        '🔑 ID control: 123',
       ].join('\n')
     )
   })
@@ -396,5 +434,100 @@ describe('rounds orchestration service', () => {
     expect(finished.estado).toBe('cumplido')
     expect(finished.tiempoAcumuladoSegundos).toBe(900)
     expect(finished.finRealAt?.toISOString()).toBe(closedAt.toISOString())
+  })
+
+  it('assigns, reassigns and releases an occurrence preserving accumulated work', async () => {
+    const repo = createFakeRepo({
+      occurrences: [
+        {
+          id: 55,
+          plantillaId: 10,
+          programacionId: 10,
+          fechaOperativa: '2026-04-06',
+          programadoAt: new Date('2026-04-06T12:00:00-03:00'),
+          programadoAtLabel: '12:00',
+          estado: 'pausada',
+          recordatorioEnviadoAt: new Date('2026-04-06T12:00:00-03:00'),
+          confirmadoAt: null,
+          escaladoAt: null,
+          empleadoId: 7,
+          empleadoNombre: 'Ana',
+          empleadoWaId: '5491111111111',
+          responsableProgramadoId: 7,
+          responsableProgramadoNombre: 'Ana',
+          responsableProgramadoWaId: '5491111111111',
+          responsableActualId: 7,
+          responsableActualNombre: 'Ana',
+          responsableActualWaId: '5491111111111',
+          asignacionEstado: 'en_progreso',
+          asignadoAt: new Date('2026-04-06T11:55:00-03:00'),
+          tiempoAcumuladoSegundos: 720,
+          pausadoAt: new Date('2026-04-06T12:10:00-03:00'),
+          supervisorWaId: '5491100000000',
+          nombreRonda: 'Control de banos',
+        },
+      ],
+    })
+
+    const service = createRoundsService(repo as any)
+
+    const reassigned = await service.assignOccurrence({
+      occurrenceId: 55,
+      empleadoId: 8,
+      actor: { id: 1, name: 'Gerente' },
+      now: new Date('2026-04-06T12:20:00-03:00'),
+    })
+    expect(reassigned.responsableActualId).toBe(8)
+    expect(reassigned.empleadoId).toBe(8)
+    expect(reassigned.asignacionEstado).toBe('asignada')
+    expect(reassigned.tiempoAcumuladoSegundos).toBe(720)
+
+    const released = await service.releaseOccurrence({
+      occurrenceId: 55,
+      actor: { id: 1, name: 'Gerente' },
+      now: new Date('2026-04-06T12:25:00-03:00'),
+    })
+    expect(released.responsableActualId).toBeNull()
+    expect(released.asignacionEstado).toBe('sin_asignar')
+    expect(released.tiempoAcumuladoSegundos).toBe(720)
+  })
+
+  it('rejects lifecycle actions from a previous round owner after reassignment', async () => {
+    const repo = createFakeRepo({
+      occurrences: [
+        {
+          id: 56,
+          plantillaId: 10,
+          programacionId: 10,
+          fechaOperativa: '2026-04-06',
+          programadoAt: new Date('2026-04-06T13:00:00-03:00'),
+          estado: 'pendiente',
+          recordatorioEnviadoAt: null,
+          confirmadoAt: null,
+          escaladoAt: null,
+          empleadoId: 8,
+          empleadoNombre: 'Bea',
+          empleadoWaId: '5491222222222',
+          responsableProgramadoId: 7,
+          responsableProgramadoNombre: 'Ana',
+          responsableProgramadoWaId: '5491111111111',
+          responsableActualId: 8,
+          responsableActualNombre: 'Bea',
+          responsableActualWaId: '5491222222222',
+          asignacionEstado: 'asignada',
+          supervisorWaId: '5491100000000',
+          nombreRonda: 'Control de banos',
+        },
+      ],
+    })
+
+    const service = createRoundsService(repo as any)
+
+    await expect(service.startOccurrence({ occurrenceId: 56, empleadoId: 7 })).rejects.toThrow(
+      'Round occurrence does not belong to employee'
+    )
+    await expect(service.finishOccurrence({ occurrenceId: 56, empleadoId: 7 })).rejects.toThrow(
+      'Round occurrence does not belong to employee'
+    )
   })
 })
