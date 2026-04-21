@@ -1,3 +1,4 @@
+@import './design-tokens.css';
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
@@ -6,17 +7,21 @@
 :root {
   /* Primary */
   --primary: #2563EB;
+  --blue: #2563EB;
   --primary-dark: #1E40AF;
+  --blue-dark: #1E40AF;
   --primary-light: #DBEAFE;
   --blue-glow: rgba(37,99,235,0.18);
 
   /* Sidebar / Navy */
   --sidebar-bg: #0F172A;
+  --navy: #0F172A;
   --navy-mid: #162032;
   --navy-light: #1E2D42;
 
   /* Accent */
   --accent: #10B981;
+  --teal: #10B981;
   --accent-light: #D1FAE5;
 
   /* Secondary */
@@ -25,10 +30,12 @@
   /* Status */
   --success: #059669;
   --warning: #D97706;
+  --warn: #D97706;
   --danger: #DC2626;
 
   /* Backgrounds */
   --background: #F1F5F9;
+  --bg: #F1F5F9;
   --surface: #FFFFFF;
   --border: #E2E8F0;
   --border-dark: #CBD5E1;
@@ -53,6 +60,15 @@
   --shadow-card-strong: 0 2px 8px rgba(15,23,42,0.05), 0 12px 32px rgba(15,23,42,0.05);
   --shadow-modal: 0 20px 60px rgba(0,0,0,0.20);
   --shadow-btn: 0 4px 14px rgba(37,99,235,0.35);
+  --shadow-btn-primary: 0 4px 14px rgba(37,99,235,0.35);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 14px;
 }
 
 html, body {
@@ -84,6 +100,7 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: var(--shadow-card);
   }
 
+  .card-strong,
   .card-xl {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -116,7 +133,7 @@ h1, h2, h3, h4, h5, h6 {
     color: white;
     border-radius: 9px;
     font-weight: 600;
-    font-size: 12.5px;
+    font-size: 13px;
     transition: all 0.16s ease;
   }
 
@@ -142,10 +159,147 @@ h1, h2, h3, h4, h5, h6 {
   .badge {
     display: inline-flex;
     align-items: center;
+    gap: 4px;
     padding: 3px 9px;
     border-radius: 6px;
     font-size: 11px;
     font-weight: 500;
+  }
+
+  .filter-input,
+  .filter-select,
+  .input,
+  .login-input,
+  .pub-input,
+  .config-input {
+    font-family: inherit;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text-1);
+    outline: none;
+    transition: all 0.15s ease;
+  }
+
+  .input,
+  .login-input,
+  .pub-input,
+  .config-input {
+    border-width: 1.5px;
+    background: #F8FAFC;
+  }
+
+  .filter-input:focus,
+  .filter-select:focus,
+  .input:focus,
+  .login-input:focus,
+  .pub-input:focus,
+  .config-input:focus {
+    border-color: var(--primary) !important;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.10) !important;
+    outline: none;
+  }
+
+  .hero-card {
+    background: linear-gradient(135deg, #0F172A 0%, #162032 40%, #1a2e50 100%);
+    border-radius: 22px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .hero-card::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 280px;
+    height: 280px;
+    background: radial-gradient(circle, rgba(37,99,235,0.20) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-card::after {
+    content: '';
+    position: absolute;
+    bottom: -30px;
+    left: 30%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(37,99,235,0.20);
+    border: 1px solid rgba(37,99,235,0.35);
+    color: #93C5FD;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+
+  .kpi:hover {
+    box-shadow: 0 4px 16px rgba(15,23,42,0.08);
+    transform: translateY(-1px);
+  }
+
+  .kpi-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+
+  .lead-card,
+  .emp-card,
+  .task-item,
+  .liq-row,
+  .config-section {
+    background: #fff;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+  }
+
+  .lead-card {
+    border-radius: 16px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .lead-card:hover {
+    box-shadow: 0 6px 20px rgba(15,23,42,0.09);
+    transform: translateY(-1px);
+  }
+
+  .config-section {
+    border-radius: 18px;
+    padding: 20px;
   }
 
   /* Table */

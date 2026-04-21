@@ -1,0 +1,88 @@
+/* ============================================================
+   DOCKS DEL PUERTO — Design System Tokens
+   Generated from: yaakov2731/docks-mantenimiento-app
+   Fonts: Poppins (headings), Inter (body) via Google Fonts
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
+/* ── BASE COLOR TOKENS ─────────────────────────────────────── */
+:root {
+  /* Primary (Action Blue) */
+  --color-primary:       #2563EB;
+  --color-primary-dark:  #1E40AF;
+  --color-primary-light: #DBEAFE;
+
+  /* Navigation / Brand Dark */
+  --color-sidebar:       #0F172A;
+  --color-sidebar-mid:   #1a2e4a;
+
+  /* Accent (Emerald) */
+  --color-accent:        #10B981;
+  --color-accent-light:  #D1FAE5;
+
+  /* Secondary (Purple) */
+  --color-secondary:     #8B5CF6;
+  --color-secondary-light: #EDE9FE;
+
+  /* Status: Success */
+  --color-success:       #059669;
+  --color-success-light: #D1FAE5;
+
+  /* Status: Warning */
+  --color-warning:       #D97706;
+  --color-warning-light: #FEF3C7;
+
+  /* Status: Danger */
+  --color-danger:        #DC2626;
+  --color-danger-light:  #FEE2E2;
+
+  /* Neutrals */
+  --color-bg:            #F9FAFB;
+  --color-surface:       #ffffff;
+  --color-gray-50:       #F9FAFB;
+  --color-gray-100:      #F3F4F6;
+  --color-gray-200:      #E5E7EB;
+  --color-gray-400:      #9CA3AF;
+  --color-gray-500:      #6B7280;
+  --color-gray-600:      #4B5563;
+  --color-gray-800:      #1F2937;
+  --color-gray-900:      #111827;
+
+  /* Logo arch colors */
+  --color-logo-red:      #D94F3B;
+  --color-logo-green:    #2E8A48;
+  --color-logo-yellow:   #E8B830;
+  --color-logo-blue:     #1E72B8;
+
+  /* ── SHADOWS ──────────────────────────────────────────────── */
+  --shadow-ds-card:         0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --shadow-ds-card-strong:  0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.05);
+  --shadow-ds-modal:        0 8px 40px rgba(0,0,0,0.12);
+  --shadow-ds-btn-primary:  0 4px 12px rgba(37,99,235,0.30);
+
+  /* ── BORDER RADIUS ───────────────────────────────────────── */
+  --radius-sm:    8px;   /* buttons, inputs */
+  --radius-md:    12px;  /* inputs rounding (xl) */
+  --radius-lg:    18px;  /* small cards */
+  --radius-xl:    22px;  /* main cards */
+  --radius-2xl:   24px;  /* hero cards */
+  --radius-modal: 32px;  /* modals / drawers */
+
+  /* ── TYPOGRAPHY ──────────────────────────────────────────── */
+  --font-heading: 'Poppins', sans-serif;
+  --font-body:    'Inter', sans-serif;
+  --font-mono:    'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+
+  /* ── SEMANTIC: Foreground ────────────────────────────────── */
+  --fg-base:        var(--color-gray-900);
+  --fg-muted:       var(--color-gray-600);
+  --fg-subtle:      var(--color-gray-400);
+  --fg-on-dark:     rgba(255,255,255,0.80);
+  --fg-on-dark-dim: rgba(255,255,255,0.45);
+
+  /* ── SEMANTIC: Backgrounds ───────────────────────────────── */
+  --bg-app:         var(--color-bg);
+  --bg-card:        var(--color-surface);
+  --bg-sidebar:     var(--color-sidebar);
+}
