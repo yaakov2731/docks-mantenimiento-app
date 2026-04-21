@@ -4,16 +4,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS TOKENS ─────────────────────────────────── */
 :root {
-  /* Primary */
   --primary: #2563EB;
   --blue: #2563EB;
   --primary-dark: #1E40AF;
   --blue-dark: #1E40AF;
   --primary-light: #DBEAFE;
-  --blue-glow: rgba(37,99,235,0.18);
-
-  /* Sidebar / Navy */
   --sidebar-bg: #0F172A;
   --navy: #0F172A;
   --navy-mid: #162032;
@@ -23,17 +20,11 @@
   --accent: #10B981;
   --teal: #10B981;
   --accent-light: #D1FAE5;
-
-  /* Secondary */
   --secondary: #8B5CF6;
-
-  /* Status */
   --success: #059669;
   --warning: #D97706;
   --warn: #D97706;
   --danger: #DC2626;
-
-  /* Backgrounds */
   --background: #F1F5F9;
   --bg: #F1F5F9;
   --surface: #FFFFFF;
@@ -71,13 +62,14 @@ html {
   font-size: 14px;
 }
 
+/* ── BASE ───────────────────────────────────────── */
 html, body {
   font-family: 'Inter', sans-serif;
-  font-size: 14px;
   background-color: var(--background);
-  color: var(--text-1);
+  color: var(--gray-900);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -88,9 +80,11 @@ h1, h2, h3, h4, h5, h6 {
   min-height: 100vh;
 }
 
+/* ── SCROLLBAR ──────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
 @layer components {
   .card {
@@ -341,6 +335,99 @@ h1, h2, h3, h4, h5, h6 {
   .page-enter { animation: fadeSlideIn 0.22s ease forwards; }
 }
 
+.surface-panel {
+  background: #ffffff;
+  border: 1px solid var(--gray-200);
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.04);
+}
+
+.surface-panel-strong {
+  background: #ffffff;
+  border: 1px solid var(--gray-200);
+  box-shadow: 0 2px 8px rgba(15,23,42,0.05), 0 12px 32px rgba(15,23,42,0.05);
+}
+
+/* ── BRAND HEADER / HERO ────────────────────────── */
+.brand-header {
+  background: linear-gradient(135deg, #0F172A 0%, #162032 40%, #1a2e50 100%);
+}
+
+.brand-hero {
+  background: linear-gradient(135deg, #0F172A 0%, #162032 40%, #1a2e50 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-hero::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 320px; height: 320px;
+  background: radial-gradient(circle, rgba(37,99,235,0.18) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.brand-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -40px; left: 30%;
+  width: 240px; height: 240px;
+  background: radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+/* ── BUTTONS ────────────────────────────────────── */
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+  border-radius: 9px;
+  font-weight: 600;
+  transition: all 0.18s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: var(--gray-100);
+  color: var(--gray-900);
+  border-radius: 9px;
+  font-weight: 600;
+  transition: all 0.18s ease;
+}
+
+.btn-secondary:hover {
+  background-color: var(--gray-200);
+}
+
+/* ── INPUTS ─────────────────────────────────────── */
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10) !important;
+  outline: none;
+  background: #fff !important;
+}
+
+/* ── PAGE TRANSITION ────────────────────────────── */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+main > * {
+  animation: pageEnter 0.2s ease forwards;
+}
+
+/* ── PRINT ──────────────────────────────────────── */
 @media print {
   body * { visibility: hidden; }
   .print-area, .print-area * { visibility: visible; }

@@ -26,153 +26,156 @@ export default function Login() {
   })
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 100,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#070E1C', padding: 16,
-    }}>
+    <div className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: '#070E1C' }}>
+
       {/* Background glows */}
-      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-        <div style={{ position: 'absolute', top: -100, left: -100, width: 600, height: 600, background: 'radial-gradient(circle, rgba(37,99,235,0.15) 0%, transparent 65%)' }} />
-        <div style={{ position: 'absolute', bottom: -80, right: -80, width: 400, height: 400, background: 'radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 65%)' }} />
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div style={{
+          position: 'absolute', top: '-100px', left: '-100px',
+          width: '600px', height: '600px',
+          background: 'radial-gradient(circle, rgba(37,99,235,0.14) 0%, transparent 65%)',
+        }} />
+        <div style={{
+          position: 'absolute', bottom: '-80px', right: '-80px',
+          width: '400px', height: '400px',
+          background: 'radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 65%)',
+        }} />
       </div>
 
-      <div style={{
-        width: '100%', maxWidth: 900,
-        display: 'flex', overflow: 'hidden',
-        borderRadius: 24,
-        boxShadow: '0 24px 80px rgba(0,0,0,0.50)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        position: 'relative', zIndex: 1,
-      }}>
+      <div className="w-full max-w-[900px] flex overflow-hidden relative z-10"
+        style={{
+          borderRadius: '24px',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.50)',
+          border: '1px solid rgba(255,255,255,0.07)',
+        }}>
 
-        {/* Brand panel — hidden on mobile */}
-        <div
-          className="hidden md:flex"
-          style={{
-            width: '44%', flexShrink: 0,
-            background: 'linear-gradient(160deg, #0F172A 0%, #162032 50%, #1a2e50 100%)',
-            padding: '44px 40px',
-            flexDirection: 'column', justifyContent: 'space-between',
-            borderRight: '1px solid rgba(255,255,255,0.07)',
-            position: 'relative', overflow: 'hidden',
-          }}
-        >
-          <div style={{ position: 'absolute', top: -60, right: -60, width: 300, height: 300, background: 'radial-gradient(circle, rgba(37,99,235,0.18) 0%, transparent 65%)', pointerEvents: 'none' }} />
+        {/* Left — Brand panel */}
+        <div className="hidden md:flex flex-col justify-between text-white p-10 w-[44%] flex-shrink-0 relative overflow-hidden"
+          style={{ background: 'linear-gradient(160deg, #0F172A 0%, #162032 50%, #1a2e50 100%)', borderRight: '1px solid rgba(255,255,255,0.07)' }}>
 
-          <div style={{ position: 'relative', zIndex: 1 }}>
+          {/* Glow */}
+          <div className="pointer-events-none absolute top-0 right-0 w-72 h-72"
+            style={{ background: 'radial-gradient(circle, rgba(37,99,235,0.18) 0%, transparent 65%)', transform: 'translate(30%, -30%)' }} />
+
+          <div className="relative z-10">
             <BrandLogo variant="dark" size="md" showTagline />
-            <div style={{ marginTop: 36 }}>
-              <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgba(255,255,255,0.28)', marginBottom: 16 }}>
-                Sistema de gestión
-              </p>
-              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 20, fontWeight: 700, color: '#fff', lineHeight: 1.45, marginBottom: 24 }}>
+            <div className="mt-9">
+              <p className="text-[10px] font-semibold uppercase tracking-[.14em] mb-4"
+                style={{ color: 'rgba(255,255,255,0.28)' }}>Sistema de gestión</p>
+              <h2 className="font-heading font-bold text-[20px] leading-snug mb-6"
+                style={{ color: '#fff' }}>
                 Gestión de reclamos,<br />operaciones y equipo.
               </h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+              <div className="space-y-3">
                 {features.map(({ color, text }) => (
-                  <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.50)' }}>{text}</span>
+                  <div key={text} className="flex items-center gap-3">
+                    <div className="w-[6px] h-[6px] rounded-full flex-shrink-0" style={{ background: color }} />
+                    <span className="text-[12.5px]" style={{ color: 'rgba(255,255,255,0.50)' }}>{text}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.16)', position: 'relative', zIndex: 1 }}>
+          <p className="text-[11px] relative z-10" style={{ color: 'rgba(255,255,255,0.16)' }}>
             Docks del Puerto · Puerto de Frutos, Tigre
           </p>
         </div>
 
-        {/* Form panel */}
-        <div style={{ flex: 1, background: '#fff', padding: '44px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        {/* Right — Login form */}
+        <div className="flex-1 bg-white p-10 flex flex-col justify-center">
+
           {/* Mobile logo */}
-          <div className="md:hidden" style={{ marginBottom: 32 }}>
+          <div className="md:hidden mb-8">
             <BrandLogo size="sm" />
           </div>
 
-          <div style={{ maxWidth: 360, width: '100%', margin: '0 auto' }}>
-            <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94A3B8', marginBottom: 6 }}>
-              Panel interno
-            </p>
-            <h1 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 26, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>
+          <div style={{ maxWidth: '360px', width: '100%', margin: '0 auto' }}>
+            <p className="font-semibold uppercase tracking-[.12em] mb-1.5"
+              style={{ fontSize: '10px', color: '#94A3B8' }}>Panel interno</p>
+            <h1 className="font-heading font-bold mb-2" style={{ fontSize: '26px', color: '#0F172A' }}>
               Ingresá al panel
             </h1>
-            <p style={{ fontSize: 13, color: '#94A3B8', marginBottom: 32 }}>
+            <p className="mb-8" style={{ fontSize: '13px', color: '#94A3B8' }}>
               Acceso restringido al personal autorizado.
             </p>
 
-            <form onSubmit={e => { e.preventDefault(); setError(''); login.mutate(form) }} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <form
+              onSubmit={e => { e.preventDefault(); setError(''); login.mutate(form) }}
+              className="space-y-4"
+            >
               <div>
-                <label style={{ fontSize: 12.5, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>Usuario</label>
+                <label className="block font-medium mb-1.5" style={{ fontSize: '12.5px', color: '#374151' }}>
+                  Usuario
+                </label>
                 <input
                   type="text"
                   value={form.username}
                   onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
                   placeholder="admin"
                   required
+                  className="w-full rounded-xl px-4 py-3 text-sm transition-all"
                   style={{
-                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: 11,
-                    padding: '12px 16px', fontSize: 14, fontFamily: 'inherit',
-                    background: '#F8FAFC', color: '#0F172A', outline: 'none',
-                    transition: 'all 0.18s', boxSizing: 'border-box',
+                    border: '1.5px solid #E2E8F0',
+                    background: '#F8FAFC',
+                    outline: 'none',
+                    fontSize: '14px',
                   }}
-                  onFocus={e => { e.target.style.borderColor = '#2563EB'; e.target.style.background = '#fff'; e.target.style.boxShadow = '0 0 0 4px rgba(37,99,235,0.10)' }}
-                  onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.background = '#F8FAFC'; e.target.style.boxShadow = '' }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: 12.5, fontWeight: 500, color: '#374151', display: 'block', marginBottom: 6 }}>Contraseña</label>
+                <label className="block font-medium mb-1.5" style={{ fontSize: '12.5px', color: '#374151' }}>
+                  Contraseña
+                </label>
                 <input
                   type="password"
                   value={form.password}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   placeholder="••••••••"
                   required
+                  className="w-full rounded-xl px-4 py-3 text-sm transition-all"
                   style={{
-                    width: '100%', border: '1.5px solid #E2E8F0', borderRadius: 11,
-                    padding: '12px 16px', fontSize: 14, fontFamily: 'inherit',
-                    background: '#F8FAFC', color: '#0F172A', outline: 'none',
-                    transition: 'all 0.18s', boxSizing: 'border-box',
+                    border: '1.5px solid #E2E8F0',
+                    background: '#F8FAFC',
+                    outline: 'none',
+                    fontSize: '14px',
                   }}
-                  onFocus={e => { e.target.style.borderColor = '#2563EB'; e.target.style.background = '#fff'; e.target.style.boxShadow = '0 0 0 4px rgba(37,99,235,0.10)' }}
-                  onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.background = '#F8FAFC'; e.target.style.boxShadow = '' }}
                 />
               </div>
 
               {error && (
-                <div style={{ fontSize: 12, color: '#DC2626', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: '10px 14px' }}>
+                <p className="text-sm rounded-xl px-4 py-3"
+                  style={{
+                    color: '#DC2626',
+                    background: '#FEF2F2',
+                    border: '1px solid #FECACA',
+                    fontSize: '12.5px',
+                  }}>
                   {error}
-                </div>
+                </p>
               )}
 
               <button
                 type="submit"
                 disabled={login.isLoading}
+                className="w-full text-white font-semibold rounded-xl py-3.5 text-sm transition-all mt-2"
                 style={{
-                  width: '100%', padding: '14px', fontSize: 14,
-                  fontFamily: 'inherit', fontWeight: 600,
                   background: login.isLoading ? '#93C5FD' : '#2563EB',
-                  color: '#fff', border: 'none', borderRadius: 12,
+                  fontSize: '14px',
                   cursor: login.isLoading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.18s', marginTop: 4,
+                  boxShadow: login.isLoading ? 'none' : '0 4px 14px rgba(37,99,235,0.30)',
                 }}
-                onMouseEnter={e => { if (!login.isLoading) { (e.currentTarget as HTMLElement).style.background = '#1E40AF'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 14px rgba(37,99,235,0.35)' } }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = login.isLoading ? '#93C5FD' : '#2563EB'; (e.currentTarget as HTMLElement).style.boxShadow = '' }}
               >
                 {login.isLoading ? 'Ingresando…' : 'Ingresar'}
               </button>
             </form>
 
-            <p style={{ marginTop: 28, textAlign: 'center', fontSize: 12, color: '#CBD5E1' }}>
-              <a
-                href="/"
-                style={{ color: '#94A3B8', textDecoration: 'none', transition: 'color 0.15s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#2563EB' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#94A3B8' }}
-              >
+            <p className="mt-8 text-center" style={{ fontSize: '12px', color: '#CBD5E1' }}>
+              <a href="/" style={{ color: '#94A3B8', textDecoration: 'none', transition: 'color .15s' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#2563EB')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}>
                 ← Ir al formulario público
               </a>
             </p>
