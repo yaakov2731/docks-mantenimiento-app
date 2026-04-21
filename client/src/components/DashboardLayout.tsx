@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'wouter'
 import { trpc } from '../lib/trpc'
 import BrandLogo from './BrandLogo'
 import {
   LayoutDashboard, ClipboardList, History, Users,
   Settings, LogOut, Menu, Home, UserCheck, X, ClipboardCheck, Wrench, Clock3,
+  Sun, Moon,
 } from 'lucide-react'
 
 type PanelRole = 'admin' | 'employee' | 'sales'
@@ -28,42 +29,65 @@ const roleLabel: Record<PanelRole, string> = {
   sales:    'Comercial / Ventas',
 }
 
+function useTheme() {
+  const [dark, setDark] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const saved = localStorage.getItem('theme')
+    if (saved) return saved === 'dark'
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (dark) {
+      root.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      root.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }, [dark])
+
+  return { dark, toggle: () => setDark(d => !d) }
+}
+
 export default function DashboardLayout({ children, title }: { children: React.ReactNode; title?: string }) {
   const [open, setOpen] = useState(false)
   const [location] = useLocation()
+  const { dark, toggle } = useTheme()
   const { data: user } = trpc.auth.me.useQuery()
   const logout = trpc.auth.logout.useMutation({ onSuccess: () => { window.location.href = '/login' } })
   const userRole = (user as { role?: PanelRole } | undefined)?.role
   const visibleNavItems = navItems.filter(item => !userRole || item.roles.includes(userRole))
 
   const Sidebar = () => (
-    <div className="flex flex-col h-full text-white w-64 relative overflow-hidden"
-      style={{ background: 'linear-gradient(180deg, #0F172A 0%, #0a1422 100%)' }}>
+    <div className="flex flex-col h-full w-64 relative overflow-hidden"
+      style={{ background: 'var(--sidebar-bg)', color: 'var(--fg-on-dark)' }}>
 
-      {/* Glow overlay */}
+      {/* Subtle ambient glow */}
       <div className="pointer-events-none absolute top-0 right-0 w-48 h-48 rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
+        style={{ background: 'radial-gradient(circle, oklch(0.65 0.135 70 / 0.08) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
 
       {/* Logo */}
-      <div className="px-5 pt-6 pb-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="px-5 pt-6 pb-5" style={{ borderBottom: '1px solid oklch(1 0 0 / 0.07)' }}>
         <BrandLogo variant="dark" size="sm" showTagline />
       </div>
 
       {/* User card */}
       {user && (
         <div className="mx-3 mt-3 mb-1 rounded-xl px-3 py-2.5"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
+          style={{ background: 'oklch(1 0 0 / 0.05)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
           <p className="text-[9px] uppercase tracking-widest font-semibold"
-            style={{ color: 'rgba(255,255,255,0.28)' }}>Conectado como</p>
-          <p className="text-[13px] font-semibold text-white mt-0.5 truncate">{user.name}</p>
-          <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.38)' }}>{roleLabel[userRole ?? 'employee']}</p>
+            style={{ color: 'oklch(1 0 0 / 0.28)' }}>Conectado como</p>
+          <p className="text-[13px] font-semibold mt-0.5 truncate" style={{ color: 'var(--fg-on-dark)', fontFamily: 'var(--font-heading)' }}>{user.name}</p>
+          <p className="text-[11px]" style={{ color: 'oklch(1 0 0 / 0.38)' }}>{roleLabel[userRole ?? 'employee']}</p>
         </div>
       )}
 
       {/* Nav */}
       <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
         <p className="text-[9px] uppercase tracking-widest font-semibold px-3 mb-2"
-          style={{ color: 'rgba(255,255,255,0.22)' }}>Navegación</p>
+          style={{ color: 'oklch(1 0 0 / 0.22)' }}>Navegación</p>
         {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = location === href
           return (
@@ -71,20 +95,19 @@ export default function DashboardLayout({ children, title }: { children: React.R
               key={href}
               href={href}
               onClick={() => setOpen(false)}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all ${
-                active
-                  ? 'text-white font-semibold'
-                  : 'hover:text-white'
-              }`}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all"
               style={active ? {
-                background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-                boxShadow: '0 4px 14px rgba(37,99,235,0.30), inset 0 1px 0 rgba(255,255,255,0.10)',
-                color: '#fff',
+                background: 'oklch(0.65 0.135 70 / 0.18)',
+                color: 'oklch(0.88 0.10 72)',
+                fontWeight: '600',
+                boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.06)',
               } : {
-                color: 'rgba(255,255,255,0.45)',
+                color: 'oklch(1 0 0 / 0.44)',
               }}
+              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(1 0 0 / 0.78)' }}
+              onMouseLeave={e => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(1 0 0 / 0.44)' }}
             >
-              <Icon size={15} className={active ? 'opacity-100' : 'opacity-70'} />
+              <Icon size={15} style={{ opacity: active ? 1 : 0.7 }} />
               {label}
             </Link>
           )
@@ -92,19 +115,19 @@ export default function DashboardLayout({ children, title }: { children: React.R
       </nav>
 
       {/* Logout */}
-      <div className="px-2.5 pb-4 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="px-2.5 pb-4 pt-3" style={{ borderTop: '1px solid oklch(1 0 0 / 0.07)' }}>
         <button
           type="button"
           onClick={() => logout.mutate()}
           className="flex items-center gap-2.5 px-3 py-2 w-full rounded-lg text-[13px] transition-all"
-          style={{ color: 'rgba(255,255,255,0.32)', background: 'transparent' }}
+          style={{ color: 'oklch(1 0 0 / 0.32)', background: 'transparent' }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.65)'
+            (e.currentTarget as HTMLButtonElement).style.background = 'oklch(1 0 0 / 0.06)'
+            ;(e.currentTarget as HTMLButtonElement).style.color = 'oklch(1 0 0 / 0.65)'
           }}
           onMouseLeave={e => {
             (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.32)'
+            ;(e.currentTarget as HTMLButtonElement).style.color = 'oklch(1 0 0 / 0.32)'
           }}
         >
           <LogOut size={15} />
@@ -115,7 +138,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
   )
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#F1F5F9' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--background)' }}>
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-shrink-0">
@@ -128,7 +151,8 @@ export default function DashboardLayout({ children, title }: { children: React.R
           <div className="flex-shrink-0">
             <Sidebar />
           </div>
-          <div className="flex-1" style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+          <div className="flex-1"
+            style={{ background: 'oklch(0 0 0 / 0.50)', backdropFilter: 'blur(2px)' }}
             onClick={() => setOpen(false)} />
         </div>
       )}
@@ -137,37 +161,65 @@ export default function DashboardLayout({ children, title }: { children: React.R
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Top bar */}
-        <header className="bg-white border-b px-4 md:px-5 flex items-center gap-3 flex-shrink-0"
-          style={{ height: '52px', borderColor: '#E2E8F0' }}>
+        <header className="flex items-center gap-3 flex-shrink-0 px-4 md:px-5"
+          style={{
+            height: '52px',
+            background: 'var(--surface)',
+            borderBottom: '1px solid var(--border)',
+          }}>
           <button
             type="button"
             className="md:hidden p-2 rounded-lg transition-colors"
-            style={{ color: '#64748B' }}
+            style={{ color: 'var(--text-2)' }}
             onClick={() => setOpen(!open)}
             aria-label="Abrir menú"
           >
             {open ? <X size={20} /> : <Menu size={20} />}
           </button>
+
           <div className="flex-1 min-w-0">
-            <h1 className="font-heading font-semibold truncate" style={{ fontSize: '16px', color: '#0F172A' }}>
+            <h1 className="font-heading font-semibold truncate"
+              style={{ fontSize: '16px', color: 'var(--text-1)', fontFamily: 'var(--font-heading)', letterSpacing: '-0.01em' }}>
               {title ?? 'Dashboard'}
             </h1>
           </div>
+
+          {/* Dark mode toggle */}
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            className="p-2 rounded-lg transition-all"
+            style={{ color: 'var(--text-2)', background: 'transparent' }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'var(--gray-100)'
+              ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--primary)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+              ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--text-2)'
+            }}
+          >
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+
           <a
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 transition-all border"
-            style={{ color: '#64748B', borderColor: '#E2E8F0', fontSize: '12px' }}
+            className="hidden sm:flex items-center gap-1.5 rounded-lg px-3 py-2 transition-all"
+            style={{ color: 'var(--text-2)', border: '1px solid var(--border)', fontSize: '12px' }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLAnchorElement).style.color = '#2563EB'
-              ;(e.currentTarget as HTMLAnchorElement).style.borderColor = '#BFDBFE'
-              ;(e.currentTarget as HTMLAnchorElement).style.background = '#EFF6FF'
+              const el = e.currentTarget as HTMLAnchorElement
+              el.style.color = 'var(--primary)'
+              el.style.borderColor = 'var(--primary-light)'
+              el.style.background = 'var(--primary-light)'
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLAnchorElement).style.color = '#64748B'
-              ;(e.currentTarget as HTMLAnchorElement).style.borderColor = '#E2E8F0'
-              ;(e.currentTarget as HTMLAnchorElement).style.background = 'transparent'
+              const el = e.currentTarget as HTMLAnchorElement
+              el.style.color = 'var(--text-2)'
+              el.style.borderColor = 'var(--border)'
+              el.style.background = 'transparent'
             }}
           >
             <Home size={12} />
