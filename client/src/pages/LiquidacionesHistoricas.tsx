@@ -104,62 +104,76 @@ export default function LiquidacionesHistoricas() {
 
   return (
     <DashboardLayout title="Liquidaciones Históricas">
-      <div className="surface-panel-strong rounded-[26px] p-5 mb-4">
-        <div className="flex flex-col xl:flex-row xl:items-start gap-4 xl:justify-between">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
-              Historial administrativo
-            </div>
-            <h2 className="mt-3 font-heading text-[22px] md:text-[28px] leading-tight font-semibold text-sidebar-bg">
-              Seguimiento histórico de liquidaciones cerradas y pagadas
-            </h2>
-            <p className="mt-3 text-[13px] md:text-sm text-slate-600">
-              Revisá períodos ya procesados, filtrá por empleado, detectá pagos pendientes y marcá como abonadas liquidaciones anteriores.
-            </p>
-          </div>
+      {/* Dark hero card */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0F172A 0%, #162032 40%, #1a2e50 100%)',
+        borderRadius: 22, padding: 28,
+        position: 'relative', overflow: 'hidden',
+        marginBottom: 16,
+        display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap',
+      }}>
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 280, height: 280, background: 'radial-gradient(circle, rgba(37,99,235,0.20) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -30, left: '30%', width: 200, height: 200, background: 'radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-          <div className="grid sm:grid-cols-3 gap-2 min-w-full xl:min-w-[640px]">
-            <div className="rounded-[20px] border border-slate-200 bg-white p-3">
-              <div className="text-[11px] uppercase tracking-wide text-slate-400">Empleado</div>
-              <select
-                value={empleadoId}
-                onChange={e => setEmpleadoId(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="">Todo el equipo</option>
-                {empleados.map((empleado: any) => (
-                  <option key={empleado.id} value={empleado.id}>{empleado.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div className="rounded-[20px] border border-slate-200 bg-white p-3">
-              <div className="text-[11px] uppercase tracking-wide text-slate-400">Período</div>
-              <select
-                value={periodoTipo}
-                onChange={e => setPeriodoTipo(e.target.value as PeriodoTipo)}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="">Todos</option>
-                <option value="dia">Día</option>
-                <option value="semana">Semana</option>
-                <option value="quincena">Quincena</option>
-                <option value="mes">Mes</option>
-              </select>
-            </div>
-            <div className="rounded-[20px] border border-slate-200 bg-white p-3">
-              <div className="text-[11px] uppercase tracking-wide text-slate-400">Estado</div>
-              <select
-                value={estado}
-                onChange={e => setEstado(e.target.value as EstadoFiltro)}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="todos">Todos</option>
-                <option value="cerrado">Pendientes de pago</option>
-                <option value="pagado">Pagados</option>
-              </select>
-            </div>
+        <div style={{ flex: 1, minWidth: 260, position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(37,99,235,0.20)', border: '1px solid rgba(37,99,235,0.35)', color: '#93C5FD', fontSize: 10, fontWeight: 600, padding: '3px 10px', borderRadius: 999, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Historial administrativo
+          </div>
+          <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, color: '#fff', lineHeight: 1.3, marginBottom: 6 }}>
+            Liquidaciones cerradas<br />y pagadas
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', lineHeight: 1.6, maxWidth: 480 }}>
+            Revisá períodos procesados, detectá pagos pendientes y marcá liquidaciones como abonadas.
           </div>
         </div>
+
+        {summary && (
+          <div style={{ display: 'flex', gap: 10, position: 'relative', zIndex: 1, flexWrap: 'wrap' }}>
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 16, padding: '16px 20px', minWidth: 140 }}>
+              <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' }}>Total</div>
+              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 24, fontWeight: 700, lineHeight: 1, marginTop: 4, color: '#fff' }}>{formatCurrency(summary.totalCerrado)}</div>
+              <div style={{ fontSize: 11, marginTop: 3, color: 'rgba(255,255,255,0.45)' }}>Todos los períodos</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.30)', borderRadius: 16, padding: '16px 20px' }}>
+                <div style={{ fontSize: 9.5, fontWeight: 500, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pagado</div>
+                <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, color: '#10B981', lineHeight: 1, marginTop: 3 }}>{formatCurrency(summary.totalPagado)}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>Liquidaciones abonadas</div>
+              </div>
+              <div style={{ background: 'rgba(217,119,6,0.20)', border: '1px solid rgba(217,119,6,0.35)', borderRadius: 16, padding: '16px 20px' }}>
+                <div style={{ fontSize: 9.5, fontWeight: 500, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pendiente</div>
+                <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, color: '#F59E0B', lineHeight: 1, marginTop: 3 }}>{formatCurrency(summary.totalPendiente)}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>{summary.cierresPendientes} liquidaciones</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Filtros */}
+      <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 18, padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Filter size={14} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+        <select value={empleadoId} onChange={e => setEmpleadoId(e.target.value)}
+          style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '7px 12px', fontSize: 12, fontFamily: 'inherit', background: '#fff', outline: 'none', color: 'var(--text-1)', cursor: 'pointer' }}>
+          <option value="">Todo el equipo</option>
+          {empleados.map((empleado: any) => (
+            <option key={empleado.id} value={empleado.id}>{empleado.nombre}</option>
+          ))}
+        </select>
+        <select value={periodoTipo} onChange={e => setPeriodoTipo(e.target.value as PeriodoTipo)}
+          style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '7px 12px', fontSize: 12, fontFamily: 'inherit', background: '#fff', outline: 'none', color: 'var(--text-1)', cursor: 'pointer' }}>
+          <option value="">Todos los períodos</option>
+          <option value="dia">Día</option>
+          <option value="semana">Semana</option>
+          <option value="quincena">Quincena</option>
+          <option value="mes">Mes</option>
+        </select>
+        <select value={estado} onChange={e => setEstado(e.target.value as EstadoFiltro)}
+          style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '7px 12px', fontSize: 12, fontFamily: 'inherit', background: '#fff', outline: 'none', color: 'var(--text-1)', cursor: 'pointer' }}>
+          <option value="todos">Todos los estados</option>
+          <option value="cerrado">Pendientes de pago</option>
+          <option value="pagado">Pagados</option>
+        </select>
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">

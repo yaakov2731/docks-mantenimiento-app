@@ -5,7 +5,7 @@ import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
 import WorkingTime from '../components/WorkingTime'
 import { ESTADOS, PRIORIDADES } from '@shared/const'
-import { AlertCircle, Clock, CheckCircle2, TrendingUp, X, PauseCircle } from 'lucide-react'
+import { AlertCircle, Clock, CheckCircle2, TrendingUp, X, PauseCircle, Download, Plus } from 'lucide-react'
 
 const DashboardCharts = lazy(() => import('../components/dashboard/DashboardCharts'))
 const ESTADOS_ASIGNACION = [
@@ -143,6 +143,34 @@ export default function Dashboard() {
           </div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', lineHeight: 1.6, maxWidth: 480 }}>
             Monitoreá reclamos, prioridades y el rendimiento del equipo desde un panel ejecutivo centralizado.
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+            <a
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#2563EB', color: '#fff', borderRadius: 9, padding: '8px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none', transition: 'all 0.16s', boxShadow: '0 4px 14px rgba(37,99,235,0.35)' }}
+            >
+              <Plus size={14} />
+              Nuevo reclamo
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                if (!reportes.length) return
+                const header = ['#', 'Locatario', 'Local', 'Categoría', 'Prioridad', 'Estado', 'Asignado', 'Fecha']
+                const rows = reportes.map((r: any) => [r.id, r.locatario, r.local, r.categoria, r.prioridad, r.estado, r.asignadoA ?? '', r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : ''])
+                const csv = [header, ...rows].map(row => row.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a'); a.href = url; a.download = 'reclamos.csv'; a.click()
+                URL.revokeObjectURL(url)
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.75)', borderRadius: 9, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all 0.16s' }}
+            >
+              <Download size={14} />
+              Exportar
+            </button>
           </div>
         </div>
 

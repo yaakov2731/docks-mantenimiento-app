@@ -94,16 +94,26 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
 
-      {/* Header — single dark band */}
-      <header className="bg-gradient-to-r from-slate-950 via-blue-950 to-blue-900 px-6 pt-6 pb-10">
-        <div className="max-w-2xl mx-auto flex items-start justify-between gap-4">
-          <BrandLogo variant="dark" size="md" showTagline />
-          <a
-            href="/login"
-            className="mt-1 text-xs text-white/35 hover:text-white/65 transition-colors font-medium tracking-wide whitespace-nowrap"
-          >
-            Admin →
-          </a>
+      {/* Header — dark hero */}
+      <header className="bg-gradient-to-r from-slate-950 via-blue-950 to-blue-900 px-6 pt-6 pb-12 relative overflow-hidden">
+        <div style={{ position: 'absolute', top: -60, right: -60, width: 300, height: 300, background: 'radial-gradient(circle, rgba(37,99,235,0.15) 0%, transparent 65%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -40, left: '40%', width: 240, height: 240, background: 'radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 65%)', pointerEvents: 'none' }} />
+        <div className="max-w-2xl mx-auto relative">
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <BrandLogo variant="dark" size="md" showTagline />
+            <a
+              href="/login"
+              className="mt-1 text-xs text-white/35 hover:text-white/65 transition-colors font-medium tracking-wide whitespace-nowrap"
+            >
+              Admin →
+            </a>
+          </div>
+          <h1 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 8, lineHeight: 1.3 }}>
+            Formulario de reclamo
+          </h1>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
+            Completá los datos para que el equipo de mantenimiento atienda tu caso.
+          </p>
         </div>
       </header>
 
