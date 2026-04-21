@@ -17,6 +17,17 @@ const DB_TIMEOUT_MS = 20_000
 function fetchWithTimeout(input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), DB_TIMEOUT_MS)
+  // Node's undici crashes when merging a Request object with additional init options
+  // (new URL([object Request]) fails). Extract URL + props to avoid this.
+  if (input instanceof Request) {
+    return fetch(input.url, {
+      method: input.method,
+      headers: input.headers,
+      body: input.body,
+      ...init,
+      signal: controller.signal,
+    }).finally(() => clearTimeout(id))
+  }
   return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(id))
 }
 
