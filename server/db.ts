@@ -17,13 +17,15 @@ const DB_TIMEOUT_MS = 20_000
 function fetchWithTimeout(input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), DB_TIMEOUT_MS)
-  // Node's undici crashes when merging a Request object with additional init options
-  // (new URL([object Request]) fails). Extract URL + props to avoid this.
-  if (input instanceof Request) {
-    return fetch(input.url, {
-      method: input.method,
-      headers: input.headers,
-      body: input.body,
+  // Node's undici crashes when a Request object is passed alongside init options
+  // because it does new URL([object Request]). Use duck-typing (not instanceof)
+  // to decompose the Request since instanceof fails across module boundaries.
+  if (typeof input === 'object' && !(input instanceof URL) && 'url' in input) {
+    const req = input as Request
+    return fetch(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
       ...init,
       signal: controller.signal,
     }).finally(() => clearTimeout(id))
