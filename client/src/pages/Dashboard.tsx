@@ -36,18 +36,18 @@ function KpiCard({ label, value, color, icon: Icon }: any) {
   return (
     <div style={{
       background: '#fff', border: '1px solid var(--border)',
-      borderRadius: 16, padding: 16,
+      borderRadius: 10, padding: '10px 14px',
       boxShadow: 'var(--shadow-card)',
       transition: 'box-shadow 0.2s, transform 0.2s',
     }}
     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(15,23,42,0.08)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)' }}
     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-card)'; (e.currentTarget as HTMLElement).style.transform = '' }}
     >
-      <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10, background: `${color}14` }}>
-        <Icon size={16} style={{ color }} />
+      <div style={{ width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, background: `${color}14` }}>
+        <Icon size={14} style={{ color }} />
       </div>
       <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)', lineHeight: 1.4 }}>{label}</div>
-      <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 30, fontWeight: 700, lineHeight: 1, margin: '6px 0 0', color }}>{value}</div>
+      <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, lineHeight: 1, margin: '4px 0 0', color }}>{value}</div>
     </div>
   )
 }
@@ -64,9 +64,9 @@ const TONE_STYLES: Record<string, { background: string; color: string }> = {
 function TeamMetric({ label, value, tone }: { label: string; value: ReactNode; tone: keyof typeof TONE_STYLES }) {
   const s = TONE_STYLES[tone]
   return (
-    <div style={{ borderRadius: 10, padding: '9px 10px', background: s.background, color: s.color }}>
+    <div style={{ borderRadius: 8, padding: '7px 9px', background: s.background, color: s.color }}>
       <div style={{ fontSize: 9.5, fontWeight: 500, opacity: 0.65, lineHeight: 1.2 }}>{label}</div>
-      <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 20, fontWeight: 700, marginTop: 3, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 16, fontWeight: 700, marginTop: 2, lineHeight: 1 }}>{value}</div>
     </div>
   )
 }
@@ -126,32 +126,29 @@ export default function Dashboard() {
       {/* Hero card */}
       <div style={{
         background: 'linear-gradient(135deg, #0F172A 0%, #162032 40%, #1a2e50 100%)',
-        borderRadius: 22, padding: 28,
+        borderRadius: 12, padding: '16px 20px',
         position: 'relative', overflow: 'hidden',
-        marginBottom: 18,
-        display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap',
+        marginBottom: 14,
+        display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
       }}>
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 280, height: 280, background: 'radial-gradient(circle, rgba(37,99,235,0.20) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -30, left: '30%', width: 200, height: 200, background: 'radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
-        <div style={{ flex: 1, minWidth: 260, position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(37,99,235,0.20)', border: '1px solid rgba(37,99,235,0.35)', color: '#93C5FD', fontSize: 10, fontWeight: 600, padding: '3px 10px', borderRadius: 999, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(37,99,235,0.20)', border: '1px solid rgba(37,99,235,0.35)', color: '#93C5FD', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             En vivo
           </div>
-          <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, color: '#fff', lineHeight: 1.3, marginBottom: 6 }}>
-            Seguimiento operativo<br />en tiempo real
+          <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 16, fontWeight: 600, color: '#fff', lineHeight: 1.3, marginBottom: 4 }}>
+            Seguimiento operativo en tiempo real
           </div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', lineHeight: 1.6, maxWidth: 480 }}>
-            Monitoreá reclamos, prioridades y el rendimiento del equipo desde un panel ejecutivo centralizado.
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, maxWidth: 400 }}>
+            Monitoreá reclamos, prioridades y el rendimiento del equipo desde un panel centralizado.
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             <a
               href="/"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#2563EB', color: '#fff', borderRadius: 9, padding: '8px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none', transition: 'all 0.16s', boxShadow: '0 4px 14px rgba(37,99,235,0.35)' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#2563EB', color: '#fff', borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 600, textDecoration: 'none', transition: 'all 0.16s', boxShadow: '0 2px 8px rgba(37,99,235,0.30)' }}
             >
-              <Plus size={14} />
+              <Plus size={13} />
               Nuevo reclamo
             </a>
             <button
@@ -166,28 +163,28 @@ export default function Dashboard() {
                 const a = document.createElement('a'); a.href = url; a.download = 'reclamos.csv'; a.click()
                 URL.revokeObjectURL(url)
               }}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.75)', borderRadius: 9, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all 0.16s' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.75)', borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all 0.16s' }}
             >
-              <Download size={14} />
+              <Download size={13} />
               Exportar
             </button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, position: 'relative', zIndex: 1, flexWrap: 'wrap' }}>
-          <div style={{ background: 'rgba(37,99,235,0.25)', border: '1px solid rgba(37,99,235,0.35)', borderRadius: 16, padding: '16px 20px', minWidth: 140 }}>
-            <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' }}>Abiertos</div>
-            <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 32, fontWeight: 700, lineHeight: 1, marginTop: 4, color: '#fff' }}>{stats ? stats.abiertos : 0}</div>
-            <div style={{ fontSize: 11, marginTop: 3, color: 'rgba(255,255,255,0.45)' }}>Activos ahora</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ background: 'rgba(37,99,235,0.25)', border: '1px solid rgba(37,99,235,0.35)', borderRadius: 10, padding: '12px 16px', minWidth: 110 }}>
+            <div style={{ fontSize: 9.5, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.50)' }}>Abiertos</div>
+            <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 24, fontWeight: 700, lineHeight: 1, marginTop: 3, color: '#fff' }}>{stats ? stats.abiertos : 0}</div>
+            <div style={{ fontSize: 10, marginTop: 2, color: 'rgba(255,255,255,0.40)' }}>Activos ahora</div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 16, padding: '16px 20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '10px 14px' }}>
               <div style={{ fontSize: 9.5, fontWeight: 500, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>RESOLUCIÓN</div>
-              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, color: '#10B981', lineHeight: 1, marginTop: 3 }}>{stats?.tasaCompletitud ?? 0}%</div>
+              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 17, fontWeight: 700, color: '#10B981', lineHeight: 1, marginTop: 2 }}>{stats?.tasaCompletitud ?? 0}%</div>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 16, padding: '16px 20px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '10px 14px' }}>
               <div style={{ fontSize: 9.5, fontWeight: 500, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>EMPLEADOS</div>
-              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, color: '#fff', lineHeight: 1, marginTop: 3 }}>{empleados.length}</div>
+              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 17, fontWeight: 700, color: '#fff', lineHeight: 1, marginTop: 2 }}>{empleados.length}</div>
             </div>
           </div>
         </div>
@@ -209,25 +206,25 @@ export default function Dashboard() {
       )}
 
       {stats?.rankingEmpleadosHoy?.length > 0 && (
-        <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 22, padding: 20, marginBottom: 18, boxShadow: 'var(--shadow-card-strong)' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 14 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: 'var(--shadow-card-strong)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 12 }}>
             <div>
-              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>Rendimiento del equipo</div>
+              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>Rendimiento del equipo</div>
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Carga operativa, respuestas y horas trabajadas hoy</div>
             </div>
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
             {stats.rankingEmpleadosHoy.map((empleado: any) => (
-              <div key={empleado.empleadoId} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 18, padding: 16, boxShadow: 'var(--shadow-card)', transition: 'box-shadow 0.2s' }}
+              <div key={empleado.empleadoId} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 10, padding: 14, boxShadow: 'var(--shadow-card)', transition: 'box-shadow 0.2s' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(15,23,42,0.08)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-card)' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 2 }}>
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 500, marginBottom: 2 }}>Operativo</div>
-                    <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{empleado.nombre}</div>
+                    <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{empleado.nombre}</div>
                   </div>
-                  <div style={{ width: 38, height: 38, borderRadius: 11, background: '#ECFEFF', color: '#0891B2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 15, flexShrink: 0 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 9, background: '#ECFEFF', color: '#0891B2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
                     {empleado.nombre?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                 </div>
@@ -249,7 +246,7 @@ export default function Dashboard() {
       {stats && stats.abiertos > 0 && (
         <Suspense
           fallback={
-            <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 22, padding: 20, marginBottom: 18, fontSize: 13, color: 'var(--text-3)' }}>
+            <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 18px', marginBottom: 14, fontSize: 13, color: 'var(--text-3)' }}>
               Cargando gráficos operativos...
             </div>
           }
@@ -259,8 +256,8 @@ export default function Dashboard() {
       )}
 
       {stats && stats.abiertos === 0 && stats.total > 0 && (
-        <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 22, padding: '28px 20px', marginBottom: 18, textAlign: 'center', boxShadow: 'var(--shadow-card)' }}>
-          <CheckCircle2 style={{ margin: '0 auto 12px', color: 'var(--success)' }} size={36} />
+        <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 16px', marginBottom: 14, textAlign: 'center', boxShadow: 'var(--shadow-card)' }}>
+          <CheckCircle2 style={{ margin: '0 auto 10px', color: 'var(--success)' }} size={28} />
           <h3 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 18, fontWeight: 600, color: 'var(--text-1)' }}>No hay reclamos abiertos</h3>
           <p style={{ marginTop: 8, fontSize: 13, color: 'var(--text-3)' }}>
             Todos los reclamos vigentes están resueltos o cerrados. La tasa de resolución actual es {stats.tasaCompletitud}%.
@@ -269,8 +266,8 @@ export default function Dashboard() {
       )}
 
       {/* Filters + Table */}
-      <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-card-strong)' }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: '#FAFBFC' }}>
+      <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', boxShadow: 'var(--shadow-card-strong)' }}>
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: '#FAFBFC' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
             <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input
@@ -345,12 +342,12 @@ export default function Dashboard() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 0 0' }}
           className="md:items-center md:p-6"
           onClick={() => setSelected(null)}>
-          <div style={{ background: '#fff', width: '100%', maxWidth: 600, borderRadius: '24px 24px 0 0', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-modal)' }}
-            className="md:rounded-[24px]"
+          <div style={{ background: '#fff', width: '100%', maxWidth: 600, borderRadius: '16px 16px 0 0', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-modal)' }}
+            className="md:rounded-[16px]"
             onClick={e => e.stopPropagation()}>
 
             {/* Modal header */}
-            <div style={{ padding: '22px 22px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 14, position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderRadius: '24px 24px 0 0' }}>
+            <div style={{ padding: '16px 18px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 14, position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderRadius: '16px 16px 0 0' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace', fontWeight: 500, marginBottom: 5 }}>#{reporte.id.toString().padStart(4,'0')} · {reporte.local}</div>
                 <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>{reporte.titulo}</h2>
