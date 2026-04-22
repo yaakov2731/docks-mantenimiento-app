@@ -16,7 +16,7 @@ import fs from 'fs'
 const app = express()
 const PORT = process.env.PORT ?? 3001
 
-const allowedOrigin = readEnv('CLIENT_URL') ?? '*'
+const allowedOrigin: string | true = readEnv('CLIENT_URL') ?? true
 app.use(cors({ origin: allowedOrigin, credentials: true }))
 app.use(express.json({ limit: '10mb' }))
 app.use(cookieParser())

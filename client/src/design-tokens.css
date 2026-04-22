@@ -1,53 +1,51 @@
 /* ============================================================
    DOCKS DEL PUERTO — Design System Tokens
-   Palette: Warm Charcoal + Amber Gold
-   Fonts: Barlow (headings), Noto Sans (body)
+   Palette: Warm Graphite + Amber Gold
+   Fonts: Syne (headings), DM Sans (body) — loaded in index.html
    ============================================================ */
-
-@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600&display=swap');
 
 /* ── LIGHT MODE (default) ──────────────────────────────────── */
 :root {
   /* ── PRIMARY: Amber Gold ── */
-  --color-primary:        oklch(0.65 0.135 70);
-  --color-primary-dark:   oklch(0.54 0.120 68);
-  --color-primary-light:  oklch(0.95 0.040 72);
+  --color-primary:        oklch(0.725 0.148 68);
+  --color-primary-dark:   oklch(0.640 0.152 65);
+  --color-primary-light:  oklch(0.970 0.040 72);
 
   /* ── SIDEBAR / BRAND DARK ── */
-  --color-sidebar:        oklch(0.14 0.018 52);
-  --color-sidebar-mid:    oklch(0.19 0.016 52);
+  --color-sidebar:        oklch(0.148 0.012 45);
+  --color-sidebar-mid:    oklch(0.205 0.012 45);
 
-  /* ── ACCENT: Forest Green ── */
-  --color-accent:         oklch(0.52 0.115 158);
-  --color-accent-light:   oklch(0.94 0.038 158);
+  /* ── ACCENT: Steel Blue ── */
+  --color-accent:         oklch(0.548 0.082 216);
+  --color-accent-light:   oklch(0.948 0.028 216);
 
-  /* ── SECONDARY ── */
-  --color-secondary:      oklch(0.55 0.10 280);
-  --color-secondary-light:oklch(0.94 0.030 280);
+  /* ── SECONDARY: Ocean ── */
+  --color-secondary:      oklch(0.555 0.068 195);
+  --color-secondary-light:oklch(0.952 0.024 195);
 
   /* ── STATUS ── */
-  --color-success:        oklch(0.52 0.120 150);
-  --color-success-light:  oklch(0.94 0.040 150);
-  --color-warning:        oklch(0.72 0.145 72);
-  --color-warning-light:  oklch(0.96 0.045 75);
-  --color-danger:         oklch(0.50 0.175 25);
-  --color-danger-light:   oklch(0.95 0.045 25);
+  --color-success:        oklch(0.530 0.130 150);
+  --color-success-light:  oklch(0.948 0.042 150);
+  --color-warning:        oklch(0.720 0.150 72);
+  --color-warning-light:  oklch(0.968 0.040 75);
+  --color-danger:         oklch(0.520 0.185 25);
+  --color-danger-light:   oklch(0.958 0.040 25);
 
   /* ── SURFACES (light) ── */
-  --color-bg:             oklch(0.974 0.007 68);
-  --color-surface:        oklch(0.997 0.003 68);
-  --color-border:         oklch(0.875 0.013 68);
-  --color-border-strong:  oklch(0.820 0.016 65);
+  --color-bg:             oklch(0.976 0.007 78);
+  --color-surface:        oklch(1.000 0.000 0);
+  --color-border:         oklch(0.875 0.009 72);
+  --color-border-strong:  oklch(0.820 0.012 72);
 
   /* ── NEUTRALS ── */
-  --color-gray-50:        oklch(0.974 0.007 68);
-  --color-gray-100:       oklch(0.950 0.010 68);
-  --color-gray-200:       oklch(0.900 0.012 68);
-  --color-gray-400:       oklch(0.720 0.012 65);
-  --color-gray-500:       oklch(0.600 0.012 60);
-  --color-gray-600:       oklch(0.480 0.012 55);
-  --color-gray-800:       oklch(0.270 0.014 52);
-  --color-gray-900:       oklch(0.170 0.015 50);
+  --color-gray-50:        oklch(0.976 0.007 78);
+  --color-gray-100:       oklch(0.948 0.008 72);
+  --color-gray-200:       oklch(0.900 0.010 72);
+  --color-gray-400:       oklch(0.718 0.012 65);
+  --color-gray-500:       oklch(0.596 0.012 60);
+  --color-gray-600:       oklch(0.470 0.012 55);
+  --color-gray-800:       oklch(0.268 0.014 50);
+  --color-gray-900:       oklch(0.195 0.014 45);
 
   /* ── LOGO ARCH COLORS (unchanged) ── */
   --color-logo-red:       #D94F3B;
@@ -56,10 +54,10 @@
   --color-logo-blue:      #1E72B8;
 
   /* ── SHADOWS ── */
-  --shadow-ds-card:         0 1px 3px oklch(0.14 0.018 52 / 0.06), 0 4px 16px oklch(0.14 0.018 52 / 0.05);
-  --shadow-ds-card-strong:  0 2px 8px oklch(0.14 0.018 52 / 0.07), 0 8px 28px oklch(0.14 0.018 52 / 0.06);
-  --shadow-ds-modal:        0 8px 48px oklch(0.14 0.018 52 / 0.18);
-  --shadow-ds-btn-primary:  0 4px 14px oklch(0.65 0.135 70 / 0.38);
+  --shadow-ds-card:         0 1px 3px oklch(0.148 0.012 45 / 0.06), 0 4px 16px oklch(0.148 0.012 45 / 0.05);
+  --shadow-ds-card-strong:  0 2px 8px oklch(0.148 0.012 45 / 0.07), 0 8px 28px oklch(0.148 0.012 45 / 0.06);
+  --shadow-ds-modal:        0 8px 48px oklch(0.148 0.012 45 / 0.18);
+  --shadow-ds-btn-primary:  0 4px 14px oklch(0.725 0.148 68 / 0.40);
 
   /* ── BORDER RADIUS ── */
   --radius-sm:    8px;
@@ -70,16 +68,16 @@
   --radius-modal: 28px;
 
   /* ── TYPOGRAPHY ── */
-  --font-heading: 'Barlow', sans-serif;
-  --font-body:    'Noto Sans', sans-serif;
+  --font-heading: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
   --font-mono:    'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
 
   /* ── SEMANTIC: Foreground (light) ── */
-  --fg-base:        oklch(0.170 0.015 50);
-  --fg-muted:       oklch(0.460 0.012 55);
-  --fg-subtle:      oklch(0.660 0.010 60);
-  --fg-on-dark:     oklch(0.970 0.005 70 / 0.88);
-  --fg-on-dark-dim: oklch(0.970 0.005 70 / 0.44);
+  --fg-base:        oklch(0.195 0.014 45);
+  --fg-muted:       oklch(0.460 0.012 48);
+  --fg-subtle:      oklch(0.638 0.010 52);
+  --fg-on-dark:     oklch(0.968 0.006 72 / 0.92);
+  --fg-on-dark-dim: oklch(0.968 0.006 72 / 0.46);
 
   /* ── SEMANTIC: Backgrounds ── */
   --bg-app:         var(--color-bg);
@@ -90,36 +88,47 @@
 /* ── DARK MODE ─────────────────────────────────────────────── */
 .dark {
   /* Surfaces */
-  --color-bg:       oklch(0.130 0.018 50);
-  --color-surface:  oklch(0.175 0.016 50);
-  --color-border:   oklch(0.270 0.015 52);
-  --color-border-strong: oklch(0.340 0.015 52);
+  --color-bg:            oklch(0.118 0.012 45);
+  --color-surface:       oklch(0.165 0.012 45);
+  --color-border:        oklch(0.248 0.012 45);
+  --color-border-strong: oklch(0.315 0.012 45);
 
-  /* Sidebar stays deepest */
-  --color-sidebar:     oklch(0.095 0.016 50);
-  --color-sidebar-mid: oklch(0.145 0.018 50);
+  /* Sidebar: deepest level */
+  --color-sidebar:     oklch(0.088 0.012 45);
+  --color-sidebar-mid: oklch(0.138 0.012 45);
 
   /* Neutrals (dark) */
-  --color-gray-50:   oklch(0.175 0.016 50);
-  --color-gray-100:  oklch(0.220 0.016 50);
-  --color-gray-200:  oklch(0.290 0.015 50);
-  --color-gray-400:  oklch(0.450 0.012 55);
-  --color-gray-500:  oklch(0.570 0.012 58);
-  --color-gray-600:  oklch(0.680 0.010 62);
-  --color-gray-800:  oklch(0.840 0.008 66);
-  --color-gray-900:  oklch(0.955 0.006 68);
+  --color-gray-50:   oklch(0.165 0.012 45);
+  --color-gray-100:  oklch(0.210 0.012 45);
+  --color-gray-200:  oklch(0.272 0.012 45);
+  --color-gray-400:  oklch(0.440 0.012 50);
+  --color-gray-500:  oklch(0.555 0.012 52);
+  --color-gray-600:  oklch(0.660 0.012 55);
+  --color-gray-800:  oklch(0.835 0.010 60);
+  --color-gray-900:  oklch(0.958 0.006 72);
 
   /* Semantic foreground (dark) */
-  --fg-base:    oklch(0.955 0.006 68);
-  --fg-muted:   oklch(0.680 0.010 62);
-  --fg-subtle:  oklch(0.480 0.010 58);
+  --fg-base:    oklch(0.958 0.006 72);
+  --fg-muted:   oklch(0.660 0.012 55);
+  --fg-subtle:  oklch(0.478 0.012 50);
 
-  /* Semantic backgrounds */
+  /* Primary brighter in dark for contrast */
+  --color-primary:       oklch(0.765 0.138 70);
+  --color-primary-light: oklch(0.218 0.050 68);
+
+  /* Status lights adjusted for dark surfaces */
+  --color-success-light:  oklch(0.215 0.055 150);
+  --color-warning-light:  oklch(0.215 0.055 75);
+  --color-danger-light:   oklch(0.215 0.055 25);
+  --color-secondary-light:oklch(0.215 0.045 195);
+  --color-accent-light:   oklch(0.215 0.045 216);
+
+  /* Backgrounds */
   --bg-app:   var(--color-bg);
   --bg-card:  var(--color-surface);
 
   /* Shadows (dark) */
-  --shadow-ds-card:        0 1px 3px oklch(0 0 0 / 0.25), 0 4px 16px oklch(0 0 0 / 0.20);
-  --shadow-ds-card-strong: 0 2px 8px oklch(0 0 0 / 0.30), 0 8px 28px oklch(0 0 0 / 0.25);
-  --shadow-ds-modal:       0 8px 48px oklch(0 0 0 / 0.55);
+  --shadow-ds-card:        0 1px 3px oklch(0 0 0 / 0.32), 0 4px 16px oklch(0 0 0 / 0.24);
+  --shadow-ds-card-strong: 0 2px 8px oklch(0 0 0 / 0.38), 0 8px 28px oklch(0 0 0 / 0.30);
+  --shadow-ds-modal:       0 8px 48px oklch(0 0 0 / 0.62);
 }

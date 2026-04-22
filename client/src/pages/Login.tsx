@@ -34,7 +34,7 @@ export default function Login() {
         <div style={{
           position: 'absolute', top: '-100px', left: '-100px',
           width: '600px', height: '600px',
-          background: 'radial-gradient(circle, oklch(0.595 0.210 264 / 0.14) 0%, transparent 65%)',
+          background: 'radial-gradient(circle, oklch(0.725 0.148 68 / 0.14) 0%, transparent 65%)',
         }} />
         <div style={{
           position: 'absolute', bottom: '-80px', right: '-80px',
@@ -56,7 +56,7 @@ export default function Login() {
 
           {/* Glow */}
           <div className="pointer-events-none absolute top-0 right-0 w-72 h-72"
-            style={{ background: 'radial-gradient(circle, oklch(0.595 0.210 264 / 0.18) 0%, transparent 65%)', transform: 'translate(30%, -30%)' }} />
+            style={{ background: 'radial-gradient(circle, oklch(0.725 0.148 68 / 0.18) 0%, transparent 65%)', transform: 'translate(30%, -30%)' }} />
 
           <div className="relative z-10">
             <BrandLogo variant="dark" size="md" showTagline />
@@ -162,9 +162,10 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={login.isLoading}
-                className="w-full text-white font-semibold rounded-xl py-3.5 text-sm transition-all mt-2"
+                className="w-full font-semibold rounded-xl py-3.5 text-sm transition-all mt-2"
                 style={{
                   background: 'var(--primary)',
+                  color: 'oklch(0.148 0.012 45)',
                   fontSize: '14px',
                   opacity: login.isLoading ? 0.6 : 1,
                   cursor: login.isLoading ? 'not-allowed' : 'pointer',
