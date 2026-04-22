@@ -1,0 +1,406 @@
+import { useMemo, useRef, useState } from 'react'
+import * as XLSX from 'xlsx'
+import { Button } from '../ui/button'
+
+type Priority = 'baja' | 'media' | 'alta' | 'urgente'
+
+type EmployeeOption = {
+  id: number
+  nombre: string
+  waId?: string | null
+}
+
+export type ImportedOperationalTaskInput = {
+  tipoTrabajo: string
+  titulo: string
+  descripcion: string
+  ubicacion: string
+  prioridad: Priority
+  empleadoId?: number
+  ordenAsignacion?: number
+}
+
+type ImportedTaskPreview = ImportedOperationalTaskInput & {
+  sourceRow: number
+  empleadoTexto?: string
+  empleadoNombre?: string
+  warnings: string[]
+}
+
+type ParseResult = {
+  tasks: ImportedTaskPreview[]
+  skippedRows: number
+}
+
+type TaskExcelImportProps = {
+  empleados: EmployeeOption[]
+  onSubmit: (tasks: ImportedOperationalTaskInput[], fileName?: string) => Promise<void> | void
+  isSubmitting?: boolean
+}
+
+const EMPLOYEE_ALIASES = [
+  'empleado',
+  'responsable',
+  'asignado',
+  'asignado a',
+  'persona',
+  'operario',
+  'trabajador',
+  'colaborador',
+  'nombre empleado',
+]
+
+const TITLE_ALIASES = ['tarea', 'titulo', 'actividad', 'trabajo', 'detalle tarea', 'descripcion tarea']
+const TITLE_BASES = ['tarea', 'titulo', 'actividad', 'trabajo']
+const DESCRIPTION_ALIASES = ['descripcion', 'detalle', 'observacion', 'observaciones', 'instruccion', 'instrucciones']
+const LOCATION_ALIASES = ['ubicacion', 'lugar', 'sector', 'local', 'area', 'zona']
+const TYPE_ALIASES = ['tipo', 'tipo trabajo', 'tipo de trabajo', 'categoria', 'rubro']
+const PRIORITY_ALIASES = ['prioridad', 'urgencia']
+const ORDER_ALIASES = ['orden', 'secuencia', 'nro', 'numero']
+
+type NormalizedEntry = {
+  key: string
+  normalized: string
+  value: unknown
+}
+
+export function parseTaskRows(rows: Record<string, unknown>[], empleados: EmployeeOption[]): ParseResult {
+  const tasks: ImportedTaskPreview[] = []
+  let skippedRows = 0
+
+  rows.forEach((row, rowIndex) => {
+    const entries = normalizeEntries(row)
+    const baseTitle = cleanText(getCell(entries, TITLE_ALIASES))
+    const slots = baseTitle ? [undefined] : getTaskSlots(entries)
+    const slotsToParse = slots.length > 0 ? slots : [undefined]
+    let parsedInRow = 0
+
+    slotsToParse.forEach((slot) => {
+      const titulo = cleanText(slot ? getSlotCell(entries, TITLE_BASES, slot) : baseTitle)
+      if (titulo.length < 3) return
+
+      const empleadoTexto = cleanText(getCell(entries, EMPLOYEE_ALIASES))
+      const empleado = matchEmployee(empleadoTexto, empleados)
+      const priorityResult = normalizePriority(
+        cleanText(slot ? getSlotCell(entries, ['prioridad', 'urgencia'], slot) : getCell(entries, PRIORITY_ALIASES))
+      )
+      const tipoTrabajo = cleanText(slot ? getSlotCell(entries, ['tipo', 'categoria', 'rubro'], slot) : getCell(entries, TYPE_ALIASES)) || 'tarea_diaria'
+      const ubicacion = cleanText(slot ? getSlotCell(entries, ['ubicacion', 'lugar', 'sector', 'local', 'area', 'zona'], slot) : getCell(entries, LOCATION_ALIASES)) || 'Shopping'
+      const descripcion = cleanText(slot ? getSlotCell(entries, ['descripcion', 'detalle', 'observacion'], slot) : getCell(entries, DESCRIPTION_ALIASES)) || titulo
+      const ordenAsignacion = parseOrder(slot ? getSlotCell(entries, ['orden', 'secuencia'], slot) : getCell(entries, ORDER_ALIASES))
+      const warnings: string[] = []
+
+      if (!empleadoTexto) {
+        warnings.push('Sin responsable en la fila')
+      } else if (!empleado) {
+        warnings.push(`No coincide con empleados activos: ${empleadoTexto}`)
+      }
+      if (priorityResult.warning) warnings.push(priorityResult.warning)
+
+      tasks.push({
+        sourceRow: rowIndex + 2,
+        tipoTrabajo,
+        titulo,
+        descripcion,
+        ubicacion,
+        prioridad: priorityResult.priority,
+        empleadoId: empleado?.id,
+        empleadoNombre: empleado?.nombre,
+        empleadoTexto,
+        ordenAsignacion,
+        warnings,
+      })
+      parsedInRow += 1
+    })
+
+    if (parsedInRow === 0) skippedRows += 1
+  })
+
+  return { tasks, skippedRows }
+}
+
+export function TaskExcelImport({
+  empleados,
+  onSubmit,
+  isSubmitting = false,
+}: TaskExcelImportProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [fileName, setFileName] = useState<string>()
+  const [tasks, setTasks] = useState<ImportedTaskPreview[]>([])
+  const [skippedRows, setSkippedRows] = useState(0)
+  const [parseError, setParseError] = useState<string>()
+  const [lastImport, setLastImport] = useState<string>()
+
+  const summary = useMemo(() => {
+    const assigned = tasks.filter((task) => task.empleadoId).length
+    const unassigned = tasks.length - assigned
+    const warningCount = tasks.reduce((total, task) => total + task.warnings.length, 0)
+    return { assigned, unassigned, warningCount }
+  }, [tasks])
+
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setParseError(undefined)
+    setLastImport(undefined)
+    setFileName(file.name)
+
+    try {
+      const buffer = await file.arrayBuffer()
+      const workbook = XLSX.read(buffer, { type: 'array' })
+      const firstSheetName = workbook.SheetNames[0]
+      if (!firstSheetName) throw new Error('El archivo no tiene hojas para leer.')
+      const worksheet = workbook.Sheets[firstSheetName]
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '', raw: false })
+      const result = parseTaskRows(rows, empleados)
+      setTasks(result.tasks)
+      setSkippedRows(result.skippedRows)
+      if (result.tasks.length === 0) {
+        setParseError('No encontré tareas válidas en la planilla.')
+      }
+    } catch (error: any) {
+      setTasks([])
+      setSkippedRows(0)
+      setParseError(error?.message ?? 'No se pudo leer la planilla.')
+    } finally {
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  async function handleImport() {
+    if (tasks.length === 0) return
+    await onSubmit(tasks.map(({ sourceRow, empleadoTexto, empleadoNombre, warnings, ...task }) => task), fileName)
+    setLastImport(`${tasks.length} tarea${tasks.length === 1 ? '' : 's'} importada${tasks.length === 1 ? '' : 's'}.`)
+    setTasks([])
+    setSkippedRows(0)
+    setFileName(undefined)
+    setParseError(undefined)
+  }
+
+  return (
+    <section className="surface-panel relative overflow-hidden rounded-[22px] border border-[#E3E8EE] p-5 shadow-sm">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(135deg,rgba(34,197,94,0.08),rgba(14,116,144,0.08),transparent)]" />
+
+      <div className="relative flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Plantilla diaria</div>
+          <h3 className="mt-2 font-heading text-lg font-semibold text-sidebar-bg">Importar tareas desde Excel</h3>
+          <p className="mt-2 text-sm text-slate-500">
+            Las filas asignadas quedan pendientes de confirmación y aparecen en el bot dentro de Mis tareas.
+          </p>
+        </div>
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700"
+        >
+          Seleccionar Excel
+        </button>
+      </div>
+
+      <div className="relative mt-4 grid gap-3">
+        {fileName ? (
+          <div className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+            <span className="font-semibold text-slate-800">{fileName}</span>
+            <span className="ml-2 text-slate-400">Filas omitidas: {skippedRows}</span>
+          </div>
+        ) : null}
+
+        {parseError ? (
+          <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+            {parseError}
+          </div>
+        ) : null}
+
+        {lastImport ? (
+          <div className="rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+            {lastImport}
+          </div>
+        ) : null}
+
+        {tasks.length > 0 ? (
+          <>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Metric label="Tareas" value={tasks.length} />
+              <Metric label="Asignadas" value={summary.assigned} />
+              <Metric label="Sin asignar" value={summary.unassigned} tone={summary.unassigned > 0 ? 'warn' : 'ok'} />
+            </div>
+
+            {summary.warningCount > 0 ? (
+              <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Hay {summary.warningCount} aviso{summary.warningCount === 1 ? '' : 's'} en la vista previa. Las tareas sin empleado se crean sin asignar.
+              </div>
+            ) : null}
+
+            <div className="max-h-72 overflow-y-auto rounded-[18px] border border-slate-200 bg-white">
+              {tasks.slice(0, 40).map((task) => (
+                <div key={`${task.sourceRow}-${task.titulo}-${task.empleadoTexto}`} className="border-b border-slate-100 px-4 py-3 last:border-b-0">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-mono text-slate-400">Fila {task.sourceRow}</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-800">{task.titulo}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {task.ubicacion} · {task.tipoTrabajo} · prioridad {task.prioridad}
+                      </div>
+                    </div>
+                    <div className={`rounded-full px-3 py-1 text-xs font-semibold ${task.empleadoId ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {task.empleadoNombre ?? 'Sin asignar'}
+                    </div>
+                  </div>
+                  {task.warnings.length > 0 ? (
+                    <div className="mt-2 text-xs font-medium text-amber-700">
+                      {task.warnings.join(' · ')}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+              {tasks.length > 40 ? (
+                <div className="px-4 py-3 text-sm text-slate-500">Vista previa limitada a 40 filas.</div>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setTasks([])
+                  setSkippedRows(0)
+                  setFileName(undefined)
+                  setParseError(undefined)
+                }}
+              >
+                Limpiar
+              </Button>
+              <Button type="button" onClick={handleImport} loading={isSubmitting}>
+                Crear tareas
+              </Button>
+            </div>
+          </>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
+function Metric({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string
+  value: number
+  tone?: 'neutral' | 'ok' | 'warn'
+}) {
+  const toneClass = tone === 'ok'
+    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+    : tone === 'warn'
+      ? 'border-amber-100 bg-amber-50 text-amber-700'
+      : 'border-slate-100 bg-white text-slate-700'
+
+  return (
+    <div className={`rounded-[16px] border px-4 py-3 ${toneClass}`}>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-70">{label}</div>
+      <div className="mt-1 text-xl font-semibold">{value}</div>
+    </div>
+  )
+}
+
+function normalizeEntries(row: Record<string, unknown>): NormalizedEntry[] {
+  return Object.entries(row).map(([key, value]) => ({
+    key,
+    normalized: normalizeText(key),
+    value,
+  }))
+}
+
+function getCell(entries: NormalizedEntry[], aliases: string[]) {
+  const normalizedAliases = aliases.map(normalizeText)
+  return entries.find((entry) => normalizedAliases.includes(entry.normalized))?.value
+}
+
+function getSlotCell(entries: NormalizedEntry[], bases: string[], slot: number) {
+  const normalizedBases = bases.map(normalizeText)
+  const candidates = normalizedBases.flatMap((base) => [`${base} ${slot}`, `${base}${slot}`])
+  return entries.find((entry) => candidates.includes(entry.normalized))?.value
+}
+
+function getTaskSlots(entries: NormalizedEntry[]) {
+  const slots = new Set<number>()
+  for (const entry of entries) {
+    const match = entry.normalized.match(/^(tarea|trabajo|actividad|titulo)\s*(\d+)$/)
+    if (!match) continue
+    if (!cleanText(entry.value)) continue
+    slots.add(Number(match[2]))
+  }
+  return [...slots].sort((left, right) => left - right)
+}
+
+function normalizePriority(value: string): { priority: Priority; warning?: string } {
+  const normalized = normalizeText(value)
+  if (!normalized) return { priority: 'media', warning: 'Prioridad vacía, se usa media' }
+  if (['baja', 'bajo', 'low'].includes(normalized)) return { priority: 'baja' }
+  if (['media', 'medio', 'normal', 'mediana'].includes(normalized)) return { priority: 'media' }
+  if (['alta', 'alto', 'high'].includes(normalized)) return { priority: 'alta' }
+  if (['urgente', 'urgent', 'critica', 'critico'].includes(normalized)) return { priority: 'urgente' }
+  return { priority: 'media', warning: `Prioridad no reconocida: ${value}` }
+}
+
+function matchEmployee(value: string, empleados: EmployeeOption[]) {
+  const normalized = normalizeSearch(value)
+  if (!normalized) return null
+
+  const byId = /^\d+$/.test(normalized)
+    ? empleados.find((empleado) => empleado.id === Number(normalized))
+    : null
+  if (byId) return byId
+
+  const digits = value.replace(/\D/g, '')
+  if (digits) {
+    const byWhatsapp = empleados.find((empleado) => (empleado.waId ?? '').replace(/\D/g, '') === digits)
+    if (byWhatsapp) return byWhatsapp
+  }
+
+  const exact = empleados.find((empleado) => normalizeSearch(empleado.nombre) === normalized)
+  if (exact) return exact
+
+  const candidates = empleados.filter((empleado) => {
+    const employeeName = normalizeSearch(empleado.nombre)
+    return employeeName.includes(normalized) || normalized.includes(employeeName)
+  })
+  return candidates.length === 1 ? candidates[0] : null
+}
+
+function parseOrder(value: unknown) {
+  const text = cleanText(value)
+  if (!text) return undefined
+  const number = Number(text.replace(',', '.'))
+  return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : undefined
+}
+
+function cleanText(value: unknown) {
+  if (value === null || value === undefined) return ''
+  return String(value).replace(/\s+/g, ' ').trim()
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function normalizeSearch(value: string) {
+  return normalizeText(value).replace(/\s+/g, ' ')
+}

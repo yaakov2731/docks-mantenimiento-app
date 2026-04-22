@@ -38,6 +38,16 @@ const roundsService = createRoundsService(database as any)
 const attendanceActionEnum = z.enum(ATTENDANCE_ACTIONS)
 const attendancePeriodEnum = z.enum(['dia', 'semana', 'quincena', 'mes'])
 const payrollAmountSchema = z.number().int().min(0).default(0)
+const operationalTaskPriorityEnum = z.enum(['baja', 'media', 'alta', 'urgente'])
+const operationalTaskImportItemSchema = z.object({
+  tipoTrabajo: z.string().min(2),
+  titulo: z.string().min(3),
+  descripcion: z.string().min(3),
+  ubicacion: z.string().min(2),
+  prioridad: operationalTaskPriorityEnum,
+  empleadoId: z.number().int().positive().optional(),
+  ordenAsignacion: z.number().int().min(0).optional(),
+})
 const BA_OFFSET_MS = 3 * 60 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -874,7 +884,7 @@ export const appRouter = router({
         titulo: z.string().min(3),
         descripcion: z.string().min(3),
         ubicacion: z.string().min(2),
-        prioridad: z.enum(['baja', 'media', 'alta', 'urgente']),
+        prioridad: operationalTaskPriorityEnum,
         empleadoId: z.number().optional(),
       }))
       .mutation(async ({ input }) => {
@@ -901,6 +911,90 @@ export const appRouter = router({
         }
 
         return { success: true, id }
+      }),
+
+    importarExcel: protectedProcedure
+      .input(z.object({
+        nombreArchivo: z.string().max(180).optional(),
+        tareas: z.array(operationalTaskImportItemSchema).min(1).max(300),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+
+        const employeeIds = [...new Set(
+          input.tareas
+            .map((task) => task.empleadoId)
+            .filter((id): id is number => typeof id === 'number')
+        )]
+
+        const empleadosById = new Map<number, Awaited<ReturnType<typeof getEmpleadoById>>>()
+        for (const empleadoId of employeeIds) {
+          const empleado = await getEmpleadoById(empleadoId)
+          if (!empleado) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: `Empleado ${empleadoId} no encontrado` })
+          }
+          empleadosById.set(empleadoId, empleado)
+        }
+
+        const orderByEmployee = new Map<string, number>()
+        const created: Array<{
+          id: number
+          titulo: string
+          ubicacion: string
+          prioridad: z.infer<typeof operationalTaskPriorityEnum>
+          empleadoId?: number
+        }> = []
+
+        for (const [index, task] of input.tareas.entries()) {
+          const empleado = task.empleadoId ? empleadosById.get(task.empleadoId) ?? null : null
+          const employeeKey = empleado?.id ? String(empleado.id) : 'sin-asignar'
+          const nextOrder = (orderByEmployee.get(employeeKey) ?? 0) + 1
+          orderByEmployee.set(employeeKey, nextOrder)
+
+          const id = await createOperationalTask({
+            origen: 'manual',
+            tipoTrabajo: task.tipoTrabajo.trim(),
+            titulo: task.titulo.trim(),
+            descripcion: task.descripcion.trim(),
+            ubicacion: task.ubicacion.trim(),
+            prioridad: task.prioridad,
+            empleadoId: empleado?.id,
+            empleadoNombre: empleado?.nombre ?? undefined,
+            empleadoWaId: empleado?.waId ?? undefined,
+            ordenAsignacion: task.ordenAsignacion ?? nextOrder ?? index + 1,
+          } as any)
+
+          created.push({
+            id,
+            titulo: task.titulo.trim(),
+            ubicacion: task.ubicacion.trim(),
+            prioridad: task.prioridad,
+            empleadoId: empleado?.id,
+          })
+        }
+
+        let notificaciones = 0
+        for (const empleadoId of employeeIds) {
+          const empleado = empleadosById.get(empleadoId)
+          if (!empleado) continue
+          const tareas = created.filter((task) => task.empleadoId === empleadoId)
+          if (tareas.length === 0) continue
+          const notified = await notifyOperationalTaskBatchAssignment({
+            employee: empleado,
+            tasks: tareas,
+            sourceName: input.nombreArchivo,
+          })
+          if (notified) notificaciones += 1
+        }
+
+        return {
+          success: true,
+          creadas: created.length,
+          asignadas: created.filter((task) => task.empleadoId).length,
+          sinAsignar: created.filter((task) => !task.empleadoId).length,
+          notificaciones,
+          ids: created.map((task) => task.id),
+        }
       }),
 
     crearDesdeReclamo: protectedProcedure
@@ -1239,6 +1333,37 @@ async function notifyOperationalTaskAssignment(taskId: number, employee: { nombr
   ]
 
   await enqueueBotMessage(employee.waId, lines.filter(Boolean).join('\n'))
+}
+
+async function notifyOperationalTaskBatchAssignment({
+  employee,
+  tasks,
+  sourceName,
+}: {
+  employee: { nombre: string; waId?: string | null }
+  tasks: Array<{ id: number; titulo: string; ubicacion: string; prioridad: string }>
+  sourceName?: string
+}) {
+  if (!employee.waId || tasks.length === 0) return false
+
+  const visibleTasks = tasks.slice(0, 10)
+  const lines = [
+    '*Lista de tareas diarias — Docks del Puerto*',
+    '',
+    `${employee.nombre}, tenés ${tasks.length} tarea${tasks.length === 1 ? '' : 's'} nueva${tasks.length === 1 ? '' : 's'} asignada${tasks.length === 1 ? '' : 's'}.`,
+    sourceName ? `Origen: ${sourceName}` : '',
+    '',
+    ...visibleTasks.flatMap((task, index) => [
+      `${index + 1}. #${task.id} — ${task.titulo}`,
+      `   ${task.ubicacion} · Prioridad ${task.prioridad.toUpperCase()}`,
+    ]),
+    tasks.length > visibleTasks.length ? `...y ${tasks.length - visibleTasks.length} más.` : '',
+    '',
+    'Abrí *Mis tareas* en el bot para aceptar cada trabajo y seguir el flujo normal.',
+  ]
+
+  await enqueueBotMessage(employee.waId, lines.filter(Boolean).join('\n'))
+  return true
 }
 
 function buildLeadAssignmentMessage({
