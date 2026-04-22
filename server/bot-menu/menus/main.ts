@@ -54,33 +54,46 @@ export async function buildAdminMainMenu(session: BotSession): Promise<string> {
   const abiertos = reportes.filter(r => !['completado', 'cancelado'].includes(r.estado))
   const urgentes = abiertos.filter(r => r.prioridad === 'urgente' && !r.asignadoId)
 
-  const resumen = abiertos.length > 0
-    ? `📊 ${abiertos.length} abiertos${urgentes.length > 0 ? ` | 🔴 ${urgentes.length} urgente${urgentes.length > 1 ? 's' : ''} sin asignar` : ''}`
-    : '✅ Sin reclamos abiertos'
-
-  const leadsResumen = leadsLibres.length > 0
-    ? `🎯 ${leadsLibres.length} lead${leadsLibres.length > 1 ? 's' : ''} sin asignar`
-    : null
-
   return [
-    `👔 *${session.userName}* — Panel gerente`,
+    `👔 Hola, ${session.userName}. Panel de administración`,
+    `🏢 Docks del Puerto`,
+    ``,
+    `📋 Abiertos: ${abiertos.length} | 🔴 Urgentes: ${urgentes.length} | 🎯 Leads: ${leadsLibres.length}`,
+    ``,
+    `Elegí un área:`,
+    `1️⃣  Reclamos`,
+    `2️⃣  Operación diaria`,
+    `3️⃣  Rondas de baños`,
+    `4️⃣  Comercial`,
+    ``,
+    `0️⃣  Ayuda`,
+  ].join('\n')
+}
+
+export function buildAdminReclamosMenu(_session: BotSession): string {
+  return [
+    `📋 *Reclamos*`,
     `🏢 Docks del Puerto`,
     SEP,
-    resumen,
-    leadsResumen,
+    `1️⃣  Ver pendientes`,
+    `2️⃣  Urgentes sin asignar`,
+    `3️⃣  Sin asignar`,
+    `4️⃣  SLA vencidos`,
     SEP,
-    `1️⃣  📋 Ver reclamos pendientes`,
-    `2️⃣  🔴 Ver urgentes sin asignar`,
-    `3️⃣  👷 Ver sin asignar`,
-    `4️⃣  📊 Estado general del día`,
-    `5️⃣  🚻 Estado rondas de baños`,
-    `6️⃣  ⚠️  Tareas vencidas (SLA)`,
-    `7️⃣  🚻 Gestionar rondas de baños`,
-    `8️⃣  🎯 Asignar lead de alquiler`,
-    `9️⃣  📋 Asignar tarea a empleado`,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
+export function buildAdminOperationMenu(_session: BotSession): string {
+  return [
+    `📊 *Operación diaria*`,
+    `🏢 Docks del Puerto`,
     SEP,
-    `0️⃣  ❓ Ayuda`,
-  ].filter(Boolean).join('\n')
+    `1️⃣  Estado general del día`,
+    `2️⃣  Asignar tarea a empleado`,
+    SEP,
+    `0️⃣  Volver`,
+  ].join('\n')
 }
 
 // ─── Ventas ──────────────────────────────────────────────────────────────────

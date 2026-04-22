@@ -14,7 +14,7 @@ if (!TURSO_URL || !TURSO_TOKEN) {
 
 const DB_TIMEOUT_MS = 20_000
 
-function fetchWithTimeout(input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) {
+export function fetchWithTimeout(input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), DB_TIMEOUT_MS)
   // Node's undici crashes when a Request object is passed alongside init options
