@@ -9,6 +9,8 @@ import {
   Activity,
   BadgeCheck,
   CalendarRange,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   FileSpreadsheet,
   LogIn,
@@ -223,6 +225,7 @@ function TurnChip({ turn }: { turn: any }) {
 
 export default function Asistencia() {
   const [periodo, setPeriodo] = useState<Periodo>('dia')
+  const [referenceMs, setReferenceMs] = useState(() => Date.now())
   const [empleadoId, setEmpleadoId] = useState('')
   const [now, setNow] = useState(() => new Date())
 
@@ -234,7 +237,7 @@ export default function Asistencia() {
   const { data: catalogoEmpleados = [] } = trpc.empleados.listar.useQuery()
   const selectedEmpleadoId = empleadoId ? Number(empleadoId) : undefined
 
-  const resumen = trpc.asistencia.resumen.useQuery({ periodo, empleadoId: selectedEmpleadoId }, { refetchInterval: 15000 })
+  const resumen = trpc.asistencia.resumen.useQuery({ periodo, empleadoId: selectedEmpleadoId, referenceDateMs: referenceMs }, { refetchInterval: 15000 })
   const registrar = trpc.asistencia.registrar.useMutation({
     onSuccess: async () => {
       await resumen.refetch()
@@ -312,7 +315,7 @@ export default function Asistencia() {
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => setPeriodo(option.value)}
+                  onClick={() => { setPeriodo(option.value); setReferenceMs(Date.now()) }}
                   className={`rounded-2xl border px-4 py-2 text-left transition-all ${
                     periodo === option.value
                       ? 'border-primary bg-primary text-white shadow-[0_8px_18px_rgba(10,126,164,0.18)]'
@@ -323,6 +326,38 @@ export default function Asistencia() {
                   <div className={`text-[11px] ${periodo === option.value ? 'text-white/75' : 'text-slate-500'}`}>{option.hint}</div>
                 </button>
               ))}
+            </div>
+
+            {/* Navegación de períodos anteriores */}
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { if (periodoInfo) setReferenceMs(periodoInfo.startMs - 1) }}
+                disabled={!periodoInfo}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-600 hover:border-primary/40 hover:text-primary transition-all disabled:opacity-40"
+              >
+                <ChevronLeft size={14} /> Anterior
+              </button>
+              <span className="text-[12px] text-slate-500 font-medium min-w-[160px] text-center">
+                {periodoInfo ? `${periodoInfo.desde} → ${periodoInfo.hasta}` : '…'}
+              </span>
+              <button
+                type="button"
+                onClick={() => { if (periodoInfo) setReferenceMs(periodoInfo.endMs + 1) }}
+                disabled={!periodoInfo || periodoInfo.endMs > Date.now()}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-600 hover:border-primary/40 hover:text-primary transition-all disabled:opacity-40"
+              >
+                Siguiente <ChevronRight size={14} />
+              </button>
+              {referenceMs < Date.now() - 86_400_000 && (
+                <button
+                  type="button"
+                  onClick={() => setReferenceMs(Date.now())}
+                  className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-1.5 text-[12px] font-medium text-primary hover:bg-primary/10 transition-all"
+                >
+                  Hoy
+                </button>
+              )}
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">

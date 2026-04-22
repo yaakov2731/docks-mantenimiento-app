@@ -299,8 +299,9 @@ function mapAggregateClosure(closures: any[]) {
 async function buildAttendanceSummary(params: {
   periodo: z.infer<typeof attendancePeriodEnum>
   empleadoId?: number
+  referenceDateMs?: number
 }) {
-  const period = getAttendancePeriodRange(params.periodo)
+  const period = getAttendancePeriodRange(params.periodo, params.referenceDateMs)
   const [empleadosRaw, eventosRaw, cierresRaw, reportesRaw, tareasOperativasRaw] = await Promise.all([
     getEmpleados(),
     database.db.select().from(schema.empleadoAsistencia),
@@ -1048,6 +1049,7 @@ export const appRouter = router({
       .input(z.object({
         periodo: attendancePeriodEnum,
         empleadoId: z.number().optional(),
+        referenceDateMs: z.number().optional(),
       }))
       .query(async ({ input, ctx }) => {
         assertAdmin(ctx.user)
