@@ -431,30 +431,40 @@ export default function Asistencia() {
             </div>
           </div>
 
-          <div className="rounded-[28px] bg-[#17212B] text-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.28)]">
-            <div className="flex items-center justify-between gap-3">
+          <div className="rounded-[28px] text-white p-5" style={{ background: 'var(--sidebar-bg)', boxShadow: '0 8px 32px oklch(0 0 0 / 0.28)' }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 mb-4">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.24em] text-white/40">Reloj central</div>
-                <div className="mt-1 text-sm text-white/65">Puesto de control administrativo</div>
+                <div className="text-[9.5px] uppercase tracking-[0.24em]" style={{ color: 'oklch(1 0 0 / 0.35)' }}>Reloj central</div>
+                <div className="text-[12px] mt-0.5" style={{ color: 'oklch(1 0 0 / 0.55)' }}>Puesto de control administrativo</div>
               </div>
-              <div className="rounded-2xl bg-white/10 p-3">
-                <Clock3 size={18} className="text-cyan-300" />
+              <div className="rounded-xl p-2" style={{ background: 'oklch(1 0 0 / 0.07)' }}>
+                <Clock3 size={15} style={{ color: 'var(--accent)' }} />
               </div>
             </div>
 
-            <div className="mt-6 rounded-[24px] border border-white/10 bg-black/15 px-4 py-5">
-              <div className="font-mono text-[42px] leading-none tracking-[0.08em] text-cyan-300 md:text-[52px]">{digitalTime}</div>
-              <div className="mt-3 text-sm capitalize text-white/70">{formatFullDate(now)}</div>
+            {/* Compact clock strip */}
+            <div className="rounded-[16px] px-4 py-3 flex items-center justify-between gap-4"
+              style={{ background: 'oklch(0 0 0 / 0.18)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
+              <span className="font-mono text-[22px] font-semibold leading-none tracking-[0.06em]"
+                style={{ color: 'var(--accent)', letterSpacing: '0.06em' }}>
+                {digitalTime}
+              </span>
+              <span className="text-[12px] capitalize text-right" style={{ color: 'oklch(1 0 0 / 0.50)' }}>
+                {formatFullDate(now)}
+              </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <div className="rounded-[22px] bg-white/6 px-4 py-4">
-                <div className="text-[11px] uppercase tracking-wide text-white/35">En turno</div>
-                <div className="mt-2 font-heading text-3xl font-semibold">{equipo?.enTurno ?? 0}</div>
+            {/* KPIs */}
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div className="rounded-[16px] px-4 py-3" style={{ background: 'oklch(1 0 0 / 0.05)' }}>
+                <div className="text-[10px] uppercase tracking-wide" style={{ color: 'oklch(1 0 0 / 0.35)' }}>En turno</div>
+                <div className="mt-1.5 font-heading text-2xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>{equipo?.enTurno ?? 0}</div>
               </div>
-              <div className="rounded-[22px] bg-white/6 px-4 py-4">
-                <div className="text-[11px] uppercase tracking-wide text-white/35">A pagar</div>
-                <div className="mt-2 font-heading text-2xl font-semibold">{formatCurrency(equipo?.totalPagar ?? 0)}</div>
+              <div className="rounded-[16px] px-4 py-3" style={{ background: 'oklch(1 0 0 / 0.05)' }}>
+                <div className="text-[10px] uppercase tracking-wide" style={{ color: 'oklch(1 0 0 / 0.35)' }}>A pagar</div>
+                <div className="mt-1.5 font-heading text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>{formatCurrency(equipo?.totalPagar ?? 0)}</div>
               </div>
             </div>
 
@@ -462,9 +472,9 @@ export default function Asistencia() {
               variant="outline"
               onClick={() => resumen.refetch()}
               disabled={resumen.isFetching}
-              className="mt-4 w-full border-white/25 bg-transparent text-white hover:bg-white/10"
+              className="mt-3 w-full border-white/25 bg-transparent text-white hover:bg-white/10"
             >
-              <RefreshCw size={14} className={resumen.isFetching ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={resumen.isFetching ? 'animate-spin' : ''} />
               Actualizar tablero
             </Button>
           </div>
@@ -675,11 +685,11 @@ export default function Asistencia() {
                         </div>
                       </div>
 
-                      <div className="mt-4 rounded-[22px] bg-[#182330] text-white p-4">
+                      <div className="mt-4 rounded-[18px] text-white p-4" style={{ background: 'var(--sidebar-bg)' }}>
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-[10px] uppercase tracking-[0.22em] text-white/40">{turnHeaderLabel}</div>
-                            <div className="mt-2 font-mono text-[32px] leading-none text-cyan-300">
+                            <div className="text-[9px] uppercase tracking-[0.22em]" style={{ color: 'oklch(1 0 0 / 0.35)' }}>{turnHeaderLabel}</div>
+                            <div className="mt-1.5 font-mono text-[20px] leading-none font-semibold" style={{ color: 'var(--accent)', letterSpacing: '0.04em' }}>
                               <WorkingTime
                                 seconds={liveClockSeconds}
                                 isRunning={onShift}
@@ -688,8 +698,8 @@ export default function Asistencia() {
                               />
                             </div>
                           </div>
-                          <div className="rounded-2xl bg-white/10 p-3">
-                            <MonitorSmartphone size={18} className="text-cyan-200" />
+                          <div className="rounded-xl p-2" style={{ background: 'oklch(1 0 0 / 0.07)' }}>
+                            <MonitorSmartphone size={15} style={{ color: 'var(--accent)' }} />
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-white/65">
