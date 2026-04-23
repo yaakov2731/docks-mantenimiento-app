@@ -715,6 +715,7 @@ function normalizePriority(value: string): { priority: Priority; warning?: strin
 function matchEmployee(value: string, empleados: EmployeeOption[]) {
   const normalized = normalizeSearch(value)
   if (!normalized) return null
+  const aliases = getEmployeeSearchAliases(value)
 
   const byId = /^\d+$/.test(normalized)
     ? empleados.find((empleado) => empleado.id === Number(normalized))
@@ -727,14 +728,33 @@ function matchEmployee(value: string, empleados: EmployeeOption[]) {
     if (byWhatsapp) return byWhatsapp
   }
 
-  const exact = empleados.find((empleado) => normalizeSearch(empleado.nombre) === normalized)
-  if (exact) return exact
+  const exact = empleados.filter((empleado) =>
+    getEmployeeSearchAliases(empleado.nombre).some((alias) => aliases.includes(alias))
+  )
+  if (exact.length === 1) return exact[0]
 
   const candidates = empleados.filter((empleado) => {
-    const employeeName = normalizeSearch(empleado.nombre)
-    return employeeName.includes(normalized) || normalized.includes(employeeName)
+    const employeeAliases = getEmployeeSearchAliases(empleado.nombre)
+    return employeeAliases.some((employeeAlias) =>
+      aliases.some((alias) => employeeAlias.includes(alias) || alias.includes(employeeAlias))
+    )
   })
   return candidates.length === 1 ? candidates[0] : null
+}
+
+function getEmployeeSearchAliases(value: string) {
+  const normalized = normalizeSearch(value)
+  if (!normalized) return []
+
+  const aliases = new Set([normalized])
+  const parts = normalized.split(' ')
+  const lastPart = parts[parts.length - 1]
+  if (lastPart?.length > 1 && /[iy]$/.test(lastPart)) {
+    const alternateLastPart = `${lastPart.slice(0, -1)}${lastPart.endsWith('i') ? 'y' : 'i'}`
+    aliases.add([...parts.slice(0, -1), alternateLastPart].join(' '))
+  }
+
+  return [...aliases]
 }
 
 function parseOrder(value: unknown) {

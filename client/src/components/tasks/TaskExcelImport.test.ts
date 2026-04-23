@@ -5,7 +5,7 @@ const empleados = [
   { id: 1, nombre: 'Juan Perez', waId: '5491111111111' },
   { id: 2, nombre: 'Maria Gomez', waId: '5492222222222' },
   { id: 3, nombre: 'Walter', waId: '5493333333333' },
-  { id: 4, nombre: 'Mili', waId: '5494444444444' },
+  { id: 4, nombre: 'Mily', waId: '5494444444444' },
   { id: 5, nombre: 'Monica', waId: '5495555555555' },
 ]
 
@@ -72,5 +72,21 @@ describe('parseTaskRows', () => {
       prioridad: 'alta',
       ubicacion: 'Sanitarios',
     })
+  })
+
+  it('matches Mili from the schedule with employee Mily from the bot', () => {
+    const result = parseTaskWorkbookRows([
+      ['HORARIO', 'WALTER', 'MILI', 'MONICA'],
+      ['MARTES', '', '', ''],
+      ['09:00-10:00', '', 'Preparación carros + insumos vidrios', ''],
+    ], empleados)
+
+    expect(result.tasks).toHaveLength(1)
+    expect(result.tasks[0]).toMatchObject({
+      empleadoId: 4,
+      empleadoNombre: 'Mily',
+      empleadoTexto: 'MILI',
+    })
+    expect(result.tasks[0].warnings).toEqual([])
   })
 })
