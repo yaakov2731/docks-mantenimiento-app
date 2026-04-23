@@ -68,6 +68,12 @@ type NormalizedEntry = {
   value: unknown
 }
 
+type PdfTextCell = {
+  text: string
+  x: number
+  y: number
+}
+
 export function parseTaskRows(rows: Record<string, unknown>[], empleados: EmployeeOption[]): ParseResult {
   const tasks: ImportedTaskPreview[] = []
   let skippedRows = 0
@@ -142,6 +148,100 @@ export function parseTaskWorkbookRows(rows: unknown[][], empleados: EmployeeOpti
   return parseTaskRows(objectRows, empleados)
 }
 
+function parseWorkbookBuffer(buffer: ArrayBuffer, empleados: EmployeeOption[]): ParseResult {
+  const workbook = XLSX.read(buffer, { type: 'array' })
+  const firstSheetName = workbook.SheetNames[0]
+  if (!firstSheetName) throw new Error('El archivo no tiene hojas para leer.')
+  const worksheet = workbook.Sheets[firstSheetName]
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: '', raw: false })
+  return parseTaskWorkbookRows(rows, empleados)
+}
+
+async function parsePdfScheduleFile(buffer: ArrayBuffer, empleados: EmployeeOption[]): Promise<ParseResult> {
+  const pdfjs = await import('pdfjs-dist')
+  const worker = await import('pdfjs-dist/build/pdf.worker.mjs?url')
+  pdfjs.GlobalWorkerOptions.workerSrc = worker.default
+
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise
+  const matrixRows: unknown[][] = []
+  let columnXs: number[] | null = null
+  let headerLabels: string[] | null = null
+  let pendingPreRows: string[][] = []
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber)
+    const content = await page.getTextContent()
+    const cells: PdfTextCell[] = (content.items as any[])
+      .map((item) => ({
+        text: cleanText(item.str),
+        x: Number(item.transform?.[4] ?? 0),
+        y: Number(item.transform?.[5] ?? 0),
+      }))
+      .filter((item) => item.text.length > 0)
+
+    const textRows = groupPdfTextRows(cells)
+    for (let rowIndex = 0; rowIndex < textRows.length; rowIndex += 1) {
+      const textRow = textRows[rowIndex]
+      const rowText = textRow.map((item) => item.text).join(' ')
+      if (!columnXs) {
+        const header = detectPdfScheduleHeader(textRow)
+        if (header) {
+          columnXs = header.xs
+          headerLabels = header.labels
+          matrixRows.push(header.labels)
+        }
+        continue
+      }
+
+      const byColumn = assignPdfCellsToColumns(textRow, columnXs)
+      const firstCell = byColumn[0] ?? ''
+
+      if (isDaySection(rowText)) {
+        pendingPreRows = []
+        matrixRows.push([normalizeDayLabel(rowText), ...Array((headerLabels?.length ?? 1) - 1).fill('')])
+        continue
+      }
+
+      if (isTimeRange(firstCell)) {
+        const slotRows = [...pendingPreRows, byColumn]
+        pendingPreRows = []
+
+        let previousY = textRow[0].y
+        let lookahead = rowIndex + 1
+        while (lookahead < textRows.length) {
+          const nextRow = textRows[lookahead]
+          const nextRowText = nextRow.map((item) => item.text).join(' ')
+          const nextByColumn = assignPdfCellsToColumns(nextRow, columnXs)
+          const nextFirstCell = nextByColumn[0] ?? ''
+          const yGap = previousY - nextRow[0].y
+
+          if (isDaySection(nextRowText) || isTimeRange(nextFirstCell) || yGap > 9) break
+          slotRows.push(nextByColumn)
+          previousY = nextRow[0].y
+          lookahead += 1
+        }
+
+        rowIndex = lookahead - 1
+        matrixRows.push([
+          firstCell,
+          ...columnXs.slice(1).map((_, employeeIndex) =>
+            slotRows
+              .map((slotRow) => slotRow[employeeIndex + 1])
+              .filter(Boolean)
+              .join(' ')
+              .trim()
+          ),
+        ])
+        continue
+      }
+
+      pendingPreRows.push(byColumn)
+    }
+  }
+
+  return parseTaskWorkbookRows(matrixRows, empleados)
+}
+
 export function TaskExcelImport({
   empleados,
   onSubmit,
@@ -182,12 +282,9 @@ export function TaskExcelImport({
 
     try {
       const buffer = await file.arrayBuffer()
-      const workbook = XLSX.read(buffer, { type: 'array' })
-      const firstSheetName = workbook.SheetNames[0]
-      if (!firstSheetName) throw new Error('El archivo no tiene hojas para leer.')
-      const worksheet = workbook.Sheets[firstSheetName]
-      const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: '', raw: false })
-      const result = parseTaskWorkbookRows(rows, empleados)
+      const result = file.name.toLowerCase().endsWith('.pdf')
+        ? await parsePdfScheduleFile(buffer, empleados)
+        : parseWorkbookBuffer(buffer, empleados)
       setTasks(result.tasks)
       setSkippedRows(result.skippedRows)
       const days = [...new Set(result.tasks.map((task) => task.sourceDay).filter((day): day is string => Boolean(day)))]
@@ -232,7 +329,7 @@ export function TaskExcelImport({
         <input
           ref={inputRef}
           type="file"
-          accept=".xlsx,.xls,.csv"
+          accept=".pdf,.xlsx,.xls,.csv"
           className="hidden"
           onChange={handleFileChange}
         />
@@ -241,7 +338,7 @@ export function TaskExcelImport({
           onClick={() => inputRef.current?.click()}
           className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700"
         >
-          Seleccionar Excel
+          Seleccionar PDF / Excel
         </button>
       </div>
 
@@ -452,6 +549,61 @@ function parseScheduleMatrixRows(rows: unknown[][], empleados: EmployeeOption[])
   })
 
   return { tasks, skippedRows }
+}
+
+function groupPdfTextRows(cells: PdfTextCell[]) {
+  const sorted = [...cells].sort((left, right) => right.y - left.y || left.x - right.x)
+  const rows: PdfTextCell[][] = []
+
+  for (const cell of sorted) {
+    const row = rows.find((candidate) => Math.abs(candidate[0].y - cell.y) <= 3)
+    if (row) {
+      row.push(cell)
+    } else {
+      rows.push([cell])
+    }
+  }
+
+  return rows
+    .map((row) => row.sort((left, right) => left.x - right.x))
+    .sort((left, right) => right[0].y - left[0].y)
+}
+
+function detectPdfScheduleHeader(row: PdfTextCell[]) {
+  const normalized = row.map((cell) => normalizeText(cell.text))
+  const horarioIndex = normalized.findIndex((text) => text === 'horario')
+  if (horarioIndex < 0) return null
+
+  const scheduleHeaders = row
+    .filter((cell, index) => index >= horarioIndex)
+    .map((cell) => ({ label: cleanText(cell.text), x: cell.x }))
+    .filter((cell) => cell.label.length > 0)
+
+  if (scheduleHeaders.length < 2) return null
+  return {
+    labels: scheduleHeaders.map((cell) => cell.label),
+    xs: scheduleHeaders.map((cell) => cell.x),
+  }
+}
+
+function assignPdfCellsToColumns(row: PdfTextCell[], columnXs: number[]) {
+  const output = Array(columnXs.length).fill('')
+  const boundaries = columnXs.map((x, index) => {
+    if (index === columnXs.length - 1) return Number.POSITIVE_INFINITY
+    if (index === 0) {
+      const firstColumnWidth = columnXs[1] - x
+      return x + Math.min(55, Math.max(40, firstColumnWidth * 0.45))
+    }
+    return (x + columnXs[index + 1]) / 2
+  })
+
+  for (const cell of row) {
+    const columnIndex = boundaries.findIndex((boundary) => cell.x < boundary)
+    const safeIndex = columnIndex < 0 ? columnXs.length - 1 : columnIndex
+    output[safeIndex] = [output[safeIndex], cell.text].filter(Boolean).join(' ')
+  }
+
+  return output.map((value) => value.trim())
 }
 
 function findGenericHeaderRow(rows: unknown[][]): [number, string[] | null] {

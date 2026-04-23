@@ -1,4 +1,4 @@
-import{c as x,r as h,t as c,j as e,P as j,E as f}from"./index-B4guoH3W.js";import{D as y}from"./DashboardLayout-DUrlcMp0.js";import{B as i}from"./button-Cvpjkdqi.js";import{W as v}from"./WorkingTime-C9QnGfKA.js";import{a as p,C as N}from"./clock-EOgwPd8Z.js";/**
+import{c as x,r as h,t as c,j as e,P as j,E as f}from"./index-BWTb9aBq.js";import{D as y}from"./DashboardLayout-CIZ7Vnlc.js";import{B as i}from"./button-QJpie01Y.js";import{W as v}from"./WorkingTime-HnOketf7.js";import{a as p,C as N}from"./clock-BH7K6XoA.js";/**
  * @license lucide-react v0.363.0 - ISC
  *
  * This source code is licensed under the ISC license.
