@@ -22,6 +22,8 @@ export type ImportedOperationalTaskInput = {
 
 type ImportedTaskPreview = ImportedOperationalTaskInput & {
   sourceRow: number
+  sourceDay?: string
+  sourceTime?: string
   empleadoTexto?: string
   empleadoNombre?: string
   warnings: string[]
@@ -57,6 +59,8 @@ const LOCATION_ALIASES = ['ubicacion', 'lugar', 'sector', 'local', 'area', 'zona
 const TYPE_ALIASES = ['tipo', 'tipo trabajo', 'tipo de trabajo', 'categoria', 'rubro']
 const PRIORITY_ALIASES = ['prioridad', 'urgencia']
 const ORDER_ALIASES = ['orden', 'secuencia', 'nro', 'numero']
+const WEEK_DAYS = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO', 'DOMINGO']
+const REST_VALUES = ['franco', 'almuerzo', 'descanso']
 
 type NormalizedEntry = {
   key: string
@@ -119,6 +123,25 @@ export function parseTaskRows(rows: Record<string, unknown>[], empleados: Employ
   return { tasks, skippedRows }
 }
 
+export function parseTaskWorkbookRows(rows: unknown[][], empleados: EmployeeOption[]): ParseResult {
+  const schedule = parseScheduleMatrixRows(rows, empleados)
+  if (schedule.tasks.length > 0) return schedule
+
+  const [headerRowIndex, headers] = findGenericHeaderRow(rows)
+  if (!headers) return { tasks: [], skippedRows: rows.length }
+
+  const objectRows = rows.slice(headerRowIndex + 1).map((row) => {
+    const record: Record<string, unknown> = {}
+    headers.forEach((header, index) => {
+      if (!header) return
+      record[header] = row[index] ?? ''
+    })
+    return record
+  })
+
+  return parseTaskRows(objectRows, empleados)
+}
+
 export function TaskExcelImport({
   empleados,
   onSubmit,
@@ -127,16 +150,27 @@ export function TaskExcelImport({
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [fileName, setFileName] = useState<string>()
   const [tasks, setTasks] = useState<ImportedTaskPreview[]>([])
+  const [selectedDay, setSelectedDay] = useState<string>('')
   const [skippedRows, setSkippedRows] = useState(0)
   const [parseError, setParseError] = useState<string>()
   const [lastImport, setLastImport] = useState<string>()
 
+  const availableDays = useMemo(
+    () => [...new Set(tasks.map((task) => task.sourceDay).filter((day): day is string => Boolean(day)))],
+    [tasks]
+  )
+
+  const visibleTasks = useMemo(
+    () => selectedDay ? tasks.filter((task) => task.sourceDay === selectedDay) : tasks,
+    [selectedDay, tasks]
+  )
+
   const summary = useMemo(() => {
-    const assigned = tasks.filter((task) => task.empleadoId).length
-    const unassigned = tasks.length - assigned
-    const warningCount = tasks.reduce((total, task) => total + task.warnings.length, 0)
+    const assigned = visibleTasks.filter((task) => task.empleadoId).length
+    const unassigned = visibleTasks.length - assigned
+    const warningCount = visibleTasks.reduce((total, task) => total + task.warnings.length, 0)
     return { assigned, unassigned, warningCount }
-  }, [tasks])
+  }, [visibleTasks])
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -152,15 +186,18 @@ export function TaskExcelImport({
       const firstSheetName = workbook.SheetNames[0]
       if (!firstSheetName) throw new Error('El archivo no tiene hojas para leer.')
       const worksheet = workbook.Sheets[firstSheetName]
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '', raw: false })
-      const result = parseTaskRows(rows, empleados)
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: '', raw: false })
+      const result = parseTaskWorkbookRows(rows, empleados)
       setTasks(result.tasks)
       setSkippedRows(result.skippedRows)
+      const days = [...new Set(result.tasks.map((task) => task.sourceDay).filter((day): day is string => Boolean(day)))]
+      setSelectedDay(resolveDefaultDay(days))
       if (result.tasks.length === 0) {
         setParseError('No encontré tareas válidas en la planilla.')
       }
     } catch (error: any) {
       setTasks([])
+      setSelectedDay('')
       setSkippedRows(0)
       setParseError(error?.message ?? 'No se pudo leer la planilla.')
     } finally {
@@ -169,10 +206,11 @@ export function TaskExcelImport({
   }
 
   async function handleImport() {
-    if (tasks.length === 0) return
-    await onSubmit(tasks.map(({ sourceRow, empleadoTexto, empleadoNombre, warnings, ...task }) => task), fileName)
-    setLastImport(`${tasks.length} tarea${tasks.length === 1 ? '' : 's'} importada${tasks.length === 1 ? '' : 's'}.`)
+    if (visibleTasks.length === 0) return
+    await onSubmit(visibleTasks.map(({ sourceRow, sourceDay, sourceTime, empleadoTexto, empleadoNombre, warnings, ...task }) => task), fileName)
+    setLastImport(`${visibleTasks.length} tarea${visibleTasks.length === 1 ? '' : 's'} importada${visibleTasks.length === 1 ? '' : 's'}.`)
     setTasks([])
+    setSelectedDay('')
     setSkippedRows(0)
     setFileName(undefined)
     setParseError(undefined)
@@ -229,8 +267,27 @@ export function TaskExcelImport({
 
         {tasks.length > 0 ? (
           <>
+            {availableDays.length > 0 ? (
+              <div className="rounded-[16px] border border-cyan-100 bg-cyan-50 px-4 py-3">
+                <label className="grid gap-2 text-sm">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-700">
+                    Día a cargar en operaciones
+                  </span>
+                  <select
+                    value={selectedDay}
+                    onChange={(event) => setSelectedDay(event.target.value)}
+                    className="w-full rounded-[12px] border border-cyan-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  >
+                    {availableDays.map((day) => (
+                      <option key={day} value={day}>{day}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+
             <div className="grid gap-2 sm:grid-cols-3">
-              <Metric label="Tareas" value={tasks.length} />
+              <Metric label="Tareas" value={visibleTasks.length} />
               <Metric label="Asignadas" value={summary.assigned} />
               <Metric label="Sin asignar" value={summary.unassigned} tone={summary.unassigned > 0 ? 'warn' : 'ok'} />
             </div>
@@ -242,11 +299,15 @@ export function TaskExcelImport({
             ) : null}
 
             <div className="max-h-72 overflow-y-auto rounded-[18px] border border-slate-200 bg-white">
-              {tasks.slice(0, 40).map((task) => (
+              {visibleTasks.slice(0, 40).map((task) => (
                 <div key={`${task.sourceRow}-${task.titulo}-${task.empleadoTexto}`} className="border-b border-slate-100 px-4 py-3 last:border-b-0">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <div className="text-xs font-mono text-slate-400">Fila {task.sourceRow}</div>
+                      <div className="text-xs font-mono text-slate-400">
+                        Fila {task.sourceRow}
+                        {task.sourceDay ? ` · ${task.sourceDay}` : ''}
+                        {task.sourceTime ? ` · ${task.sourceTime}` : ''}
+                      </div>
                       <div className="mt-1 text-sm font-semibold text-slate-800">{task.titulo}</div>
                       <div className="mt-1 text-xs text-slate-500">
                         {task.ubicacion} · {task.tipoTrabajo} · prioridad {task.prioridad}
@@ -263,7 +324,7 @@ export function TaskExcelImport({
                   ) : null}
                 </div>
               ))}
-              {tasks.length > 40 ? (
+              {visibleTasks.length > 40 ? (
                 <div className="px-4 py-3 text-sm text-slate-500">Vista previa limitada a 40 filas.</div>
               ) : null}
             </div>
@@ -274,6 +335,7 @@ export function TaskExcelImport({
                 variant="outline"
                 onClick={() => {
                   setTasks([])
+                  setSelectedDay('')
                   setSkippedRows(0)
                   setFileName(undefined)
                   setParseError(undefined)
@@ -313,6 +375,149 @@ function Metric({
       <div className="mt-1 text-xl font-semibold">{value}</div>
     </div>
   )
+}
+
+function parseScheduleMatrixRows(rows: unknown[][], empleados: EmployeeOption[]): ParseResult {
+  const headerIndex = rows.findIndex((row) => normalizeText(cleanText(row[0])) === 'horario')
+  if (headerIndex < 0) return { tasks: [], skippedRows: rows.length }
+
+  const header = rows[headerIndex]
+  const employeeColumns = header
+    .map((value, index) => ({ index, label: cleanText(value) }))
+    .filter((column) => column.index > 0 && column.label.length > 0)
+
+  if (employeeColumns.length === 0) return { tasks: [], skippedRows: rows.length }
+
+  const tasks: ImportedTaskPreview[] = []
+  const orderByEmployee = new Map<string, number>()
+  let currentDay = ''
+  let skippedRows = headerIndex
+
+  rows.slice(headerIndex + 1).forEach((row, offset) => {
+    const sourceRow = headerIndex + offset + 2
+    const firstCell = cleanText(row[0])
+    if (!firstCell) {
+      skippedRows += 1
+      return
+    }
+
+    if (isDaySection(firstCell)) {
+      currentDay = normalizeDayLabel(firstCell)
+      return
+    }
+
+    if (!isTimeRange(firstCell)) {
+      skippedRows += 1
+      return
+    }
+
+    let parsedInRow = 0
+    for (const column of employeeColumns) {
+      const rawTask = cleanText(row[column.index])
+      if (!rawTask || isRestCell(rawTask)) continue
+
+      const empleado = matchEmployee(column.label, empleados)
+      const warnings: string[] = []
+      if (!empleado) warnings.push(`No coincide con empleados activos: ${column.label}`)
+
+      const employeeKey = empleado?.id ? String(empleado.id) : column.label
+      const nextOrder = (orderByEmployee.get(employeeKey) ?? 0) + 1
+      orderByEmployee.set(employeeKey, nextOrder)
+
+      const cleanTask = stripScheduleIcons(rawTask)
+      tasks.push({
+        sourceRow,
+        sourceDay: currentDay || undefined,
+        sourceTime: firstCell,
+        tipoTrabajo: inferScheduleType(cleanTask),
+        titulo: cleanTask,
+        descripcion: [
+          currentDay ? `Día: ${currentDay}` : '',
+          `Horario: ${firstCell}`,
+          `Responsable: ${column.label}`,
+          `Tarea: ${cleanTask}`,
+        ].filter(Boolean).join('\n'),
+        ubicacion: inferScheduleLocation(cleanTask),
+        prioridad: inferSchedulePriority(rawTask),
+        empleadoId: empleado?.id,
+        empleadoNombre: empleado?.nombre,
+        empleadoTexto: column.label,
+        ordenAsignacion: nextOrder,
+        warnings,
+      })
+      parsedInRow += 1
+    }
+
+    if (parsedInRow === 0) skippedRows += 1
+  })
+
+  return { tasks, skippedRows }
+}
+
+function findGenericHeaderRow(rows: unknown[][]): [number, string[] | null] {
+  const index = rows.findIndex((row) => row.some((cell) => {
+    const normalized = normalizeText(cleanText(cell))
+    return TITLE_ALIASES.map(normalizeText).includes(normalized) ||
+      EMPLOYEE_ALIASES.map(normalizeText).includes(normalized)
+  }))
+  if (index < 0) return [-1, null]
+  return [index, rows[index].map((cell) => cleanText(cell))]
+}
+
+function isDaySection(value: string) {
+  const normalized = normalizeText(value)
+  return WEEK_DAYS.some((day) => normalized.startsWith(normalizeText(day)))
+}
+
+function normalizeDayLabel(value: string) {
+  const normalized = normalizeText(value)
+  const day = WEEK_DAYS.find((candidate) => normalized.startsWith(normalizeText(candidate)))
+  return day ?? value
+}
+
+function isTimeRange(value: string) {
+  return /^\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}$/.test(value.trim())
+}
+
+function isRestCell(value: string) {
+  const normalized = normalizeText(value)
+  return REST_VALUES.some((restValue) => normalized === restValue)
+}
+
+function stripScheduleIcons(value: string) {
+  return value.replace(/[^\S\r\n]+/g, ' ').replace(/^🚨+\s*/u, '').trim()
+}
+
+function inferSchedulePriority(value: string): Priority {
+  const normalized = normalizeText(value)
+  if (value.includes('🚨') || normalized.includes('pre pico') || normalized.includes('fds')) return 'urgente'
+  if (normalized.includes('sanitarios') || normalized.includes('profunda')) return 'alta'
+  return 'media'
+}
+
+function inferScheduleType(value: string) {
+  const normalized = normalizeText(value)
+  if (normalized.includes('sanitarios')) return 'sanitarios'
+  if (normalized.includes('vidrios')) return 'vidrios'
+  if (normalized.includes('hidrolavado')) return 'hidrolavado'
+  if (normalized.includes('residuos') || normalized.includes('cestos') || normalized.includes('contenedor')) return 'residuos'
+  return 'limpieza_diaria'
+}
+
+function inferScheduleLocation(value: string) {
+  const zoneMatch = value.match(/Zona\s+[A-E]/i)
+  if (zoneMatch) return zoneMatch[0]
+  const moduleMatch = value.match(/(?:m[oó]dulos?|edif|local(?:es)?)\s+[0-9][0-9\s/+\-a-zA-Z]*/)
+  if (moduleMatch) return moduleMatch[0].trim()
+  if (normalizeText(value).includes('sanitarios')) return 'Sanitarios'
+  if (normalizeText(value).includes('deposito')) return 'Depósito'
+  return 'Shopping'
+}
+
+function resolveDefaultDay(days: string[]) {
+  if (days.length === 0) return ''
+  const today = WEEK_DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]
+  return days.includes(today) ? today : days[0]
 }
 
 function normalizeEntries(row: Record<string, unknown>): NormalizedEntry[] {

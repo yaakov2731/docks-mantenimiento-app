@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { parseTaskRows } from './TaskExcelImport'
+import { parseTaskRows, parseTaskWorkbookRows } from './TaskExcelImport'
 
 const empleados = [
   { id: 1, nombre: 'Juan Perez', waId: '5491111111111' },
   { id: 2, nombre: 'Maria Gomez', waId: '5492222222222' },
+  { id: 3, nombre: 'Walter', waId: '5493333333333' },
+  { id: 4, nombre: 'Mili', waId: '5494444444444' },
+  { id: 5, nombre: 'Monica', waId: '5495555555555' },
 ]
 
 describe('parseTaskRows', () => {
@@ -46,5 +49,28 @@ describe('parseTaskRows', () => {
     expect(result.tasks.map((task) => task.titulo)).toEqual(['Abrir portones', 'Reponer bolsas'])
     expect(result.tasks.every((task) => task.empleadoId === 2)).toBe(true)
     expect(result.tasks.every((task) => task.prioridad === 'media')).toBe(true)
+  })
+
+  it('parses the Docks cleaning schedule matrix by day, employee and time order', () => {
+    const result = parseTaskWorkbookRows([
+      ['PLAN DIARIO DETALLADO — 9:00 a 17:00', '', '', ''],
+      ['Distribución horaria por empleado y día', '', '', ''],
+      ['HORARIO', 'WALTER', 'MILI', 'MONICA'],
+      ['LUNES — Shopping CERRADO (Walter + Mónica)', '', '', ''],
+      ['09:00-10:00', 'Revisión predio + retiro residuos acumulados FDS', 'FRANCO', 'Limpieza baño chico + preparación carros'],
+      ['10:00-12:30', 'HIDROLAVADO veredas Zona A (edif 1a, 1, 1b, 2)', '', 'Pasillos + veredas Zona D (edif 12-15)'],
+      ['12:30-13:30', 'Almuerzo', '', 'Almuerzo'],
+      ['13:30-16:00', 'HIDROLAVADO veredas Zona B (edif 3 a 7)', '', 'SANITARIOS profunda (desinfección integral) + reposición'],
+    ], empleados)
+
+    expect(result.tasks).toHaveLength(6)
+    expect(result.tasks.map((task) => task.sourceDay)).toEqual(['LUNES', 'LUNES', 'LUNES', 'LUNES', 'LUNES', 'LUNES'])
+    expect(result.tasks.filter((task) => task.empleadoNombre === 'Walter').map((task) => task.ordenAsignacion)).toEqual([1, 2, 3])
+    expect(result.tasks.filter((task) => task.empleadoNombre === 'Monica').map((task) => task.ordenAsignacion)).toEqual([1, 2, 3])
+    expect(result.tasks.find((task) => task.titulo.includes('SANITARIOS'))).toMatchObject({
+      tipoTrabajo: 'sanitarios',
+      prioridad: 'alta',
+      ubicacion: 'Sanitarios',
+    })
   })
 })

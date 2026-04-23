@@ -2363,6 +2363,17 @@ function toOperationalTaskRecord(task: schema.TareaOperativa) {
 }
 
 function compareOperationalTasks(left: any, right: any) {
+  const stateDiff = operationalTaskStateRank(left.estado) - operationalTaskStateRank(right.estado)
+  if (stateDiff !== 0) return stateDiff
+
+  const leftOrder = Number(left.ordenAsignacion ?? 0)
+  const rightOrder = Number(right.ordenAsignacion ?? 0)
+  if (leftOrder > 0 || rightOrder > 0) {
+    return leftOrder - rightOrder ||
+      priorityRank(right.prioridad) - priorityRank(left.prioridad) ||
+      toMs(left.createdAt) - toMs(right.createdAt)
+  }
+
   return operationalTaskStateRank(left.estado) - operationalTaskStateRank(right.estado) ||
     priorityRank(right.prioridad) - priorityRank(left.prioridad) ||
     Number(left.ordenAsignacion ?? 0) - Number(right.ordenAsignacion ?? 0) ||
