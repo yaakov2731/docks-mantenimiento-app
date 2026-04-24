@@ -1,7 +1,9 @@
 import {
   enqueueBotMessage,
   getEmpleadoById,
+  getEmpleados,
   getOperationalTaskById,
+  getPoolTasks,
   persistOperationalTaskChange,
 } from './db'
 
@@ -92,4 +94,62 @@ export async function notifyOperationalTaskAssignment(
   ]
 
   await enqueueBotMessage(employee.waId, lines.filter(Boolean).join('\n'))
+}
+
+/**
+ * Cuando un empleado registra entrada, toma su porción del pool de tareas del día.
+ *
+ * Lógica de distribución:
+ *   - Pool = tareas en estado 'pendiente_asignacion' sin empleado asignado
+ *   - Se dividen entre el total de empleados activos (ceil)
+ *   - El empleado recibe las primeras N tareas disponibles del pool
+ *   - Si el pool ya está vacío (todos llegaron), no asigna nada
+ *
+ * Retorna las tareas asignadas para incluirlas en el mensaje de confirmación.
+ */
+export async function autoDistributePoolTasksOnEntry(empleadoId: number): Promise<Array<{ id: number; titulo: string; ubicacion: string }>> {
+  const [pool, activeEmployees] = await Promise.all([
+    getPoolTasks(),
+    getEmpleados(),
+  ])
+
+  if (pool.length === 0) return []
+
+  const totalActive = Math.max(1, activeEmployees.length)
+  const tasksPerEmployee = Math.ceil(pool.length / totalActive)
+  const slice = pool.slice(0, tasksPerEmployee)
+
+  const empleado = await getEmpleadoById(empleadoId)
+  if (!empleado) return []
+
+  const now = new Date()
+  const assigned: Array<{ id: number; titulo: string; ubicacion: string }> = []
+
+  for (const task of slice) {
+    try {
+      await persistOperationalTaskChange(task.id, {
+        empleadoId: empleado.id,
+        empleadoNombre: empleado.nombre,
+        empleadoWaId: empleado.waId ?? null,
+        estado: 'pendiente_confirmacion',
+        asignadoAt: now,
+        aceptadoAt: null,
+        trabajoIniciadoAt: null,
+        pausadoAt: null,
+      } as any, [{
+        tareaId: task.id,
+        tipo: 'asignacion',
+        actorTipo: 'system',
+        actorId: null,
+        actorNombre: 'Auto-asignación (entrada)',
+        descripcion: `Asignada automáticamente a ${empleado.nombre} al registrar entrada.`,
+        createdAt: now,
+      }])
+      assigned.push({ id: task.id, titulo: task.titulo, ubicacion: task.ubicacion })
+    } catch (err) {
+      console.error(`[auto-assign] Error asignando tarea #${task.id} a empleado #${empleadoId}:`, err)
+    }
+  }
+
+  return assigned
 }

@@ -50,6 +50,7 @@ import { readEnv } from './_core/env'
 import { createRoundsService } from './rounds/service'
 import { createOperationalTasksService } from './tasks/service'
 import { assignReporteToEmployee } from './reporte-assignment'
+import { autoDistributePoolTasksOnEntry } from './operational-task-assignment'
 
 const botRouter = Router()
 const roundsService = createRoundsService(roundDb as any)
@@ -1048,9 +1049,21 @@ botRouter.post('/empleado/:id/entrada', authBot, async (req, res) => {
     if (!marcacion) {
       return res.status(409).json({ error: 'No se pudo abrir la jornada del empleado.' })
     }
+
+    let tareasAutoAsignadas = 0
+    if (!alreadyOpen) {
+      try {
+        const assigned = await autoDistributePoolTasksOnEntry(empleadoId)
+        tareasAutoAsignadas = assigned.length
+      } catch (err) {
+        console.error('[bot-api/entrada] auto-assign error:', err)
+      }
+    }
+
     return res.json({
       success: true,
       alreadyOpen,
+      tareasAutoAsignadas,
       empleado: { id: empleado.id, nombre: empleado.nombre },
       jornada: {
         id: marcacion.id,

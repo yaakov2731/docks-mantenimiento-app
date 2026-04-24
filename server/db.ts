@@ -2766,3 +2766,15 @@ function describeRoundEvent(type: 'recordatorio' | 'confirmacion' | 'observacion
     default: return 'Evento de ronda'
   }
 }
+
+export async function getPoolTasks() {
+  const rows = await db.select().from(schema.tareasOperativas).where(
+    and(
+      eq(schema.tareasOperativas.estado, 'pendiente_asignacion'),
+      isNull(schema.tareasOperativas.empleadoId),
+    )
+  )
+  return rows.map(toOperationalTaskRecord).sort((a, b) =>
+    (a.ordenAsignacion ?? 0) - (b.ordenAsignacion ?? 0) || a.id - b.id
+  )
+}

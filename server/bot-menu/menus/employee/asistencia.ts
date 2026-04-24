@@ -8,6 +8,7 @@ import {
   getEmpleadoAttendanceStatus,
   registerEmpleadoAttendance,
 } from '../../../db'
+import { autoDistributePoolTasksOnEntry } from '../../../operational-task-assignment'
 
 // ─── Menú principal de asistencia ────────────────────────────────────────────
 
@@ -112,12 +113,33 @@ async function ejecutarAsistencia(
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires',
   })
 
+  // Auto-asignar tareas del pool al registrar entrada
+  let tareasAsignadas: Array<{ id: number; titulo: string; ubicacion: string }> = []
+  if (accion === 'entrada') {
+    try {
+      tareasAsignadas = await autoDistributePoolTasksOnEntry(session.userId)
+    } catch (err) {
+      console.error('[bot/asistencia] auto-assign error:', err)
+    }
+  }
+
+  const tareasLines = tareasAsignadas.length > 0
+    ? [
+        ``,
+        `📋 *Se te asignaron ${tareasAsignadas.length} tarea${tareasAsignadas.length > 1 ? 's' : ''} del día:*`,
+        ...tareasAsignadas.map(t => `  • ${t.titulo}${t.ubicacion ? ` — ${t.ubicacion}` : ''}`),
+        ``,
+        `Revisalas en *Mis tareas* y aceptalas para comenzar.`,
+      ]
+    : []
+
   const mensajes: Record<string, string[]> = {
     entrada: [
       `✅ *Entrada registrada*`,
       ``,
       `Hola ${session.userName}! 👷`,
       `📍 Entrada a las *${ahora}*`,
+      ...tareasLines,
       ``,
       `¡Buen turno!`,
     ],
