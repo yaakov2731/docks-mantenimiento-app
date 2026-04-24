@@ -15,6 +15,7 @@ import {
   getReportesVencidos,
   getBotConnectionStatus,
   getPendingBotMessages,
+  getOperationalTasksOverview,
 } from '../../../db'
 import { assignReporteToEmployee } from '../../../reporte-assignment'
 import { createRoundsService } from '../../../rounds/service'
@@ -365,11 +366,12 @@ export async function handleCancelarReclamo(session: BotSession, input: string):
 // ─── Estado general del día ───────────────────────────────────────────────────
 
 export async function buildEstadoGeneral(session: BotSession): Promise<string> {
-  const [reportes, vencidos, botStatus, pendingMsgs] = await Promise.all([
+  const [reportes, vencidos, botStatus, pendingMsgs, tareasOverview] = await Promise.all([
     getReportes(),
     getReportesVencidos(),
     getBotConnectionStatus(),
     getPendingBotMessages(),
+    getOperationalTasksOverview(),
   ])
 
   const abiertos = reportes.filter(r => !['completado', 'cancelado'].includes(r.estado))
@@ -393,16 +395,36 @@ export async function buildEstadoGeneral(session: BotSession): Promise<string> {
     timeZone: 'America/Argentina/Buenos_Aires',
   })
 
+  // Resumen por empleado (solo los que tienen algo hoy)
+  const empleadosLines = tareasOverview.porEmpleado
+    .filter(e => e.activas + e.pausadas + e.pendientes + e.terminadasHoy > 0)
+    .map(e => {
+      const parts = []
+      if (e.activas > 0) parts.push(`▶️${e.activas}`)
+      if (e.pausadas > 0) parts.push(`⏸️${e.pausadas}`)
+      if (e.pendientes > 0) parts.push(`⏳${e.pendientes}`)
+      if (e.terminadasHoy > 0) parts.push(`✅${e.terminadasHoy}`)
+      return `  👷 ${e.empleadoNombre}: ${parts.join(' ')}`
+    })
+
   return [
     `📊 *Estado general — Docks del Puerto*`,
     `📅 ${today}`,
     SEP,
-    `📋 Reclamos abiertos: *${abiertos.length}*`,
+    `📋 *Reclamos abiertos: ${abiertos.length}*`,
     `  ▶️ En progreso: ${enProgreso.length}`,
     `  ⚠️  Sin asignar: ${sinAsignar.length}`,
     `  🔴 Urgentes sin asignar: ${urgentesLibres.length}`,
     `  🚨 SLA vencidos: ${vencidos.length}`,
     `  ✅ Completados hoy: ${completadosHoy.length}`,
+    SEP,
+    `📋 *Tareas operativas: ${tareasOverview.total}*`,
+    `  ▶️ En progreso: ${tareasOverview.activas}`,
+    `  ⏸️ Pausadas: ${tareasOverview.pausadas}`,
+    `  ⏳ Sin aceptar: ${tareasOverview.pendientesConfirmacion}`,
+    `  ✅ Finalizadas hoy: ${tareasOverview.terminadasHoy}`,
+    tareasOverview.rechazadasHoy > 0 ? `  ❌ Rechazadas hoy: ${tareasOverview.rechazadasHoy}` : '',
+    ...empleadosLines,
     SEP,
     `🤖 Bot WhatsApp: ${botStr}`,
     pendingMsgs.length > 0 ? `  📨 Mensajes en cola: ${pendingMsgs.length}` : '',
