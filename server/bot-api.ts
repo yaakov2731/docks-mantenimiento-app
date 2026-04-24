@@ -3,6 +3,7 @@
  * Autenticación: header X-Bot-Api-Key
  */
 import { Router } from 'express'
+import { timingSafeEqual } from 'crypto'
 import * as roundDb from './db'
 import {
   ATTENDANCE_ACTIONS,
@@ -187,10 +188,21 @@ function buildAttendancePayload(status: any) {
 
 function authBot(req: any, res: any, next: any) {
   const key = req.headers['x-bot-api-key']
-  if (!key || key !== readEnv('BOT_API_KEY')) {
+  const expected = readEnv('BOT_API_KEY') ?? ''
+  if (!key || typeof key !== 'string' || key.length !== expected.length) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
+  const match = timingSafeEqual(Buffer.from(key), Buffer.from(expected))
+  if (!match) return res.status(401).json({ error: 'Unauthorized' })
   next()
+}
+
+const MAX_TEXT = 500
+const MAX_NOMBRE = 120
+const MAX_WA = 20
+
+function clamp(value: string | undefined, max: number): string | undefined {
+  return value ? value.slice(0, max) : value
 }
 
 function parseId(value: string) {
@@ -979,20 +991,20 @@ botRouter.post('/reporte', authBot, async (req, res) => {
     }).catch(console.error)
     return res.json({ success: true, id })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
 // POST /api/bot/lead
 botRouter.post('/lead', authBot, async (req, res) => {
   try {
-    const nombre = normalizeText(req.body?.nombre)
-    const telefono = normalizeOptionalText(req.body?.telefono)
-    const email = normalizeOptionalText(req.body?.email)
-    const waId = normalizeOptionalText(req.body?.waId)
-    const rubro = normalizeOptionalText(req.body?.rubro)
-    const tipoLocal = normalizeOptionalText(req.body?.tipoLocal)
-    const mensaje = normalizeOptionalText(req.body?.mensaje)
+    const nombre = clamp(normalizeText(req.body?.nombre), MAX_NOMBRE)
+    const telefono = clamp(normalizeOptionalText(req.body?.telefono), MAX_WA)
+    const email = clamp(normalizeOptionalText(req.body?.email), 200)
+    const waId = clamp(normalizeOptionalText(req.body?.waId), MAX_WA)
+    const rubro = clamp(normalizeOptionalText(req.body?.rubro), 100)
+    const tipoLocal = clamp(normalizeOptionalText(req.body?.tipoLocal), 200)
+    const mensaje = clamp(normalizeOptionalText(req.body?.mensaje), MAX_TEXT)
     if (!nombre) return res.status(400).json({ error: 'nombre es requerido' })
     const id = await crearLead({ nombre, telefono, email, waId, rubro, tipoLocal, mensaje, fuente: 'whatsapp' } as any)
     notifyOwner({
@@ -1000,8 +1012,8 @@ botRouter.post('/lead', authBot, async (req, res) => {
       content: `${nombre} (${telefono || waId || 'sin contacto'}) — ${rubro || 'sin rubro'}`,
     }).catch(console.error)
     return res.json({ success: true, id })
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+  } catch {
+    return res.status(500).json({ error: 'No se pudo registrar el lead' })
   }
 })
 
@@ -1020,7 +1032,7 @@ botRouter.get('/empleado/identificar/:waNumber', authBot, async (req, res) => {
     if (!empleado) return res.status(404).json({ found: false })
     return res.json({ found: true, id: empleado.id, nombre: empleado.nombre, especialidad: empleado.especialidad })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1048,7 +1060,7 @@ botRouter.post('/empleado/:id/entrada', authBot, async (req, res) => {
       message: alreadyOpen ? 'La jornada ya estaba iniciada.' : 'Entrada registrada correctamente.',
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1077,7 +1089,7 @@ botRouter.post('/empleado/:id/salida', authBot, async (req, res) => {
       message: 'Salida registrada correctamente.',
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1097,7 +1109,7 @@ botRouter.get('/empleado/:id/jornada', authBot, async (req, res) => {
       },
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1109,7 +1121,7 @@ botRouter.get('/empleado/:id/tareas', authBot, async (req, res) => {
     const tareas = await getTareasEmpleado(empleadoId)
     return res.json({ tareas: tareas.map(t => buildTaskPayload(t, t.tiempoTrabajadoSegundos ?? 0)) })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1144,7 +1156,7 @@ botRouter.get('/empleado/:id/resumen', authBot, async (req, res) => {
       tareasInternas,
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1179,7 +1191,7 @@ botRouter.post('/empleado/:id/asistencia', authBot, async (req, res) => {
       attendance: buildAttendancePayload(result.status),
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1246,7 +1258,7 @@ botRouter.post('/reporte/:id/respuesta', authBot, async (req, res) => {
       task: updated ? buildTaskPayload(updated) : null,
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1278,7 +1290,7 @@ botRouter.post('/reporte/:id/iniciar', authBot, async (req, res) => {
       tiempoTrabajado: formatDuration(updated ? getReporteTiempoTrabajadoSegundos(updated) : 0),
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1306,7 +1318,7 @@ botRouter.post('/reporte/:id/pausar', authBot, async (req, res) => {
       tiempoTrabajado: formatDuration(updated?.trabajoAcumuladoSegundos ?? 0),
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1346,7 +1358,7 @@ botRouter.post('/reporte/:id/progreso', authBot, async (req, res) => {
       tiempoTrabajado: formatDuration(updated ? getReporteTiempoTrabajadoSegundos(updated) : 0),
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1421,7 +1433,7 @@ botRouter.post('/reporte/:id/completar', authBot, async (req, res) => {
       tiempoTrabajado: formatDuration(tiempoTrabajadoSegundos),
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1437,7 +1449,7 @@ botRouter.get('/queue', authBot, async (req, res) => {
     }).catch(() => { /* no bloquear */ })
     return res.json({ items })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1449,7 +1461,7 @@ botRouter.post('/queue/:id/sent', authBot, async (req, res) => {
     await markBotMessageSent(id)
     return res.json({ success: true })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1462,7 +1474,7 @@ botRouter.post('/queue/:id/failed', authBot, async (req, res) => {
     await markBotMessageFailed(id, errorMsg)
     return res.json({ success: true })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1472,7 +1484,7 @@ botRouter.post('/queue/retry', authBot, async (_req, res) => {
     await retryFailedBotMessages()
     return res.json({ success: true, message: 'Mensajes fallidos puestos a reintentar' })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1482,7 +1494,7 @@ botRouter.get('/queue/dead-letter', authBot, async (_req, res) => {
     const items = await getDeadLetterBotMessages()
     return res.json({ items, total: items.length })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1495,7 +1507,7 @@ botRouter.post('/heartbeat', authBot, async (req, res) => {
     })
     return res.json({ success: true, serverTime: new Date().toISOString() })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1515,7 +1527,7 @@ botRouter.get('/status', authBot, async (_req, res) => {
       },
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1528,7 +1540,7 @@ botRouter.post('/parse-intent', authBot, async (req, res) => {
     const intent = parseIntent(message)
     return res.json({ intent })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1550,7 +1562,7 @@ botRouter.get('/sla/vencidos', authBot, async (_req, res) => {
       })),
     })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -1564,7 +1576,7 @@ botRouter.get('/reporte/:id/sla', authBot, async (req, res) => {
     const sla = calcularSLA(reporte.prioridad, reporte.createdAt)
     return res.json({ reporteId, prioridad: reporte.prioridad, sla })
   } catch (e: any) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 })
 

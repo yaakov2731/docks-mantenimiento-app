@@ -1,6 +1,8 @@
 import 'dotenv/config'
 import express, { Request, Response, NextFunction } from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import { rateLimit } from 'express-rate-limit'
 import cookieParser from 'cookie-parser'
 import { createExpressMiddleware } from '@trpc/server/adapters/express'
 import { appRouter } from './routers'
@@ -15,14 +17,42 @@ import fs from 'fs'
 
 const app = express()
 const PORT = process.env.PORT ?? 3001
+const isProd = process.env.NODE_ENV === 'production'
 
-const allowedOrigin: string | true = readEnv('CLIENT_URL') ?? true
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Vite assets tienen hashes dinámicos
+  crossOriginEmbedderPolicy: false,
+}))
+
+// CORS — solo permite el origen configurado; en dev permite localhost
+const allowedOrigin = readEnv('CLIENT_URL') ?? (isProd ? false : 'http://localhost:5173')
 app.use(cors({ origin: allowedOrigin, credentials: true }))
-app.use(express.json({ limit: '10mb' }))
+
+// Body limit reducido — los mensajes del bot nunca necesitan 10mb
+app.use(express.json({ limit: '256kb' }))
 app.use(cookieParser())
 
-app.use('/trpc', createExpressMiddleware({ router: appRouter, createContext }))
-app.use('/api/bot', botRouter)
+// Rate limiting — bot API: 120 req/min por IP (el bot hace polling, no explosiones)
+const botRateLimit = rateLimit({
+  windowMs: 60_000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests' },
+})
+
+// Rate limiting — endpoints de login/trpc: 30 req/min por IP
+const authRateLimit = rateLimit({
+  windowMs: 60_000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests' },
+})
+
+app.use('/api/bot', botRateLimit, botRouter)
+app.use('/trpc', authRateLimit, createExpressMiddleware({ router: appRouter, createContext }))
 app.use('/api', roundsHttpRouter)
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }))
 
@@ -33,13 +63,13 @@ if (fs.existsSync(path.join(clientDist, 'index.html'))) {
   app.get('*', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')))
 }
 
+// Error handler — no exponer detalles en producción
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[Server ERROR]', err)
-  res.status(500).json({ error: true, message: err?.message ?? 'Internal server error' })
+  const message = isProd ? 'Internal server error' : (err?.message ?? 'Internal server error')
+  res.status(500).json({ error: true, message })
 })
 
-// Start listening immediately so Railway healthcheck passes,
-// then initialize DB in the background
 app.listen(PORT, () => {
   console.log(`[Server] Running on http://localhost:${PORT}`)
   console.log(`[tRPC]    http://localhost:${PORT}/trpc`)

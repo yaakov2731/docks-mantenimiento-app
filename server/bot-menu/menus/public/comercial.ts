@@ -14,6 +14,12 @@ import { BotSession, navigateTo, navigateBack } from '../../session'
 import { SEP, confirmMsg, errorMsg } from '../../shared/guards'
 import { crearLead, getUsers, enqueueBotMessage } from '../../../db'
 
+const MAX_INPUT = 300
+
+function trimSafe(v: string): string {
+  return v.trim().slice(0, MAX_INPUT)
+}
+
 // ─── Helper: formato profesional de número argentino ────────────────────────
 
 function fmtPhone(waId: string): string {
@@ -69,13 +75,23 @@ export async function handlePublicMain(session: BotSession, input: string): Prom
   return `❓ *Opción no válida.* Ingresá el número de la opción:\n\n${buildPublicMainMenu()}`
 }
 
-// ─── Flujo: Consulta de alquiler ─────────────────────────────────────────────
+// ─── Flujo: Consulta de alquiler (7 pasos) ───────────────────────────────────
+//
+// P1 → nombre y apellido
+// P2 → nombre de la marca o comercio
+// P3 → rubro
+// P4 → Instagram o web
+// P5 → ¿ya tenés local o vendés online?
+// P6 → ¿qué tipo de espacio buscás?
+// P7 → ¿desde cuándo querés comenzar?
+// → submit
 
 export function buildPublicAlquilerP1(): string {
   return [
     `🏪 *Consulta de alquiler*`,
     SEP,
-    `Por favor, ¿cuál es tu *nombre completo*?`,
+    `*Paso 1 de 7*`,
+    `¿Cuál es tu *nombre y apellido*?`,
     SEP,
     `0️⃣  Volver`,
   ].join('\n')
@@ -88,7 +104,7 @@ export async function handlePublicAlquilerP1(session: BotSession, input: string)
   }
   await navigateTo(session, 'public_alquiler_p2', {
     pendingText: true,
-    publicNombre: input.trim(),
+    alquilerNombre: trimSafe(input),
   })
   return buildPublicAlquilerP2()
 }
@@ -97,8 +113,8 @@ export function buildPublicAlquilerP2(): string {
   return [
     `🏪 *Consulta de alquiler*`,
     SEP,
-    `¿Qué tipo de local estás buscando?`,
-    `(ej: _local de 50m²_, _oficina en planta alta_, etc.)`,
+    `*Paso 2 de 7*`,
+    `¿Cuál es el *nombre de tu marca o comercio*?`,
     SEP,
     `0️⃣  Volver`,
   ].join('\n')
@@ -106,21 +122,174 @@ export function buildPublicAlquilerP2(): string {
 
 export async function handlePublicAlquilerP2(session: BotSession, input: string): Promise<string | null> {
   if (input === '0') return null
+  if (input.trim().length < 1) {
+    return `⚠️ Por favor ingresá el nombre de tu marca.\n\n${buildPublicAlquilerP2()}`
+  }
+  const ctx = session.contextData as Record<string, any>
+  await navigateTo(session, 'public_alquiler_p3', {
+    pendingText: true,
+    alquilerNombre: ctx.alquilerNombre,
+    alquilerMarca: trimSafe(input),
+  })
+  return buildPublicAlquilerP3()
+}
+
+export function buildPublicAlquilerP3(): string {
+  return [
+    `🏪 *Consulta de alquiler*`,
+    SEP,
+    `*Paso 3 de 7*`,
+    `¿A qué *rubro* pertenece tu negocio?`,
+    `_(ej: gastronomía, indumentaria, servicios, etc.)_`,
+    SEP,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
+export async function handlePublicAlquilerP3(session: BotSession, input: string): Promise<string | null> {
+  if (input === '0') return null
+  if (input.trim().length < 2) {
+    return `⚠️ Por favor indicá el rubro de tu negocio.\n\n${buildPublicAlquilerP3()}`
+  }
+  const ctx = session.contextData as Record<string, any>
+  await navigateTo(session, 'public_alquiler_p4', {
+    pendingText: true,
+    alquilerNombre: ctx.alquilerNombre,
+    alquilerMarca: ctx.alquilerMarca,
+    alquilerRubro: trimSafe(input),
+  })
+  return buildPublicAlquilerP4()
+}
+
+export function buildPublicAlquilerP4(): string {
+  return [
+    `🏪 *Consulta de alquiler*`,
+    SEP,
+    `*Paso 4 de 7*`,
+    `¿Tenés *Instagram o página web*?`,
+    `Pasanos el usuario o la URL. Si no tenés, escribí _"no"_.`,
+    SEP,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
+export async function handlePublicAlquilerP4(session: BotSession, input: string): Promise<string | null> {
+  if (input === '0') return null
+  if (input.trim().length < 1) {
+    return `⚠️ Por favor respondé o escribí "no".\n\n${buildPublicAlquilerP4()}`
+  }
+  const ctx = session.contextData as Record<string, any>
+  await navigateTo(session, 'public_alquiler_p5', {
+    pendingText: true,
+    alquilerNombre: ctx.alquilerNombre,
+    alquilerMarca: ctx.alquilerMarca,
+    alquilerRubro: ctx.alquilerRubro,
+    alquilerInstagram: trimSafe(input),
+  })
+  return buildPublicAlquilerP5()
+}
+
+export function buildPublicAlquilerP5(): string {
+  return [
+    `🏪 *Consulta de alquiler*`,
+    SEP,
+    `*Paso 5 de 7*`,
+    `¿Ya tenés un *local físico* o vendés *online*?`,
+    SEP,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
+export async function handlePublicAlquilerP5(session: BotSession, input: string): Promise<string | null> {
+  if (input === '0') return null
+  if (input.trim().length < 1) {
+    return `⚠️ Por favor respondé.\n\n${buildPublicAlquilerP5()}`
+  }
+  const ctx = session.contextData as Record<string, any>
+  await navigateTo(session, 'public_alquiler_p6', {
+    pendingText: true,
+    alquilerNombre: ctx.alquilerNombre,
+    alquilerMarca: ctx.alquilerMarca,
+    alquilerRubro: ctx.alquilerRubro,
+    alquilerInstagram: ctx.alquilerInstagram,
+    alquilerTieneLocal: trimSafe(input),
+  })
+  return buildPublicAlquilerP6()
+}
+
+export function buildPublicAlquilerP6(): string {
+  return [
+    `🏪 *Consulta de alquiler*`,
+    SEP,
+    `*Paso 6 de 7*`,
+    `¿Qué tipo de *espacio* estás buscando?`,
+    `_(ej: local de 30m², puesto en pasillo, espacio en planta alta, etc.)_`,
+    SEP,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
+export async function handlePublicAlquilerP6(session: BotSession, input: string): Promise<string | null> {
+  if (input === '0') return null
   if (input.trim().length < 3) {
-    return `⚠️ Por favor describí qué estás buscando.\n\n${buildPublicAlquilerP2()}`
+    return `⚠️ Por favor describí qué estás buscando.\n\n${buildPublicAlquilerP6()}`
+  }
+  const ctx = session.contextData as Record<string, any>
+  await navigateTo(session, 'public_alquiler_p7', {
+    pendingText: true,
+    alquilerNombre: ctx.alquilerNombre,
+    alquilerMarca: ctx.alquilerMarca,
+    alquilerRubro: ctx.alquilerRubro,
+    alquilerInstagram: ctx.alquilerInstagram,
+    alquilerTieneLocal: ctx.alquilerTieneLocal,
+    alquilerTipoEspacio: trimSafe(input),
+  })
+  return buildPublicAlquilerP7()
+}
+
+export function buildPublicAlquilerP7(): string {
+  return [
+    `🏪 *Consulta de alquiler*`,
+    SEP,
+    `*Paso 7 de 7*`,
+    `¿*Desde cuándo* te gustaría comenzar?`,
+    `_(ej: marzo 2026, lo antes posible, en 3 meses)_`,
+    SEP,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
+export async function handlePublicAlquilerP7(session: BotSession, input: string): Promise<string | null> {
+  if (input === '0') return null
+  if (input.trim().length < 1) {
+    return `⚠️ Por favor indicá desde cuándo.\n\n${buildPublicAlquilerP7()}`
   }
 
-  const { publicNombre } = session.contextData as Record<string, any>
-  const nombre = String(publicNombre ?? 'Sin nombre')
-  const phone  = fmtPhone(session.waNumber)
+  const ctx = session.contextData as Record<string, any>
+  const nombre       = String(ctx.alquilerNombre ?? 'Sin nombre')
+  const marca        = String(ctx.alquilerMarca ?? '')
+  const rubro        = String(ctx.alquilerRubro ?? '')
+  const instagram    = String(ctx.alquilerInstagram ?? '')
+  const tieneLocal   = String(ctx.alquilerTieneLocal ?? '')
+  const tipoEspacio  = String(ctx.alquilerTipoEspacio ?? '')
+  const desdeCuando  = trimSafe(input)
+  const phone        = fmtPhone(session.waNumber)
+
+  const mensaje = [
+    marca       ? `Marca: ${marca}` : null,
+    instagram   ? `Instagram/web: ${instagram}` : null,
+    tieneLocal  ? `Tiene local: ${tieneLocal}` : null,
+    tipoEspacio ? `Espacio buscado: ${tipoEspacio}` : null,
+    desdeCuando ? `Inicio deseado: ${desdeCuando}` : null,
+  ].filter(Boolean).join(' | ')
 
   try {
     const leadId = await crearLead({
       nombre,
       telefono: session.waNumber,
       waId: session.waNumber,
-      rubro: 'alquiler',
-      mensaje: input.trim(),
+      rubro,
+      mensaje,
       fuente: 'whatsapp',
       estado: 'nuevo',
     })
@@ -129,12 +298,16 @@ export async function handlePublicAlquilerP2(session: BotSession, input: string)
       `🏪 *Nueva consulta de alquiler*`,
       `🏢 Docks del Puerto`,
       SEP,
-      `👤 *${nombre}*`,
+      `👤 *${nombre}*  |  🏷️ ${marca}`,
       `📞 ${phone}`,
-      `💬 _"${input.trim()}"_`,
+      `🏬 Rubro: ${rubro}`,
+      instagram   ? `📸 ${instagram}` : null,
+      tieneLocal  ? `🏪 Tiene local: ${tieneLocal}` : null,
+      `📐 Busca: ${tipoEspacio}`,
+      `📅 Inicio: ${desdeCuando}`,
       SEP,
       `_Lead #${leadId} · WhatsApp · ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}_`,
-    ].join('\n'))
+    ].filter((l): l is string => !!l).join('\n'))
 
     await navigateTo(session, 'main', {})
     return [
@@ -172,7 +345,7 @@ export async function handlePublicReclamoP1(session: BotSession, input: string):
   }
   await navigateTo(session, 'public_reclamo_p2', {
     pendingText: true,
-    publicNombre: input.trim(),
+    publicNombre: trimSafe(input),
   })
   return buildPublicReclamoP2()
 }
@@ -204,7 +377,7 @@ export async function handlePublicReclamoP2(session: BotSession, input: string):
       telefono: session.waNumber,
       waId: session.waNumber,
       rubro: 'reclamo_locatario',
-      mensaje: input.trim(),
+      mensaje: trimSafe(input),
       fuente: 'whatsapp',
       estado: 'nuevo',
     })
@@ -215,7 +388,7 @@ export async function handlePublicReclamoP2(session: BotSession, input: string):
       SEP,
       `👤 *${nombre}*`,
       `📞 ${phone}`,
-      `🔧 _"${input.trim()}"_`,
+      `🔧 _"${trimSafe(input)}"_`,
       SEP,
       `_Lead #${leadId} · WhatsApp · ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}_`,
     ].join('\n'))
@@ -255,7 +428,7 @@ export async function handlePublicMensajeP1(session: BotSession, input: string):
   }
   await navigateTo(session, 'public_mensaje_p2', {
     pendingText: true,
-    publicNombre: input.trim(),
+    publicNombre: trimSafe(input),
   })
   return buildPublicMensajeP2(input.trim())
 }
@@ -287,7 +460,7 @@ export async function handlePublicMensajeP2(session: BotSession, input: string):
       telefono: session.waNumber,
       waId: session.waNumber,
       rubro: 'consulta',
-      mensaje: input.trim(),
+      mensaje: trimSafe(input),
       fuente: 'whatsapp',
       estado: 'nuevo',
     })
@@ -298,7 +471,7 @@ export async function handlePublicMensajeP2(session: BotSession, input: string):
       SEP,
       `👤 *${nombre}*`,
       `📞 ${phone}`,
-      `💬 _"${input.trim()}"_`,
+      `💬 _"${trimSafe(input)}"_`,
       SEP,
       `_Lead #${leadId} · WhatsApp · ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}_`,
     ].join('\n'))
