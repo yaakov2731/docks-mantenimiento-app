@@ -466,52 +466,54 @@ export default function Asistencia() {
             </div>
           </div>
 
-          <div className="rounded-[20px] text-white p-4" style={{ background: 'var(--sidebar-bg)', boxShadow: '0 8px 24px oklch(0 0 0 / 0.22), inset 0 1px 0 oklch(1 0 0 / 0.07)' }}>
+          <div className="rounded-[18px] text-white overflow-hidden" style={{ background: 'var(--sidebar-bg)', boxShadow: '0 4px 20px oklch(0 0 0 / 0.18), 0 1px 0 oklch(1 0 0 / 0.10)' }}>
 
-            {/* Header */}
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <div className="text-[9px] uppercase tracking-[0.28em] font-medium" style={{ color: 'oklch(1 0 0 / 0.35)' }}>Reloj central</div>
-                <div className="text-[11px] mt-0.5 font-light" style={{ color: 'oklch(1 0 0 / 0.50)' }}>Control administrativo</div>
-              </div>
-              <div className="rounded-full p-2" style={{ background: 'oklch(1 0 0 / 0.08)', border: '1px solid oklch(1 0 0 / 0.12)' }}>
-                <Clock3 size={13} style={{ color: 'var(--accent)' }} />
-              </div>
+            {/* Header strip */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3">
+              <span className="text-[9px] uppercase tracking-[0.32em] font-semibold" style={{ color: 'oklch(1 0 0 / 0.50)' }}>Reloj central</span>
+              <Clock3 size={11} style={{ color: 'oklch(1 0 0 / 0.35)' }} />
             </div>
 
-            {/* Clock display */}
-            <div className="rounded-[14px] px-4 py-4 flex flex-col items-center justify-center gap-1.5"
-              style={{ background: 'oklch(0 0 0 / 0.20)', border: '1px solid oklch(1 0 0 / 0.09)' }}>
-              <span className="font-mono text-[38px] font-semibold leading-none tabular-nums"
-                style={{ color: 'var(--accent)', letterSpacing: '0.04em' }}>
+            {/* Clock — hero, sin caja interior */}
+            <div className="flex flex-col items-center pb-4 px-4">
+              <span className="font-mono font-bold leading-none tabular-nums w-full text-center"
+                style={{ fontSize: '54px', color: 'white', letterSpacing: '-0.02em' }}>
                 {digitalTime}
               </span>
-              <span className="text-[10.5px] capitalize" style={{ color: 'oklch(1 0 0 / 0.42)', letterSpacing: '0.02em' }}>
+              <span className="text-[10px] uppercase tracking-[0.18em] mt-2 text-center" style={{ color: 'oklch(1 0 0 / 0.48)' }}>
                 {formatFullDate(now)}
               </span>
             </div>
 
-            {/* KPIs */}
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <div className="rounded-[16px] px-4 py-3" style={{ background: 'oklch(1 0 0 / 0.05)' }}>
-                <div className="text-[10px] uppercase tracking-wide" style={{ color: 'oklch(1 0 0 / 0.35)' }}>En turno</div>
-                <div className="mt-1.5 font-heading text-2xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>{equipo?.enTurno ?? 0}</div>
+            {/* Divider */}
+            <div style={{ height: '1px', background: 'oklch(1 0 0 / 0.10)' }} />
+
+            {/* KPIs en fila con divisor vertical */}
+            <div className="grid grid-cols-2">
+              <div className="px-4 py-3" style={{ borderRight: '1px solid oklch(1 0 0 / 0.10)' }}>
+                <div className="text-[9px] uppercase tracking-[0.20em]" style={{ color: 'oklch(1 0 0 / 0.45)' }}>En turno</div>
+                <div className="mt-1 font-heading text-2xl font-bold leading-none" style={{ fontFamily: 'var(--font-heading)' }}>{equipo?.enTurno ?? 0}</div>
               </div>
-              <div className="rounded-[16px] px-4 py-3" style={{ background: 'oklch(1 0 0 / 0.05)' }}>
-                <div className="text-[10px] uppercase tracking-wide" style={{ color: 'oklch(1 0 0 / 0.35)' }}>A pagar</div>
-                <div className="mt-1.5 font-heading text-xl font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>{formatCurrency(equipo?.totalPagar ?? 0)}</div>
+              <div className="px-4 py-3">
+                <div className="text-[9px] uppercase tracking-[0.20em]" style={{ color: 'oklch(1 0 0 / 0.45)' }}>A pagar</div>
+                <div className="mt-1 font-heading text-base font-bold leading-none" style={{ fontFamily: 'var(--font-heading)' }}>{formatCurrency(equipo?.totalPagar ?? 0)}</div>
               </div>
             </div>
 
-            <Button
-              variant="outline"
-              onClick={() => resumen.refetch()}
-              disabled={resumen.isFetching}
-              className="mt-3 w-full border-white/25 bg-transparent text-white hover:bg-white/10"
-            >
-              <RefreshCw size={13} className={resumen.isFetching ? 'animate-spin' : ''} />
-              Actualizar tablero
-            </Button>
+            {/* Divider */}
+            <div style={{ height: '1px', background: 'oklch(1 0 0 / 0.10)' }} />
+
+            <div className="px-3 py-2.5">
+              <Button
+                variant="outline"
+                onClick={() => resumen.refetch()}
+                disabled={resumen.isFetching}
+                className="w-full border-white/20 bg-transparent text-white hover:bg-white/10 text-[12px] h-8"
+              >
+                <RefreshCw size={12} className={resumen.isFetching ? 'animate-spin' : ''} />
+                Actualizar tablero
+              </Button>
+            </div>
           </div>
 
           <div className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">

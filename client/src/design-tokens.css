@@ -12,8 +12,8 @@
   --color-primary-light:  oklch(0.970 0.040 72);
 
   /* ── SIDEBAR / BRAND DARK ── */
-  --color-sidebar:        oklch(0.228 0.052 248);
-  --color-sidebar-mid:    oklch(0.278 0.046 248);
+  --color-sidebar:        oklch(0.310 0.072 248);
+  --color-sidebar-mid:    oklch(0.370 0.065 248);
 
   /* ── ACCENT: Steel Blue ── */
   --color-accent:         oklch(0.548 0.082 216);
@@ -94,8 +94,8 @@
   --color-border-strong: oklch(0.315 0.012 45);
 
   /* Sidebar: deepest level */
-  --color-sidebar:     oklch(0.155 0.045 248);
-  --color-sidebar-mid: oklch(0.205 0.040 248);
+  --color-sidebar:     oklch(0.220 0.065 248);
+  --color-sidebar-mid: oklch(0.270 0.060 248);
 
   /* Neutrals (dark) */
   --color-gray-50:   oklch(0.165 0.012 45);
