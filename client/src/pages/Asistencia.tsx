@@ -466,27 +466,27 @@ export default function Asistencia() {
             </div>
           </div>
 
-          <div className="rounded-[28px] text-white p-5" style={{ background: 'var(--sidebar-bg)', boxShadow: '0 8px 32px oklch(0 0 0 / 0.28)' }}>
+          <div className="rounded-[20px] text-white p-4" style={{ background: 'var(--sidebar-bg)', boxShadow: '0 8px 24px oklch(0 0 0 / 0.22), inset 0 1px 0 oklch(1 0 0 / 0.07)' }}>
 
             {/* Header */}
-            <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
               <div>
-                <div className="text-[9.5px] uppercase tracking-[0.24em]" style={{ color: 'oklch(1 0 0 / 0.35)' }}>Reloj central</div>
-                <div className="text-[12px] mt-0.5" style={{ color: 'oklch(1 0 0 / 0.55)' }}>Puesto de control administrativo</div>
+                <div className="text-[9px] uppercase tracking-[0.28em] font-medium" style={{ color: 'oklch(1 0 0 / 0.35)' }}>Reloj central</div>
+                <div className="text-[11px] mt-0.5 font-light" style={{ color: 'oklch(1 0 0 / 0.50)' }}>Control administrativo</div>
               </div>
-              <div className="rounded-xl p-2" style={{ background: 'oklch(1 0 0 / 0.07)' }}>
-                <Clock3 size={15} style={{ color: 'var(--accent)' }} />
+              <div className="rounded-full p-2" style={{ background: 'oklch(1 0 0 / 0.08)', border: '1px solid oklch(1 0 0 / 0.12)' }}>
+                <Clock3 size={13} style={{ color: 'var(--accent)' }} />
               </div>
             </div>
 
-            {/* Compact clock strip */}
-            <div className="rounded-[16px] px-4 py-3 flex items-center justify-between gap-4"
-              style={{ background: 'oklch(0 0 0 / 0.18)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
-              <span className="font-mono text-[22px] font-semibold leading-none tracking-[0.06em]"
-                style={{ color: 'var(--accent)', letterSpacing: '0.06em' }}>
+            {/* Clock display */}
+            <div className="rounded-[14px] px-4 py-4 flex flex-col items-center justify-center gap-1.5"
+              style={{ background: 'oklch(0 0 0 / 0.20)', border: '1px solid oklch(1 0 0 / 0.09)' }}>
+              <span className="font-mono text-[38px] font-semibold leading-none tabular-nums"
+                style={{ color: 'var(--accent)', letterSpacing: '0.04em' }}>
                 {digitalTime}
               </span>
-              <span className="text-[12px] capitalize text-right" style={{ color: 'oklch(1 0 0 / 0.50)' }}>
+              <span className="text-[10.5px] capitalize" style={{ color: 'oklch(1 0 0 / 0.42)', letterSpacing: '0.02em' }}>
                 {formatFullDate(now)}
               </span>
             </div>

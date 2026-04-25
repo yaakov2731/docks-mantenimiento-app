@@ -8,10 +8,10 @@
   --primary:            oklch(0.725 0.148 68);
   --primary-dark:       oklch(0.640 0.152 65);
   --primary-light:      oklch(0.970 0.040 72);
-  --sidebar-bg:         oklch(0.148 0.012 45);
-  --navy:               oklch(0.148 0.012 45);
-  --navy-mid:           oklch(0.205 0.012 45);
-  --navy-light:         oklch(0.268 0.012 45);
+  --sidebar-bg:         oklch(0.228 0.052 248);
+  --navy:               oklch(0.228 0.052 248);
+  --navy-mid:           oklch(0.278 0.046 248);
+  --navy-light:         oklch(0.335 0.038 248);
 
   --accent:             oklch(0.548 0.082 216);
   --teal:               oklch(0.548 0.082 216);
@@ -58,8 +58,8 @@
   --surface:    oklch(0.165 0.012 45);
   --border:     oklch(0.248 0.012 45);
   --border-dark:oklch(0.315 0.012 45);
-  --sidebar-bg: oklch(0.088 0.012 45);
-  --navy:       oklch(0.088 0.012 45);
+  --sidebar-bg: oklch(0.155 0.045 248);
+  --navy:       oklch(0.155 0.045 248);
 
   --gray-50:    oklch(0.165 0.012 45);
   --gray-100:   oklch(0.210 0.012 45);
