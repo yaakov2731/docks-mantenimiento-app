@@ -466,99 +466,106 @@ export default function Asistencia() {
             </div>
           </div>
 
-          <div className="flex flex-col h-full rounded-[18px] text-white overflow-hidden" style={{ background: 'var(--sidebar-bg)', boxShadow: '0 4px 20px oklch(0 0 0 / 0.18), 0 1px 0 oklch(1 0 0 / 0.10)' }}>
+          {/* Columna derecha: clock + relojes del equipo correctamente agrupados */}
+          <div className="flex flex-col gap-4">
 
-            {/* Header */}
-            <div className="flex-none flex items-center justify-between px-5 pt-5 pb-4">
-              <div>
-                <div className="text-[9px] uppercase tracking-[0.30em] font-semibold" style={{ color: 'oklch(1 0 0 / 0.45)' }}>Reloj central</div>
-                <div className="text-[11px] mt-0.5 font-light" style={{ color: 'oklch(1 0 0 / 0.38)' }}>Control administrativo</div>
+            {/* Reloj central */}
+            <div className="rounded-[18px] text-white overflow-hidden" style={{ background: 'var(--sidebar-bg)', boxShadow: '0 4px 20px oklch(0 0 0 / 0.18), 0 1px 0 oklch(1 0 0 / 0.10)' }}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 pt-4 pb-3">
+                <div>
+                  <div className="text-[9px] uppercase tracking-[0.30em] font-semibold" style={{ color: 'oklch(1 0 0 / 0.45)' }}>Reloj central</div>
+                  <div className="text-[11px] mt-0.5 font-light" style={{ color: 'oklch(1 0 0 / 0.38)' }}>Control administrativo</div>
+                </div>
+                <div className="rounded-full p-2" style={{ background: 'oklch(1 0 0 / 0.08)', border: '1px solid oklch(1 0 0 / 0.12)' }}>
+                  <Clock3 size={13} style={{ color: 'oklch(1 0 0 / 0.55)' }} />
+                </div>
               </div>
-              <div className="rounded-full p-2" style={{ background: 'oklch(1 0 0 / 0.08)', border: '1px solid oklch(1 0 0 / 0.12)' }}>
-                <Clock3 size={13} style={{ color: 'oklch(1 0 0 / 0.55)' }} />
+
+              <div className="mx-5" style={{ height: '1px', background: 'oklch(1 0 0 / 0.08)' }} />
+
+              {/* Clock — tamaño fijo proporcional, centrado */}
+              <div className="flex flex-col items-center justify-center px-5 py-8 gap-2">
+                <span
+                  className="font-mono font-bold leading-none tabular-nums w-full text-center"
+                  style={{ fontSize: '52px', color: 'white', letterSpacing: '-0.02em' }}
+                >
+                  {digitalTime}
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.16em] text-center mt-1" style={{ color: 'oklch(1 0 0 / 0.45)' }}>
+                  {formatFullDate(now)}
+                </span>
+              </div>
+
+              <div style={{ height: '1px', background: 'oklch(1 0 0 / 0.08)' }} />
+
+              {/* KPIs */}
+              <div className="grid grid-cols-2">
+                <div className="px-5 py-3.5" style={{ borderRight: '1px solid oklch(1 0 0 / 0.08)' }}>
+                  <div className="text-[9px] uppercase tracking-[0.22em]" style={{ color: 'oklch(1 0 0 / 0.42)' }}>En turno</div>
+                  <div className="mt-1.5 font-heading text-2xl font-bold leading-none" style={{ fontFamily: 'var(--font-heading)' }}>{equipo?.enTurno ?? 0}</div>
+                </div>
+                <div className="px-5 py-3.5">
+                  <div className="text-[9px] uppercase tracking-[0.22em]" style={{ color: 'oklch(1 0 0 / 0.42)' }}>A pagar</div>
+                  <div className="mt-1.5 font-heading text-base font-bold leading-none" style={{ fontFamily: 'var(--font-heading)' }}>{formatCurrency(equipo?.totalPagar ?? 0)}</div>
+                </div>
+              </div>
+
+              <div style={{ height: '1px', background: 'oklch(1 0 0 / 0.08)' }} />
+
+              <div className="px-4 py-3">
+                <Button
+                  variant="outline"
+                  onClick={() => resumen.refetch()}
+                  disabled={resumen.isFetching}
+                  className="w-full border-white/20 bg-transparent text-white hover:bg-white/10 text-[12px] h-8"
+                >
+                  <RefreshCw size={12} className={resumen.isFetching ? 'animate-spin' : ''} />
+                  Actualizar tablero
+                </Button>
               </div>
             </div>
 
-            <div className="flex-none mx-5" style={{ height: '1px', background: 'oklch(1 0 0 / 0.08)' }} />
-
-            {/* Clock — flex-1: ocupa todo el espacio disponible, centrado */}
-            <div className="flex-1 flex flex-col items-center justify-center px-5 py-6 gap-2">
-              <span
-                className="font-mono font-bold leading-none tabular-nums w-full text-center"
-                style={{ fontSize: 'clamp(32px, 3.5vw, 64px)', color: 'white', letterSpacing: '-0.02em' }}
-              >
-                {digitalTime}
-              </span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-center" style={{ color: 'oklch(1 0 0 / 0.45)' }}>
-                {formatFullDate(now)}
-              </span>
-            </div>
-
-            <div className="flex-none" style={{ height: '1px', background: 'oklch(1 0 0 / 0.08)' }} />
-
-            {/* KPIs */}
-            <div className="flex-none grid grid-cols-2">
-              <div className="px-5 py-3.5" style={{ borderRight: '1px solid oklch(1 0 0 / 0.08)' }}>
-                <div className="text-[9px] uppercase tracking-[0.22em]" style={{ color: 'oklch(1 0 0 / 0.42)' }}>En turno</div>
-                <div className="mt-1.5 font-heading text-2xl font-bold leading-none" style={{ fontFamily: 'var(--font-heading)' }}>{equipo?.enTurno ?? 0}</div>
+            {/* Relojes del equipo */}
+            <div className="rounded-[18px] border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-slate-400">Relojes del equipo</div>
+                  <div className="mt-1 text-sm text-slate-500">Vista rápida de quién está en turno o almuerzo.</div>
+                </div>
+                <Clock3 size={18} className="text-primary" />
               </div>
-              <div className="px-5 py-3.5">
-                <div className="text-[9px] uppercase tracking-[0.22em]" style={{ color: 'oklch(1 0 0 / 0.42)' }}>A pagar</div>
-                <div className="mt-1.5 font-heading text-base font-bold leading-none" style={{ fontFamily: 'var(--font-heading)' }}>{formatCurrency(equipo?.totalPagar ?? 0)}</div>
-              </div>
-            </div>
-
-            <div className="flex-none" style={{ height: '1px', background: 'oklch(1 0 0 / 0.08)' }} />
-
-            <div className="flex-none px-4 py-3">
-              <Button
-                variant="outline"
-                onClick={() => resumen.refetch()}
-                disabled={resumen.isFetching}
-                className="w-full border-white/20 bg-transparent text-white hover:bg-white/10 text-[12px] h-8"
-              >
-                <RefreshCw size={12} className={resumen.isFetching ? 'animate-spin' : ''} />
-                Actualizar tablero
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-400">Relojes del equipo</div>
-                <div className="mt-1 text-sm text-slate-500">Vista rápida de quién está en turno o almuerzo.</div>
-              </div>
-              <Clock3 size={18} className="text-primary" />
-            </div>
-            <div className="mt-4 space-y-3 max-h-[360px] overflow-y-auto pr-1">
-              {empleados.map((empleado: any) => {
-                const onShift = !!empleado.attendance?.onShift
-                const onLunch = !!empleado.attendance?.onLunch
-                const statusLabel = onLunch ? 'Almuerzo' : onShift ? 'En servicio' : 'Fuera de turno'
-                const statusTone = onLunch ? 'bg-amber-100 text-amber-700' : onShift ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                const currentSeconds = onLunch
-                  ? empleado.attendance?.currentLunchSeconds ?? 0
-                  : onShift
-                    ? empleado.attendance?.currentShiftSeconds ?? 0
-                    : 0
-                return (
-                  <div key={empleado.empleadoId} className="rounded-[18px] border border-slate-200 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-medium text-slate-800 truncate">{empleado.nombre}</div>
-                        <div className="text-[11px] text-slate-500">{empleado.especialidad || 'Mantenimiento general'}</div>
+              <div className="mt-4 space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                {empleados.map((empleado: any) => {
+                  const onShift = !!empleado.attendance?.onShift
+                  const onLunch = !!empleado.attendance?.onLunch
+                  const statusLabel = onLunch ? 'Almuerzo' : onShift ? 'En servicio' : 'Fuera de turno'
+                  const statusTone = onLunch ? 'bg-amber-100 text-amber-700' : onShift ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                  const currentSeconds = onLunch
+                    ? empleado.attendance?.currentLunchSeconds ?? 0
+                    : onShift
+                      ? empleado.attendance?.currentShiftSeconds ?? 0
+                      : 0
+                  return (
+                    <div key={empleado.empleadoId} className="rounded-[14px] border border-slate-200 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium text-slate-800 truncate">{empleado.nombre}</div>
+                          <div className="text-[11px] text-slate-500">{empleado.especialidad || 'Mantenimiento general'}</div>
+                        </div>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${statusTone}`}>{statusLabel}</span>
                       </div>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${statusTone}`}>{statusLabel}</span>
+                      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+                        <div>{currentSeconds > 0 ? <><span className="font-semibold text-slate-700"><WorkingTime seconds={currentSeconds} /></span> en reloj</> : 'Sin turno abierto'}</div>
+                        <div>{empleado.attendance?.lastActionAt ? formatTime(empleado.attendance.lastActionAt) : 'N/A'}</div>
+                      </div>
                     </div>
-                    <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
-                      <div>{currentSeconds > 0 ? <><span className="font-semibold text-slate-700"><WorkingTime seconds={currentSeconds} /></span> en reloj</> : 'Sin turno abierto'}</div>
-                      <div>{empleado.attendance?.lastActionAt ? formatTime(empleado.attendance.lastActionAt) : 'N/A'}</div>
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
+
           </div>
         </div>
       </div>
