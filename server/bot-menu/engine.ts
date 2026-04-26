@@ -106,11 +106,12 @@ import {
   buildPublicMainMenu, handlePublicMain,
   buildPublicAlquilerP1, handlePublicAlquilerP1,
   buildPublicAlquilerP2, handlePublicAlquilerP2,
-  buildPublicAlquilerP3, handlePublicAlquilerP3,
+  buildPublicAlquilerP3, handlePublicAlquilerP3, handlePublicAlquilerP3Otro,
   buildPublicAlquilerP4, handlePublicAlquilerP4,
   buildPublicAlquilerP5, handlePublicAlquilerP5,
   buildPublicAlquilerP6, handlePublicAlquilerP6,
   buildPublicAlquilerP7, handlePublicAlquilerP7,
+  buildPublicAlquilerConfirmar, handlePublicAlquilerConfirmar,
   buildPublicReclamoP1, handlePublicReclamoP1,
   buildPublicReclamoP2, handlePublicReclamoP2,
   buildPublicMensajeP1, handlePublicMensajeP1,
@@ -387,10 +388,12 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'public_alquiler_p1') return handlePublicAlquilerP1(session, input)
     if (currentMenu === 'public_alquiler_p2') return handlePublicAlquilerP2(session, input)
     if (currentMenu === 'public_alquiler_p3') return handlePublicAlquilerP3(session, input)
+    if (currentMenu === 'public_alquiler_p3_otro') return handlePublicAlquilerP3Otro(session, input)
     if (currentMenu === 'public_alquiler_p4') return handlePublicAlquilerP4(session, input)
     if (currentMenu === 'public_alquiler_p5') return handlePublicAlquilerP5(session, input)
     if (currentMenu === 'public_alquiler_p6') return handlePublicAlquilerP6(session, input)
     if (currentMenu === 'public_alquiler_p7') return handlePublicAlquilerP7(session, input)
+    if (currentMenu === 'public_alquiler_confirmar') return handlePublicAlquilerConfirmar(session, input)
     if (currentMenu === 'public_reclamo_p1')  return handlePublicReclamoP1(session, input)
     if (currentMenu === 'public_reclamo_p2')  return handlePublicReclamoP2(session, input)
     if (currentMenu === 'public_mensaje_p1')  return handlePublicMensajeP1(session, input)
@@ -471,6 +474,7 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
     if (menuName === 'public_alquiler_p5') return buildPublicAlquilerP5()
     if (menuName === 'public_alquiler_p6') return buildPublicAlquilerP6()
     if (menuName === 'public_alquiler_p7') return buildPublicAlquilerP7()
+    if (menuName === 'public_alquiler_confirmar') return buildPublicAlquilerConfirmar(session.contextData as Record<string, any>)
     if (menuName === 'public_reclamo_p1')  return buildPublicReclamoP1()
     if (menuName === 'public_reclamo_p2')  return buildPublicReclamoP2()
     if (menuName === 'public_mensaje_p1')  return buildPublicMensajeP1()

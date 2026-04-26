@@ -67,14 +67,21 @@ function fmtPhone(waId: string): string {
 export function buildPublicMainMenu(): string {
   return [
     `🏢 *Docks del Puerto*`,
+    `_Shopping & Lifestyle · Tigre_`,
     SEP,
-    `¡Bienvenido/a! ¿En qué podemos ayudarte?`,
+    `Hola 👋 Somos el shopping frente al río,`,
+    `abierto cada fin de semana y feriados.`,
     ``,
-    `1️⃣  🏪 Consulta de alquiler de local`,
-    `2️⃣  📢 Reclamo de locatario`,
-    `3️⃣  ✉️  Dejar un mensaje`,
+    `Tenemos locales y módulos disponibles`,
+    `para marcas de moda, deco, lifestyle y más.`,
+    ``,
+    `¿En qué te podemos ayudar?`,
+    ``,
+    `1️⃣  🏪 Quiero un local`,
+    `2️⃣  📢 Tengo un reclamo`,
+    `3️⃣  ✉️  Otra consulta`,
     SEP,
-    `0️⃣  ✖️ Salir`,
+    `0️⃣  Salir`,
   ].join('\n')
 }
 
@@ -161,23 +168,74 @@ export async function handlePublicAlquilerP2(session: BotSession, input: string)
   return buildPublicAlquilerP3()
 }
 
+const RUBROS_ALQUILER: Record<string, string> = {
+  '1': 'Indumentaria / Moda',
+  '2': 'Calzado / Accesorios',
+  '3': 'Deco / Hogar',
+  '4': 'Belleza / Estética',
+  '5': 'Infantil / Juguetería',
+  '6': 'Arte / Artesanías',
+  '7': 'Regalos / Lifestyle',
+}
+
 export function buildPublicAlquilerP3(): string {
   return [
     `🏪 *Consulta de alquiler*`,
     SEP,
     `*Paso 3 de 7*`,
     `¿A qué *rubro* pertenece tu negocio?`,
-    `_(ej: gastronomía, indumentaria, servicios, etc.)_`,
     SEP,
-    `0️⃣  Cancelar`,
+    `1️⃣  👗 Indumentaria / Moda`,
+    `2️⃣  👟 Calzado / Accesorios`,
+    `3️⃣  🏠 Deco / Hogar`,
+    `4️⃣  💄 Belleza / Estética`,
+    `5️⃣  🧒 Infantil / Juguetería`,
+    `6️⃣  🎨 Arte / Artesanías`,
+    `7️⃣  🛍️ Regalos / Lifestyle`,
+    `8️⃣  ✏️ Otro (escribir)`,
+    SEP,
+    `_Escribí *cancelar* para salir_`,
   ].join('\n')
 }
 
 export async function handlePublicAlquilerP3(session: BotSession, input: string): Promise<string | null> {
-  if (input === '0') { await resetToMain(session); return buildPublicMainMenu() }
-  if (input.trim().length < 2) {
-    return `⚠️ Por favor indicá el rubro de tu negocio.\n\n${buildPublicAlquilerP3()}`
+  if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return buildPublicMainMenu() }
+
+  const ctx = session.contextData as Record<string, any>
+
+  if (input === '8') {
+    await navigateTo(session, 'public_alquiler_p3_otro', {
+      pendingText: true,
+      alquilerNombre: ctx.alquilerNombre,
+      alquilerMarca: ctx.alquilerMarca,
+    })
+    return [
+      `🏪 *Consulta de alquiler*`,
+      SEP,
+      `*Paso 3 de 7*`,
+      `¿Cuál es el rubro de tu negocio?`,
+      `_(Describilo con tus palabras)_`,
+      SEP,
+      `_Escribí *cancelar* para salir_`,
+    ].join('\n')
   }
+
+  const rubro = RUBROS_ALQUILER[input]
+  if (!rubro) return `⚠️ Elegí una opción del 1 al 8.\n\n${buildPublicAlquilerP3()}`
+
+  await navigateTo(session, 'public_alquiler_p4', {
+    pendingText: true,
+    alquilerNombre: ctx.alquilerNombre,
+    alquilerMarca: ctx.alquilerMarca,
+    alquilerRubro: rubro,
+  })
+  return buildPublicAlquilerP4()
+}
+
+export async function handlePublicAlquilerP3Otro(session: BotSession, input: string): Promise<string | null> {
+  if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return buildPublicMainMenu() }
+  if (input.trim().length < 2) return `⚠️ Por favor describí el rubro.\n\n${buildPublicAlquilerP3()}`
+
   const ctx = session.contextData as Record<string, any>
   await navigateTo(session, 'public_alquiler_p4', {
     pendingText: true,
@@ -245,23 +303,39 @@ export async function handlePublicAlquilerP5(session: BotSession, input: string)
   return buildPublicAlquilerP6()
 }
 
+const ESPACIOS_ALQUILER: Record<string, string> = {
+  '1': 'Local cerrado (hasta 30m²)',
+  '2': 'Local cerrado (30–60m²)',
+  '3': 'Local cerrado (más de 60m²)',
+  '4': 'Stand / Módulo en pasillo',
+  '5': 'Espacio exterior',
+  '6': 'No lo tengo claro todavía',
+}
+
 export function buildPublicAlquilerP6(): string {
   return [
     `🏪 *Consulta de alquiler*`,
     SEP,
     `*Paso 6 de 7*`,
     `¿Qué tipo de *espacio* estás buscando?`,
-    `_(ej: local de 30m², puesto en pasillo, espacio en planta alta, etc.)_`,
     SEP,
-    `0️⃣  Cancelar`,
+    `1️⃣  Local cerrado (hasta 30m²)`,
+    `2️⃣  Local cerrado (30–60m²)`,
+    `3️⃣  Local cerrado (más de 60m²)`,
+    `4️⃣  Stand / Módulo en pasillo`,
+    `5️⃣  Espacio exterior`,
+    `6️⃣  No lo tengo claro todavía`,
+    SEP,
+    `_Escribí *cancelar* para salir_`,
   ].join('\n')
 }
 
 export async function handlePublicAlquilerP6(session: BotSession, input: string): Promise<string | null> {
-  if (input === '0') { await resetToMain(session); return buildPublicMainMenu() }
-  if (input.trim().length < 3) {
-    return `⚠️ Por favor describí qué estás buscando.\n\n${buildPublicAlquilerP6()}`
-  }
+  if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return buildPublicMainMenu() }
+
+  const tipoEspacio = ESPACIOS_ALQUILER[input]
+  if (!tipoEspacio) return `⚠️ Elegí una opción del 1 al 6.\n\n${buildPublicAlquilerP6()}`
+
   const ctx = session.contextData as Record<string, any>
   await navigateTo(session, 'public_alquiler_p7', {
     pendingText: true,
@@ -270,7 +344,7 @@ export async function handlePublicAlquilerP6(session: BotSession, input: string)
     alquilerRubro: ctx.alquilerRubro,
     alquilerInstagram: ctx.alquilerInstagram,
     alquilerTieneLocal: ctx.alquilerTieneLocal,
-    alquilerTipoEspacio: trimSafe(input),
+    alquilerTipoEspacio: tipoEspacio,
   })
   return buildPublicAlquilerP7()
 }
@@ -288,24 +362,68 @@ export function buildPublicAlquilerP7(): string {
 }
 
 export async function handlePublicAlquilerP7(session: BotSession, input: string): Promise<string | null> {
-  if (input === '0') { await resetToMain(session); return buildPublicMainMenu() }
+  if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return buildPublicMainMenu() }
   if (input.trim().length < 1) {
     return `⚠️ Por favor indicá desde cuándo.\n\n${buildPublicAlquilerP7()}`
   }
 
   const ctx = session.contextData as Record<string, any>
-  const nombre       = String(ctx.alquilerNombre ?? 'Sin nombre')
-  const marca        = String(ctx.alquilerMarca ?? '')
-  const rubro        = String(ctx.alquilerRubro ?? '')
-  const instagram    = String(ctx.alquilerInstagram ?? '')
-  const tieneLocal   = String(ctx.alquilerTieneLocal ?? '')
-  const tipoEspacio  = String(ctx.alquilerTipoEspacio ?? '')
-  const desdeCuando  = trimSafe(input)
-  const phone        = fmtPhone(session.waNumber)
+  const newCtx = { ...ctx, alquilerDesdeCuando: trimSafe(input) }
+  await navigateTo(session, 'public_alquiler_confirmar', newCtx)
+  return buildPublicAlquilerConfirmar(newCtx)
+}
+
+// ─── Confirmación antes de enviar ────────────────────────────────────────────
+
+export function buildPublicAlquilerConfirmar(ctx: Record<string, any>): string {
+  const instagram = String(ctx.alquilerInstagram ?? '')
+  const lines = [
+    `🏪 *Confirmar consulta de alquiler*`,
+    SEP,
+    `👤 *${ctx.alquilerNombre ?? ''}*`,
+    ctx.alquilerMarca ? `🏷️ Marca: ${ctx.alquilerMarca}` : null,
+    ctx.alquilerRubro ? `🏬 Rubro: ${ctx.alquilerRubro}` : null,
+    instagram && instagram !== 'No tiene' ? `📸 ${instagram}` : null,
+    ctx.alquilerTieneLocal ? `🏪 ${ctx.alquilerTieneLocal}` : null,
+    ctx.alquilerTipoEspacio ? `📐 Espacio: ${ctx.alquilerTipoEspacio}` : null,
+    ctx.alquilerDesdeCuando ? `📅 Inicio: ${ctx.alquilerDesdeCuando}` : null,
+    SEP,
+    `¿Los datos están bien?`,
+    ``,
+    `1️⃣  ✅ Enviar consulta`,
+    `2️⃣  ✏️ Corregir algo`,
+  ]
+  return lines.filter(Boolean).join('\n')
+}
+
+export async function handlePublicAlquilerConfirmar(session: BotSession, input: string): Promise<string> {
+  const ctx = session.contextData as Record<string, any>
+
+  if (input === '2') {
+    await navigateTo(session, 'public_alquiler_p1', { pendingText: true })
+    return [
+      `✏️ Sin problema, empecemos de nuevo.`,
+      ``,
+      buildPublicAlquilerP1(),
+    ].join('\n')
+  }
+
+  if (input !== '1') {
+    return `⚠️ Elegí 1 para enviar o 2 para corregir.\n\n${buildPublicAlquilerConfirmar(ctx)}`
+  }
+
+  const nombre      = String(ctx.alquilerNombre ?? 'Sin nombre')
+  const marca       = String(ctx.alquilerMarca ?? '')
+  const rubro       = String(ctx.alquilerRubro ?? '')
+  const instagram   = String(ctx.alquilerInstagram ?? '')
+  const tieneLocal  = String(ctx.alquilerTieneLocal ?? '')
+  const tipoEspacio = String(ctx.alquilerTipoEspacio ?? '')
+  const desdeCuando = String(ctx.alquilerDesdeCuando ?? '')
+  const phone       = fmtPhone(session.waNumber)
 
   const mensaje = [
     marca       ? `Marca: ${marca}` : null,
-    instagram   ? `Instagram/web: ${instagram}` : null,
+    instagram && instagram !== 'No tiene' ? `Instagram/web: ${instagram}` : null,
     tieneLocal  ? `Tiene local: ${tieneLocal}` : null,
     tipoEspacio ? `Espacio buscado: ${tipoEspacio}` : null,
     desdeCuando ? `Inicio deseado: ${desdeCuando}` : null,
@@ -329,7 +447,7 @@ export async function handlePublicAlquilerP7(session: BotSession, input: string)
       `👤 *${nombre}*  |  🏷️ ${marca}`,
       `📞 ${phone}`,
       `🏬 Rubro: ${rubro}`,
-      instagram   ? `📸 ${instagram}` : null,
+      instagram && instagram !== 'No tiene' ? `📸 ${instagram}` : null,
       tieneLocal  ? `🏪 Tiene local: ${tieneLocal}` : null,
       `📐 Busca: ${tipoEspacio}`,
       `📅 Inicio: ${desdeCuando}`,
@@ -341,12 +459,12 @@ export async function handlePublicAlquilerP7(session: BotSession, input: string)
     return [
       `✅ *¡Consulta registrada!*`,
       SEP,
-      `Gracias *${nombre}*, recibimos tu consulta de alquiler.`,
-      `Un miembro de nuestro equipo comercial se va a comunicar con vos a la brevedad.`,
+      `Gracias *${nombre}*, recibimos tu consulta.`,
+      `Nuestro equipo comercial te va a contactar a la brevedad.`,
       ``,
-      `📞 También podés escribirnos nuevamente cuando quieras.`,
+      `📞 Escribinos cuando quieras.`,
       SEP,
-      `_Docks del Puerto 🏢_`,
+      `_Docks del Puerto · Shopping & Lifestyle · Tigre_`,
     ].join('\n')
   } catch {
     return errorMsg('No se pudo registrar la consulta. Intentá nuevamente.')
