@@ -20,6 +20,33 @@ function trimSafe(v: string): string {
   return v.trim().slice(0, MAX_INPUT)
 }
 
+// ─── Normalización de Instagram / web ────────────────────────────────────────
+// Acepta: @handle, instagram.com/handle, URL completa, "no", "ninguno", etc.
+
+const NO_VARIANTS = ['no', 'nope', 'ninguno', 'no tengo', 'sin dato', 'no tiene', 'sin instagram', 'sin web', 'no hay', '0']
+
+function normalizeWebOrIG(raw: string): string {
+  const v = raw.trim()
+  if (!v) return ''
+
+  // Respuestas negativas conocidas (incluyendo "0" como "no tengo")
+  if (NO_VARIANTS.includes(v.toLowerCase())) return 'No tiene'
+
+  // Extraer handle de URL de Instagram
+  const igMatch = v.match(/(?:instagram\.com|instagr\.am)\/([A-Za-z0-9_.]+)/i)
+  if (igMatch) return `@${igMatch[1].replace(/\/$/, '')}`
+
+  // Handle directo @usuario
+  if (v.startsWith('@')) return v
+
+  // URL de cualquier red social o web — limpiar protocolo y trailing slash
+  if (/^https?:\/\//i.test(v) || /^www\./i.test(v)) {
+    return v.replace(/^https?:\/\//i, '').replace(/\/$/, '')
+  }
+
+  return v
+}
+
 // ─── Helper: formato profesional de número argentino ────────────────────────
 
 function fmtPhone(waId: string): string {
@@ -167,16 +194,17 @@ export function buildPublicAlquilerP4(): string {
     SEP,
     `*Paso 4 de 7*`,
     `¿Tenés *Instagram o página web*?`,
-    `Pasanos el usuario o la URL. Si no tenés, escribí _"no"_.`,
+    `Podés pegar el link, escribir _@usuario_ o la URL.`,
+    `Si no tenés, escribí _"ninguno"_.`,
     SEP,
-    `0️⃣  Cancelar`,
+    `_Escribí *cancelar* para salir_`,
   ].join('\n')
 }
 
 export async function handlePublicAlquilerP4(session: BotSession, input: string): Promise<string | null> {
-  if (input === '0') { await resetToMain(session); return buildPublicMainMenu() }
+  if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return buildPublicMainMenu() }
   if (input.trim().length < 1) {
-    return `⚠️ Por favor respondé o escribí "no".\n\n${buildPublicAlquilerP4()}`
+    return `⚠️ Por favor respondé o escribí "ninguno".\n\n${buildPublicAlquilerP4()}`
   }
   const ctx = session.contextData as Record<string, any>
   await navigateTo(session, 'public_alquiler_p5', {
@@ -184,7 +212,7 @@ export async function handlePublicAlquilerP4(session: BotSession, input: string)
     alquilerNombre: ctx.alquilerNombre,
     alquilerMarca: ctx.alquilerMarca,
     alquilerRubro: ctx.alquilerRubro,
-    alquilerInstagram: trimSafe(input),
+    alquilerInstagram: normalizeWebOrIG(input),
   })
   return buildPublicAlquilerP5()
 }

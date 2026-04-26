@@ -208,6 +208,11 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
   if (msgLower === 'ayuda' || msgLower === 'help') {
     return buildHelpMessage(session.userType)
   }
+  // Para usuarios públicos en el wizard, "cancelar" en cualquier paso vuelve al inicio
+  if (session.userType === 'public' && session.currentMenu !== 'main' && msgLower === 'cancelar') {
+    session = await resetToMain(session)
+    return buildPublicMainMenu()
+  }
 
   // ── Enrutamiento por menú activo ─────────────────────────────────────────────
   const result = await routeMessage(session, message)
