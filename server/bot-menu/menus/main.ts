@@ -10,6 +10,7 @@ import {
   getEmpleadoAttendanceStatus,
   listUnassignedLeads,
 } from '../../db'
+import { getSalesBandejaCount } from './sales/leads'
 
 // ─── Empleado ────────────────────────────────────────────────────────────────
 
@@ -134,15 +135,24 @@ export function buildAdminOperationMenu(_session: BotSession): string {
 
 // ─── Ventas ──────────────────────────────────────────────────────────────────
 
-export function buildSalesMainMenu(session: BotSession): string {
+export async function buildSalesMainMenu(session: BotSession): Promise<string> {
+  const { misNuevos, libres } = await getSalesBandejaCount(session.userId)
+  const summaryLine = (misNuevos || libres)
+    ? [
+        misNuevos ? `📞 ${misNuevos} para llamar` : null,
+        libres ? `📋 ${libres} disponible${libres !== 1 ? 's' : ''}` : null,
+      ].filter(Boolean).join(' | ')
+    : `✅ Todo al día`
+
   return [
     `🎯 *${session.userName}* — Panel ventas`,
     `🏢 Docks del Puerto`,
     SEP,
-    `1️⃣  📋 Mis leads asignados`,
+    summaryLine,
+    SEP,
+    `1️⃣  📥 Bandeja de entrada`,
     `2️⃣  ➕ Registrar nuevo lead`,
-    `3️⃣  📊 Estado de mis leads`,
-    `4️⃣  📋 Leads sin asignar`,
+    `3️⃣  📋 Todos mis leads`,
     SEP,
     `0️⃣  ❓ Ayuda`,
   ].join('\n')

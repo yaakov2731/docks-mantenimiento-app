@@ -98,6 +98,7 @@ import {
   buildEstadoLeads,
   buildLeadsLibre, handleLeadsLibre,
   handleLeadLibreDetalle,
+  buildBandeja, handleBandeja,
 } from './menus/sales/leads'
 
 // Público (no registrados)
@@ -354,15 +355,15 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
   if (userType === 'sales') {
 
     if (currentMenu === 'main') {
-      if (input === '1') { await navigateTo(session, 'sales_leads', { page: 1 }); return buildLeadsLista({ ...session, currentMenu: 'sales_leads', contextData: { page: 1 } }) }
+      if (input === '1') { await navigateTo(session, 'sales_bandeja', { page: 1 }); return buildBandeja({ ...session, currentMenu: 'sales_bandeja', contextData: { page: 1 } }) }
       if (input === '2') { await navigateTo(session, 'sales_nuevo_lead_p1', { pendingText: true }); return buildNuevoLeadPaso1() }
-      if (input === '3') { await navigateTo(session, 'sales_estado_leads', {}); return buildEstadoLeads(session) }
-      if (input === '4') { await navigateTo(session, 'sales_leads_libre', { page: 1 }); return buildLeadsLibre({ ...session, currentMenu: 'sales_leads_libre', contextData: { page: 1 } }) }
+      if (input === '3') { await navigateTo(session, 'sales_leads', { page: 1 }); return buildLeadsLista({ ...session, currentMenu: 'sales_leads', contextData: { page: 1 } }) }
       if (input === '0') return buildHelpMessage('sales')
-      return invalidMenuOption(buildSalesMainMenu(session))
+      return invalidMenuOption(await buildSalesMainMenu(session))
     }
 
     if (currentMenu === 'sales_estado_leads') return null
+    if (currentMenu === 'sales_bandeja') return handleBandeja(session, input)
     if (currentMenu === 'sales_leads') return handleLeadsLista(session, input)
     if (currentMenu === 'sales_lead_detalle') return handleLeadDetalle(session, input)
     if (currentMenu === 'sales_lead_nota') return handleLeadNota(session, input)
@@ -451,6 +452,7 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
   }
 
   if (userType === 'sales') {
+    if (menuName === 'sales_bandeja')     return buildBandeja(session)
     if (menuName === 'sales_leads')       return buildLeadsLista(session)
     if (menuName === 'sales_leads_libre') return buildLeadsLibre(session)
     if (menuName === 'sales_estado_leads') return buildEstadoLeads(session)

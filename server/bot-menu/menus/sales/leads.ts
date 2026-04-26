@@ -335,6 +335,98 @@ export async function buildEstadoLeads(session: BotSession): Promise<string> {
   ].filter(Boolean).join('\n')
 }
 
+// ─── Bandeja de entrada (mios nuevos + libres) ───────────────────────────────
+
+type BandejaEntry = { lead: any; source: 'mio' | 'libre' }
+
+async function getBandejaEntries(userId: number): Promise<BandejaEntry[]> {
+  const [misLeads, libres] = await Promise.all([getMisLeads(userId), listUnassignedLeads()])
+  const miosNuevos = misLeads
+    .filter(l => l.estado === 'nuevo')
+    .map(l => ({ lead: l, source: 'mio' as const }))
+  const libresItems = libres.map(l => ({ lead: l, source: 'libre' as const }))
+  return [...miosNuevos, ...libresItems]
+}
+
+export async function getSalesBandejaCount(userId: number): Promise<{ misNuevos: number; libres: number }> {
+  const entries = await getBandejaEntries(userId)
+  return {
+    misNuevos: entries.filter(e => e.source === 'mio').length,
+    libres: entries.filter(e => e.source === 'libre').length,
+  }
+}
+
+export async function buildBandeja(session: BotSession): Promise<string> {
+  const entries = await getBandejaEntries(session.userId)
+
+  if (entries.length === 0) {
+    return [
+      `📥 *Bandeja de entrada*`,
+      SEP,
+      `✅ No hay nada pendiente por ahora.`,
+      SEP,
+      `0️⃣  Volver`,
+    ].join('\n')
+  }
+
+  const page = (session.contextData.page as number) ?? 1
+  const paged = paginate(entries, page, PAGE_SIZE)
+
+  const miosCount  = entries.filter(e => e.source === 'mio').length
+  const libresCount = entries.filter(e => e.source === 'libre').length
+  const summaryParts = [
+    miosCount  ? `📞 ${miosCount} para llamar` : null,
+    libresCount ? `📋 ${libresCount} disponible${libresCount !== 1 ? 's' : ''}` : null,
+  ].filter(Boolean).join(' | ')
+
+  const lines: string[] = [`📥 *Bandeja de entrada*`, SEP, summaryParts, SEP]
+
+  let lastSource: 'mio' | 'libre' | null = null
+  paged.items.forEach((entry, i) => {
+    const n = (page - 1) * PAGE_SIZE + i + 1
+    if (entry.source !== lastSource) {
+      lines.push(entry.source === 'mio' ? `📞 *Para llamar:*` : `📋 *Disponibles para tomar:*`)
+      lastSource = entry.source
+    }
+    const { lead } = entry
+    const icon = entry.source === 'mio' ? '👤' : (lead.fuente === 'whatsapp' ? '📱' : '🌐')
+    lines.push(`${n}️⃣  ${icon} *${lead.nombre}* — ${lead.rubro ?? 'Sin rubro'}`)
+  })
+
+  lines.push(SEP)
+  if (paged.hasPrev) lines.push(`8️⃣  ◀️ Anterior`)
+  if (paged.hasNext) lines.push(`9️⃣  ▶️ Ver más`)
+  lines.push(`0️⃣  Volver`)
+  return lines.join('\n')
+}
+
+export async function handleBandeja(session: BotSession, input: string): Promise<string> {
+  const entries = await getBandejaEntries(session.userId)
+  const page = (session.contextData.page as number) ?? 1
+  const paged = paginate(entries, page, PAGE_SIZE)
+
+  if (input === '8' && paged.hasPrev) {
+    await navigateTo(session, 'sales_bandeja', { page: page - 1 })
+    return buildBandeja({ ...session, contextData: { page: page - 1 } })
+  }
+  if (input === '9' && paged.hasNext) {
+    await navigateTo(session, 'sales_bandeja', { page: page + 1 })
+    return buildBandeja({ ...session, contextData: { page: page + 1 } })
+  }
+  if (input === '0') return null as any
+
+  const opt = parseMenuOption(input, paged.items.length)
+  if (!opt) return invalidOption(await buildBandeja(session))
+
+  const entry = paged.items[opt - 1]
+  if (entry.source === 'mio') {
+    await navigateTo(session, 'sales_lead_detalle', { leadId: entry.lead.id })
+    return buildLeadDetalle(entry.lead)
+  }
+  await navigateTo(session, 'sales_lead_libre_detalle', { leadId: entry.lead.id })
+  return buildLeadLibreDetalle(entry.lead)
+}
+
 // ─── Leads sin asignar (disponibles para tomar) ───────────────────────────────
 
 export async function buildLeadsLibre(session: BotSession): Promise<string> {
