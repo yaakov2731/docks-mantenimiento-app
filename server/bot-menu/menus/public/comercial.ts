@@ -10,7 +10,7 @@
  * que el equipo comercial los gestione desde el panel.
  */
 
-import { BotSession, navigateTo, navigateBack } from '../../session'
+import { BotSession, navigateTo, navigateBack, resetToMain } from '../../session'
 import { SEP, confirmMsg, errorMsg } from '../../shared/guards'
 import { crearLead, getUsers, enqueueBotMessage } from '../../../db'
 
@@ -116,12 +116,12 @@ export function buildPublicAlquilerP2(): string {
     `*Paso 2 de 7*`,
     `¿Cuál es el *nombre de tu marca o comercio*?`,
     SEP,
-    `0️⃣  Volver`,
+    `0️⃣  Cancelar`,
   ].join('\n')
 }
 
 export async function handlePublicAlquilerP2(session: BotSession, input: string): Promise<string | null> {
-  if (input === '0') return null
+  if (input === '0') { await resetToMain(session); return buildPublicMainMenu() }
   if (input.trim().length < 1) {
     return `⚠️ Por favor ingresá el nombre de tu marca.\n\n${buildPublicAlquilerP2()}`
   }
@@ -142,12 +142,12 @@ export function buildPublicAlquilerP3(): string {
     `¿A qué *rubro* pertenece tu negocio?`,
     `_(ej: gastronomía, indumentaria, servicios, etc.)_`,
     SEP,
-    `0️⃣  Volver`,
+    `0️⃣  Cancelar`,
   ].join('\n')
 }
 
 export async function handlePublicAlquilerP3(session: BotSession, input: string): Promise<string | null> {
-  if (input === '0') return null
+  if (input === '0') { await resetToMain(session); return buildPublicMainMenu() }
   if (input.trim().length < 2) {
     return `⚠️ Por favor indicá el rubro de tu negocio.\n\n${buildPublicAlquilerP3()}`
   }
@@ -169,12 +169,12 @@ export function buildPublicAlquilerP4(): string {
     `¿Tenés *Instagram o página web*?`,
     `Pasanos el usuario o la URL. Si no tenés, escribí _"no"_.`,
     SEP,
-    `0️⃣  Volver`,
+    `0️⃣  Cancelar`,
   ].join('\n')
 }
 
 export async function handlePublicAlquilerP4(session: BotSession, input: string): Promise<string | null> {
-  if (input === '0') return null
+  if (input === '0') { await resetToMain(session); return buildPublicMainMenu() }
   if (input.trim().length < 1) {
     return `⚠️ Por favor respondé o escribí "no".\n\n${buildPublicAlquilerP4()}`
   }
@@ -196,12 +196,12 @@ export function buildPublicAlquilerP5(): string {
     `*Paso 5 de 7*`,
     `¿Ya tenés un *local físico* o vendés *online*?`,
     SEP,
-    `0️⃣  Volver`,
+    `0️⃣  Cancelar`,
   ].join('\n')
 }
 
 export async function handlePublicAlquilerP5(session: BotSession, input: string): Promise<string | null> {
-  if (input === '0') return null
+  if (input === '0') { await resetToMain(session); return buildPublicMainMenu() }
   if (input.trim().length < 1) {
     return `⚠️ Por favor respondé.\n\n${buildPublicAlquilerP5()}`
   }
@@ -225,12 +225,12 @@ export function buildPublicAlquilerP6(): string {
     `¿Qué tipo de *espacio* estás buscando?`,
     `_(ej: local de 30m², puesto en pasillo, espacio en planta alta, etc.)_`,
     SEP,
-    `0️⃣  Volver`,
+    `0️⃣  Cancelar`,
   ].join('\n')
 }
 
 export async function handlePublicAlquilerP6(session: BotSession, input: string): Promise<string | null> {
-  if (input === '0') return null
+  if (input === '0') { await resetToMain(session); return buildPublicMainMenu() }
   if (input.trim().length < 3) {
     return `⚠️ Por favor describí qué estás buscando.\n\n${buildPublicAlquilerP6()}`
   }
@@ -255,12 +255,12 @@ export function buildPublicAlquilerP7(): string {
     `¿*Desde cuándo* te gustaría comenzar?`,
     `_(ej: marzo 2026, lo antes posible, en 3 meses)_`,
     SEP,
-    `0️⃣  Volver`,
+    `0️⃣  Cancelar`,
   ].join('\n')
 }
 
 export async function handlePublicAlquilerP7(session: BotSession, input: string): Promise<string | null> {
-  if (input === '0') return null
+  if (input === '0') { await resetToMain(session); return buildPublicMainMenu() }
   if (input.trim().length < 1) {
     return `⚠️ Por favor indicá desde cuándo.\n\n${buildPublicAlquilerP7()}`
   }

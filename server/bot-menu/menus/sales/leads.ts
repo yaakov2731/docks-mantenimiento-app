@@ -4,7 +4,7 @@
  */
 import { BotSession, navigateTo, navigateBack } from '../../session'
 import { SEP, parseMenuOption, invalidOption, paginate, errorMsg, confirmMsg } from '../../shared/guards'
-import { crearLead } from '../../../db'
+import { crearLead, listUnassignedLeads, actualizarLead } from '../../../db'
 import { notifyOwner } from '../../../_core/notification'
 import { createClient } from '@libsql/client'
 import { drizzle } from 'drizzle-orm/libsql'
@@ -333,4 +333,117 @@ export async function buildEstadoLeads(session: BotSession): Promise<string> {
     SEP,
     `0️⃣  Volver`,
   ].filter(Boolean).join('\n')
+}
+
+// ─── Leads sin asignar (disponibles para tomar) ───────────────────────────────
+
+export async function buildLeadsLibre(session: BotSession): Promise<string> {
+  const leads = await listUnassignedLeads()
+
+  if (leads.length === 0) {
+    return [
+      `📋 *Leads sin asignar*`,
+      SEP,
+      `✅ No hay leads disponibles en este momento.`,
+      SEP,
+      `0️⃣  Volver`,
+    ].join('\n')
+  }
+
+  const page = session.contextData.page ?? 1
+  const paged = paginate(leads, page, PAGE_SIZE)
+  const lines = [
+    `📋 *Leads sin asignar* (${leads.length})`,
+    SEP,
+  ]
+
+  paged.items.forEach((l, i) => {
+    const n = (page - 1) * PAGE_SIZE + i + 1
+    const contacto = l.telefono ?? l.waId ?? '—'
+    const fuente = l.fuente === 'whatsapp' ? '📱' : '🌐'
+    lines.push(
+      `${n}️⃣  ${fuente} *${l.nombre}*`,
+      `   🏪 ${l.rubro ?? 'Sin rubro'} | 📞 ${contacto}`,
+    )
+  })
+
+  lines.push(SEP)
+  if (paged.hasPrev) lines.push(`8️⃣  ◀️ Anterior`)
+  if (paged.hasNext) lines.push(`9️⃣  ▶️ Ver más`)
+  lines.push(`0️⃣  Volver`)
+  return lines.join('\n')
+}
+
+export async function handleLeadsLibre(session: BotSession, input: string): Promise<string> {
+  const leads = await listUnassignedLeads()
+  const page = session.contextData.page ?? 1
+  const paged = paginate(leads, page, PAGE_SIZE)
+
+  if (input === '8' && paged.hasPrev) {
+    await navigateTo(session, 'sales_leads_libre', { page: page - 1 })
+    return buildLeadsLibre({ ...session, contextData: { page: page - 1 } })
+  }
+  if (input === '9' && paged.hasNext) {
+    await navigateTo(session, 'sales_leads_libre', { page: page + 1 })
+    return buildLeadsLibre({ ...session, contextData: { page: page + 1 } })
+  }
+  if (input === '0') return null as any
+
+  const opt = parseMenuOption(input, paged.items.length)
+  if (!opt) return invalidOption(await buildLeadsLibre(session))
+
+  const lead = paged.items[opt - 1]
+  await navigateTo(session, 'sales_lead_libre_detalle', { leadId: lead.id })
+  return buildLeadLibreDetalle(lead)
+}
+
+function buildLeadLibreDetalle(lead: any): string {
+  return [
+    `📋 *Lead disponible — ${lead.nombre}*`,
+    SEP,
+    lead.telefono ? `📞 ${lead.telefono}` : '',
+    lead.rubro    ? `🏪 Rubro: ${lead.rubro}` : '',
+    lead.mensaje  ? `💬 "${lead.mensaje}"` : '',
+    lead.fuente === 'whatsapp' ? `📱 Vino por WhatsApp` : `🌐 Vino por web`,
+    SEP,
+    `1️⃣  ✋ Tomar este lead`,
+    `0️⃣  Volver`,
+  ].filter(Boolean).join('\n')
+}
+
+export async function handleLeadLibreDetalle(session: BotSession, input: string): Promise<string> {
+  const leadId = Number(session.contextData.leadId)
+  if (!Number.isFinite(leadId)) return errorMsg('No se encontró el lead.')
+
+  if (input === '0') return null as any
+
+  const [lead] = await db.select().from(schema.leads).where(eq(schema.leads.id, leadId))
+  if (!lead) return errorMsg('Lead no encontrado.')
+
+  if (input === '1') {
+    if (lead.asignadoId) {
+      await navigateTo(session, 'sales_leads_libre', { page: 1 })
+      return [
+        `⚠️ Este lead ya fue tomado por otro vendedor.`,
+        SEP,
+        `0️⃣  Volver`,
+      ].join('\n')
+    }
+
+    await actualizarLead(leadId, {
+      asignadoId: session.userId,
+      asignadoA: session.userName,
+    })
+
+    await navigateTo(session, 'sales_leads', { page: 1 })
+    return [
+      `✅ *Lead tomado exitosamente.*`,
+      SEP,
+      `👤 *${lead.nombre}* ya aparece en tus leads asignados.`,
+      SEP,
+      `0️⃣  Volver a mis leads`,
+    ].join('\n')
+  }
+
+  return invalidOption(buildLeadLibreDetalle(lead))
 }

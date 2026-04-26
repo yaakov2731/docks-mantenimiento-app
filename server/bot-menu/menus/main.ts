@@ -13,8 +13,36 @@ import {
 
 // ─── Empleado ────────────────────────────────────────────────────────────────
 
+function isEmployeeTaskClosed(task: any): boolean {
+  const estado = (task as any).estado ?? ''
+  return ['completado', 'cancelado', 'terminada', 'rechazada'].includes(estado)
+}
+
+function isPendingConfirmation(task: any): boolean {
+  return (task as any).asignacionEstado === 'pendiente_confirmacion'
+    || (task as any).estado === 'pendiente_confirmacion'
+}
+
+function employeeTaskRank(task: any): number {
+  if (isPendingConfirmation(task)) return 0
+
+  switch ((task as any).estado) {
+    case 'en_progreso': return 1
+    case 'pausado':
+    case 'pausada': return 2
+    case 'pendiente': return 3
+    case 'pendiente_asignacion': return 4
+    default: return 5
+  }
+}
+
+function buildFeaturedTaskLabel(task: any): string {
+  const isOperation = task.ubicacion !== undefined || task.checklistObjetivo !== undefined || task.ordenAsignacion !== undefined
+  const kind = isOperation ? 'Op.' : 'Rec.'
+  return `${kind} #${task.id} — ${task.titulo}`
+}
+
 export async function buildEmployeeMainMenu(session: BotSession): Promise<string> {
-  // Contar tareas activas
   const [reclamos, operaciones] = await Promise.all([
     getTareasEmpleado(session.userId),
     listOperationalTasksByEmployee(session.userId),
@@ -22,23 +50,31 @@ export async function buildEmployeeMainMenu(session: BotSession): Promise<string
   const tareasActivas = [
     ...reclamos,
     ...operaciones.filter(t => !['terminada', 'cancelada', 'rechazada'].includes(t.estado)),
-  ].filter(t => !['completado', 'cancelado'].includes((t as any).estado ?? ''))
+  ].filter(t => !isEmployeeTaskClosed(t))
 
-  const pendConf = tareasActivas.filter(
-    t => (t as any).asignacionEstado === 'pendiente_confirmacion'
-      || (t as any).estado === 'pendiente_confirmacion'
-  ).length
+  const pendingConfirmation = tareasActivas.filter(isPendingConfirmation).length
+  const inProgress = tareasActivas.filter(t => (t as any).estado === 'en_progreso').length
+  const featuredTask = [...tareasActivas].sort((left, right) => employeeTaskRank(left) - employeeTaskRank(right))[0]
 
-  const countLabel = tareasActivas.length > 0
-    ? ` (${tareasActivas.length} activa${tareasActivas.length > 1 ? 's' : ''}${pendConf > 0 ? `, ${pendConf} sin confirmar` : ''})`
-    : ''
+  const summaryLines = featuredTask
+    ? [
+        `🎯 Siguiente: ${buildFeaturedTaskLabel(featuredTask)}`,
+        `📋 Tenés ${tareasActivas.length} tarea${tareasActivas.length === 1 ? '' : 's'} activa${tareasActivas.length === 1 ? '' : 's'} (${pendingConfirmation} por aceptar, ${inProgress} en curso)`,
+      ]
+    : [
+        `✅ No tenés tareas activas ahora.`,
+        `Podés revisar el historial o registrar asistencia.`,
+      ]
 
   return [
     `👷 *${session.userName}* — Menú principal`,
     SEP,
-    `1️⃣  📋 Mis tareas${countLabel}`,
-    `2️⃣  🕐 Registrar asistencia`,
-    `3️⃣  🚻 Control de baños`,
+    ...summaryLines,
+    SEP,
+    `1️⃣  🎯 Ver mi tarea actual`,
+    `2️⃣  📋 Ver todas mis tareas`,
+    `3️⃣  🕐 Registrar asistencia`,
+    `4️⃣  🚻 Control de baños`,
     SEP,
     `0️⃣  ❓ Ayuda`,
   ].join('\n')
@@ -106,6 +142,7 @@ export function buildSalesMainMenu(session: BotSession): string {
     `1️⃣  📋 Mis leads asignados`,
     `2️⃣  ➕ Registrar nuevo lead`,
     `3️⃣  📊 Estado de mis leads`,
+    `4️⃣  📋 Leads sin asignar`,
     SEP,
     `0️⃣  ❓ Ayuda`,
   ].join('\n')
@@ -126,7 +163,8 @@ export function buildHelpMessage(userType: 'employee' | 'admin' | 'sales' | 'pub
 
   if (userType === 'employee') {
     base.push(
-      `📋 *Mis tareas:* ver, aceptar, completar y pausar tareas`,
+      `🎯 *Mi tarea actual:* aceptar, finalizar o pausar más rápido`,
+      `📋 *Ver todas mis tareas:* lista completa por si necesitás elegir otra`,
       `🕐 *Asistencia:* registrar entrada, salida y almuerzo`,
       `🚻 *Control de baños:* confirmar rondas programadas`,
     )

@@ -32,6 +32,7 @@ import {
 
 // Empleado
 import {
+  buildTareaActual, handleTareaActual,
   buildTareasLista, handleTareasLista,
   buildTareaDetalle, handleTareaDetalle,
   handleConfirmarCompletar,
@@ -95,6 +96,8 @@ import {
   handleNuevoLeadPaso2, handleNuevoLeadPaso3,
   handleNuevoLeadPaso4, handleNuevoLeadConfirmar,
   buildEstadoLeads,
+  buildLeadsLibre, handleLeadsLibre,
+  handleLeadLibreDetalle,
 } from './menus/sales/leads'
 
 // Público (no registrados)
@@ -227,13 +230,19 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
 
     // Menú principal empleado
     if (currentMenu === 'main') {
-      if (input === '1') { await navigateTo(session, 'tareas_lista', { page: 1 }); return buildTareasLista({ ...session, currentMenu: 'tareas_lista', contextData: { page: 1 } }) }
-      if (input === '2') { await navigateTo(session, 'asistencia', {}); return buildAsistenciaMenu({ ...session, currentMenu: 'asistencia' }) }
-      if (input === '3') { await navigateTo(session, 'rondas_lista', { page: 1 }); return buildRondasLista({ ...session, currentMenu: 'rondas_lista', contextData: { page: 1 } }) }
+      if (isAttendanceShortcut(input)) {
+        const attendanceSession = await navigateTo(session, 'asistencia', {})
+        return handleAsistencia(attendanceSession, input)
+      }
+      if (input === '1') { await navigateTo(session, 'tarea_actual', {}); return buildTareaActual({ ...session, currentMenu: 'tarea_actual', contextData: {} }) }
+      if (input === '2') { await navigateTo(session, 'tareas_lista', { page: 1 }); return buildTareasLista({ ...session, currentMenu: 'tareas_lista', contextData: { page: 1 } }) }
+      if (input === '3') { await navigateTo(session, 'asistencia', {}); return buildAsistenciaMenu({ ...session, currentMenu: 'asistencia' }) }
+      if (input === '4') { await navigateTo(session, 'rondas_lista', { page: 1 }); return buildRondasLista({ ...session, currentMenu: 'rondas_lista', contextData: { page: 1 } }) }
       if (input === '0') return buildHelpMessage('employee')
       return invalidMenuOption(await buildEmployeeMainMenu(session))
     }
 
+    if (currentMenu === 'tarea_actual') return handleTareaActual(session, input)
     if (currentMenu === 'tareas_lista') return handleTareasLista(session, input)
     if (currentMenu === 'tarea_detalle') return handleTareaDetalle(session, input)
     if (currentMenu === 'tarea_confirmar_completar') return handleConfirmarCompletar(session, input)
@@ -347,11 +356,13 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'main') {
       if (input === '1') { await navigateTo(session, 'sales_leads', { page: 1 }); return buildLeadsLista({ ...session, currentMenu: 'sales_leads', contextData: { page: 1 } }) }
       if (input === '2') { await navigateTo(session, 'sales_nuevo_lead_p1', { pendingText: true }); return buildNuevoLeadPaso1() }
-      if (input === '3') { return buildEstadoLeads(session) }
+      if (input === '3') { await navigateTo(session, 'sales_estado_leads', {}); return buildEstadoLeads(session) }
+      if (input === '4') { await navigateTo(session, 'sales_leads_libre', { page: 1 }); return buildLeadsLibre({ ...session, currentMenu: 'sales_leads_libre', contextData: { page: 1 } }) }
       if (input === '0') return buildHelpMessage('sales')
       return invalidMenuOption(buildSalesMainMenu(session))
     }
 
+    if (currentMenu === 'sales_estado_leads') return null
     if (currentMenu === 'sales_leads') return handleLeadsLista(session, input)
     if (currentMenu === 'sales_lead_detalle') return handleLeadDetalle(session, input)
     if (currentMenu === 'sales_lead_nota') return handleLeadNota(session, input)
@@ -360,6 +371,8 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'sales_nuevo_lead_p3') return handleNuevoLeadPaso3(session, input)
     if (currentMenu === 'sales_nuevo_lead_p4') return handleNuevoLeadPaso4(session, input)
     if (currentMenu === 'sales_nuevo_lead_confirmar') return handleNuevoLeadConfirmar(session, input)
+    if (currentMenu === 'sales_leads_libre') return handleLeadsLibre(session, input)
+    if (currentMenu === 'sales_lead_libre_detalle') return handleLeadLibreDetalle(session, input)
   }
 
   // ── PÚBLICO (no registrado) ───────────────────────────────────────────────────
@@ -399,6 +412,7 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
   if (menuName === 'main') return buildMainMenu(session)
 
   if (userType === 'employee') {
+    if (menuName === 'tarea_actual')   return buildTareaActual(session)
     if (menuName === 'tareas_lista')   return buildTareasLista(session)
     if (menuName === 'tarea_detalle')  return buildTareaDetalle(session)
     if (menuName === 'asistencia')     return buildAsistenciaMenu(session)
@@ -437,7 +451,9 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
   }
 
   if (userType === 'sales') {
-    if (menuName === 'sales_leads') return buildLeadsLista(session)
+    if (menuName === 'sales_leads')       return buildLeadsLista(session)
+    if (menuName === 'sales_leads_libre') return buildLeadsLibre(session)
+    if (menuName === 'sales_estado_leads') return buildEstadoLeads(session)
   }
 
   if (userType === 'public') {
@@ -459,4 +475,50 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
 
 function invalidMenuOption(menuText: string): string {
   return `❓ *Opción no válida.* Ingresá el número de la opción:\n\n${menuText}`
+}
+
+function isAttendanceShortcut(input: string): boolean {
+  const normalized = normalizeBotText(input)
+  if (!normalized || /^\d+$/.test(normalized)) return false
+
+  return [
+    'asistencia',
+    'marcacion',
+    'marcacion asistencia',
+    'registrar asistencia',
+    'turno',
+    'entrada',
+    'registrar entrada',
+    'marcar entrada',
+    'ingreso',
+    'entro',
+    'llegue',
+    'salida',
+    'registrar salida',
+    'marcar salida',
+    'salgo',
+    'me voy',
+    'cierro turno',
+    'termino turno',
+    'inicio almuerzo',
+    'iniciar almuerzo',
+    'salgo a almorzar',
+    'me voy a almorzar',
+    'fin almuerzo',
+    'volver de almuerzo',
+    'volvi de almorzar',
+    'termine almuerzo',
+    'resumen del dia',
+    'ver resumen',
+    'resumen',
+  ].some(pattern => normalized === pattern || normalized.includes(pattern))
+}
+
+function normalizeBotText(input: string): string {
+  return input
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
 }
