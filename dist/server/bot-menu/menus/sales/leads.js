@@ -104,7 +104,7 @@ async function buildLeadsLista(session) {
         guards_1.SEP,
     ];
     paged.items.forEach((l, i) => {
-        const n = (page - 1) * PAGE_SIZE + i + 1;
+        const n = i + 1;
         const contacto = l.telefono ?? l.email ?? l.waId ?? '—';
         lines.push(`${n}️⃣  ${estadoLeadEmoji(l.estado)} *${l.nombre}*`, `   📞 ${contacto} | ${l.rubro ?? 'Sin rubro'} | ${l.estado}`);
     });
@@ -176,12 +176,18 @@ async function handleLeadDetalle(session, input) {
     };
     const nuevoEstado = ESTADOS[input];
     if (nuevoEstado) {
-        await db.update(schema.leads).set({
-            estado: nuevoEstado,
-            updatedAt: new Date(),
-        }).where((0, drizzle_orm_1.eq)(schema.leads.id, leadId)).run();
-        await (0, session_1.navigateBack)(session);
-        return `✅ Lead actualizado a *${nuevoEstado}*.\n\n0️⃣  Volver`;
+        try {
+            await db.update(schema.leads).set({
+                estado: nuevoEstado,
+                updatedAt: new Date(),
+            }).where((0, drizzle_orm_1.eq)(schema.leads.id, leadId)).run();
+            await (0, session_1.navigateBack)(session);
+            return `✅ Lead actualizado a *${nuevoEstado}*.\n\n0️⃣  Volver`;
+        }
+        catch (err) {
+            console.error('[handleLeadDetalle] update error', err);
+            return (0, guards_1.errorMsg)('No se pudo actualizar el lead. Intentá de nuevo.');
+        }
     }
     if (input === '5') {
         await (0, session_1.navigateTo)(session, 'sales_lead_nota', { leadId, pendingText: true });
@@ -387,7 +393,7 @@ async function buildBandeja(session) {
     const lines = [`📥 *Bandeja de entrada*`, guards_1.SEP, summaryParts, guards_1.SEP];
     let lastSource = null;
     paged.items.forEach((entry, i) => {
-        const n = (page - 1) * PAGE_SIZE + i + 1;
+        const n = i + 1;
         if (entry.source !== lastSource) {
             lines.push(entry.source === 'mio' ? `📞 *Para llamar:*` : `📋 *Disponibles para tomar:*`);
             lastSource = entry.source;
@@ -448,7 +454,7 @@ async function buildLeadsLibre(session) {
         guards_1.SEP,
     ];
     paged.items.forEach((l, i) => {
-        const n = (page - 1) * PAGE_SIZE + i + 1;
+        const n = i + 1;
         const contacto = l.telefono ?? l.waId ?? '—';
         const fuente = l.fuente === 'whatsapp' ? '📱' : '🌐';
         lines.push(`${n}️⃣  ${fuente} *${l.nombre}*`, `   🏪 ${l.rubro ?? 'Sin rubro'} | 📞 ${contacto}`);
@@ -513,10 +519,16 @@ async function handleLeadLibreDetalle(session, input) {
                 `0️⃣  Volver`,
             ].join('\n');
         }
-        await (0, db_1.actualizarLead)(leadId, {
-            asignadoId: session.userId,
-            asignadoA: session.userName,
-        });
+        try {
+            await (0, db_1.actualizarLead)(leadId, {
+                asignadoId: session.userId,
+                asignadoA: session.userName,
+            });
+        }
+        catch (err) {
+            console.error('[handleLeadLibreDetalle] actualizarLead error', err);
+            return (0, guards_1.errorMsg)('No se pudo tomar el lead. Intentá de nuevo.');
+        }
         await (0, session_1.navigateTo)(session, 'sales_leads', { page: 1 });
         return [
             `✅ *Lead tomado exitosamente.*`,

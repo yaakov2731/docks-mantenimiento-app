@@ -62,7 +62,7 @@ export async function buildLeadsLista(session: BotSession): Promise<string> {
   ]
 
   paged.items.forEach((l, i) => {
-    const n = (page - 1) * PAGE_SIZE + i + 1
+    const n = i + 1
     const contacto = l.telefono ?? l.email ?? l.waId ?? '—'
     lines.push(
       `${n}️⃣  ${estadoLeadEmoji(l.estado)} *${l.nombre}*`,
@@ -142,12 +142,17 @@ export async function handleLeadDetalle(session: BotSession, input: string): Pro
   const nuevoEstado = ESTADOS[input]
 
   if (nuevoEstado) {
-    await db.update(schema.leads).set({
-      estado: nuevoEstado as any,
-      updatedAt: new Date(),
-    } as any).where(eq(schema.leads.id, leadId as number)).run()
-    await navigateBack(session)
-    return `✅ Lead actualizado a *${nuevoEstado}*.\n\n0️⃣  Volver`
+    try {
+      await db.update(schema.leads).set({
+        estado: nuevoEstado as any,
+        updatedAt: new Date(),
+      } as any).where(eq(schema.leads.id, leadId as number)).run()
+      await navigateBack(session)
+      return `✅ Lead actualizado a *${nuevoEstado}*.\n\n0️⃣  Volver`
+    } catch (err) {
+      console.error('[handleLeadDetalle] update error', err)
+      return errorMsg('No se pudo actualizar el lead. Intentá de nuevo.')
+    }
   }
 
   if (input === '5') {
@@ -383,7 +388,7 @@ export async function buildBandeja(session: BotSession): Promise<string> {
 
   let lastSource: 'mio' | 'libre' | null = null
   paged.items.forEach((entry, i) => {
-    const n = (page - 1) * PAGE_SIZE + i + 1
+    const n = i + 1
     if (entry.source !== lastSource) {
       lines.push(entry.source === 'mio' ? `📞 *Para llamar:*` : `📋 *Disponibles para tomar:*`)
       lastSource = entry.source
@@ -450,7 +455,7 @@ export async function buildLeadsLibre(session: BotSession): Promise<string> {
   ]
 
   paged.items.forEach((l, i) => {
-    const n = (page - 1) * PAGE_SIZE + i + 1
+    const n = i + 1
     const contacto = l.telefono ?? l.waId ?? '—'
     const fuente = l.fuente === 'whatsapp' ? '📱' : '🌐'
     lines.push(
@@ -522,10 +527,15 @@ export async function handleLeadLibreDetalle(session: BotSession, input: string)
       ].join('\n')
     }
 
-    await actualizarLead(leadId, {
-      asignadoId: session.userId,
-      asignadoA: session.userName,
-    })
+    try {
+      await actualizarLead(leadId, {
+        asignadoId: session.userId,
+        asignadoA: session.userName,
+      })
+    } catch (err) {
+      console.error('[handleLeadLibreDetalle] actualizarLead error', err)
+      return errorMsg('No se pudo tomar el lead. Intentá de nuevo.')
+    }
 
     await navigateTo(session, 'sales_leads', { page: 1 })
     return [
