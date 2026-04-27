@@ -1,0 +1,23 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const cookie_parser_1 = __importDefault(require("cookie-parser"));
+const express_2 = require("@trpc/server/adapters/express");
+const routers_1 = require("./routers");
+const trpc_1 = require("./_core/trpc");
+const bot_api_1 = __importDefault(require("./bot-api"));
+const http_1 = __importDefault(require("./rounds/http"));
+const allowedOrigin = process.env.CLIENT_URL ?? 'http://localhost:5173';
+const app = (0, express_1.default)();
+app.use((0, cors_1.default)({ origin: allowedOrigin, credentials: true }));
+app.use(express_1.default.json({ limit: '10mb' }));
+app.use((0, cookie_parser_1.default)());
+app.use('/trpc', (0, express_2.createExpressMiddleware)({ router: routers_1.appRouter, createContext: trpc_1.createContext }));
+app.use('/api/bot', bot_api_1.default);
+app.use('/api', http_1.default);
+app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+exports.default = app;
