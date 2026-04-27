@@ -10,6 +10,7 @@ import { createContext } from './_core/trpc'
 import { initDb, countUsers, createUser } from './db'
 import botRouter from './bot-api'
 import roundsHttpRouter from './rounds/http'
+import leadsHttpRouter from './leads/http'
 import { readEnv } from './_core/env'
 import bcrypt from 'bcryptjs'
 import path from 'path'
@@ -54,6 +55,7 @@ const authRateLimit = rateLimit({
 app.use('/api/bot', botRateLimit, botRouter)
 app.use('/trpc', authRateLimit, createExpressMiddleware({ router: appRouter, createContext }))
 app.use('/api', roundsHttpRouter)
+app.use('/api', leadsHttpRouter)
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }))
 
 // Serve static client (production build)
