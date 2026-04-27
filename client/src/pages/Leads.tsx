@@ -3,7 +3,6 @@ import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
 import { Phone, Mail, MessageCircle, Calendar, X, Trash2 } from 'lucide-react'
-import * as XLSX from 'xlsx'
 
 const ESTADOS_LEAD = [
   { value: 'nuevo', label: 'Nuevo', color: '#2563EB' },
@@ -48,26 +47,121 @@ export default function Leads() {
     },
   })
 
-  function exportLeads() {
-    const ws = XLSX.utils.json_to_sheet(leads.map(l => ({
-      ID: l.id,
-      Nombre: l.nombre,
-      Telefono: l.telefono ?? '',
-      Email: l.email ?? '',
-      WhatsApp: l.waId ?? '',
-      Rubro: l.rubro ?? '',
-      TipoLocal: l.tipoLocal ?? '',
-      Estado: l.estado,
-      TurnoFecha: l.turnoFecha ?? '',
-      TurnoHora: l.turnoHora ?? '',
-      Notas: l.notas ?? '',
-      AsignadoA: (l as any).asignadoA ?? '',
-      Fuente: l.fuente,
-      Fecha: l.createdAt ? new Date(l.createdAt).toLocaleDateString('es-AR') : '',
-    })))
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Leads')
-    XLSX.writeFile(wb, `Leads-Docks-${new Date().toLocaleDateString('es-AR').replace(/\//g,'-')}.xlsx`)
+  async function exportLeads() {
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook()
+    wb.creator = 'Docks del Puerto'
+
+    const ws = wb.addWorksheet('Leads de Alquiler', {
+      pageSetup: {
+        paperSize: 9,
+        orientation: 'portrait',
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: { left: 0.5, right: 0.5, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 },
+      },
+    })
+
+    const COLS   = 10
+    const DARK   = 'FF1E1812'
+    const AMBER  = 'FFC87C2A'
+    const AMBER2 = 'FFFEF4E8'
+    const WHITE  = 'FFFFFFFF'
+    const GREEN  = 'FF16A34A'
+    const GRN_BG = 'FFF0FFF4'
+    const BORDER = 'FFE5D5C0'
+
+    ws.columns = [
+      { width: 5  },
+      { width: 22 },
+      { width: 14 },
+      { width: 16 },
+      { width: 13 },
+      { width: 12 },
+      { width: 15 },
+      { width: 15 },
+      { width: 11 },
+      { width: 12 },
+    ]
+
+    const solid = (argb: string) => ({ type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb } })
+
+    ws.mergeCells(1, 1, 1, COLS)
+    ws.getRow(1).height = 40
+    const title = ws.getCell('A1')
+    title.value = 'DOCKS DEL PUERTO'
+    title.font = { name: 'Arial', size: 18, bold: true, color: { argb: WHITE } }
+    title.fill = solid(DARK)
+    title.alignment = { horizontal: 'center', vertical: 'middle' }
+
+    ws.mergeCells(2, 1, 2, COLS)
+    ws.getRow(2).height = 22
+    const sub = ws.getCell('A2')
+    sub.value = `Leads de Alquiler   ·   ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}`
+    sub.font = { name: 'Arial', size: 10, color: { argb: WHITE } }
+    sub.fill = solid(AMBER)
+    sub.alignment = { horizontal: 'center', vertical: 'middle' }
+
+    ws.getRow(3).height = 6
+
+    const HEADERS = ['#', 'Nombre', 'Teléfono', 'Rubro', 'Tipo Local', 'Estado', 'Turno', 'Asignado A', 'Fecha', 'Contactado ✓']
+    const hr = ws.getRow(4)
+    hr.height = 24
+    HEADERS.forEach((h, i) => {
+      const cell = hr.getCell(i + 1)
+      cell.value = h
+      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE } }
+      cell.fill = solid(AMBER)
+      cell.alignment = { horizontal: 'center', vertical: 'middle' }
+      cell.border = { bottom: { style: 'medium', color: { argb: DARK } } }
+    })
+
+    leads.forEach((l, i) => {
+      const contactado = ['contactado', 'visito', 'cerrado'].includes(l.estado)
+      const estadoLabel = ESTADOS_LEAD.find(e => e.value === l.estado)?.label ?? l.estado
+      const values = [
+        l.id,
+        l.nombre,
+        l.telefono ?? '',
+        l.rubro ?? '',
+        l.tipoLocal ?? '',
+        estadoLabel,
+        l.turnoFecha ? `${l.turnoFecha} ${l.turnoHora ?? ''}`.trim() : '',
+        (l as any).asignadoA ?? '',
+        l.createdAt ? new Date(l.createdAt).toLocaleDateString('es-AR') : '',
+        contactado ? '✓' : '',
+      ]
+      const row = ws.getRow(i + 5)
+      row.height = 18
+      const bg = i % 2 === 0 ? AMBER2 : WHITE
+      values.forEach((v, j) => {
+        const cell = row.getCell(j + 1)
+        cell.value = v
+        const isCheck = j === 9
+        cell.fill = solid(isCheck && contactado ? GRN_BG : bg)
+        cell.font = isCheck && contactado
+          ? { name: 'Arial', size: 12, bold: true, color: { argb: GREEN } }
+          : { name: 'Arial', size: 9 }
+        cell.alignment = { horizontal: isCheck || j === 0 ? 'center' : 'left', vertical: 'middle' }
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: BORDER } },
+          ...(j < 9 ? { right: { style: 'thin', color: { argb: BORDER } } } : {}),
+        }
+      })
+    })
+
+    ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 4, topLeftCell: 'A5', activeCell: 'A5' }]
+    ws.pageSetup.printArea = `A1:J${leads.length + 4}`
+
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Leads-Docks-${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
