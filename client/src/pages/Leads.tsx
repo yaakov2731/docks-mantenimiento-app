@@ -48,15 +48,23 @@ export default function Leads() {
   })
 
   async function exportLeads() {
-    const res = await fetch('/api/leads/export', { credentials: 'include' })
-    if (!res.ok) return
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `Leads-Docks-${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
+    try {
+      const res = await fetch('/api/leads/export', { credentials: 'include' })
+      if (!res.ok) {
+        const err = await res.text()
+        alert(`Error al exportar: ${res.status} ${err}`)
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Leads-Docks-${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert(`Error de red: ${e}`)
+    }
   }
 
   return (

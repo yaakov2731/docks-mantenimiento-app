@@ -33,9 +33,10 @@ const router = Router()
 
 router.get('/leads/export', async (req: Request, res: Response) => {
   const token = req.cookies?.[JWT_COOKIE]
-  if (!token) return res.status(401).json({ error: 'No autenticado' })
-  try { jwt.verify(token, JWT_SECRET) } catch { return res.status(401).json({ error: 'Token inválido' }) }
+  if (!token) { res.status(401).json({ error: 'No autenticado' }); return }
+  try { jwt.verify(token, JWT_SECRET) } catch { res.status(401).json({ error: 'Token inválido' }); return }
 
+  try {
   const leads = await getLeads()
 
   const wb = new ExcelJS.Workbook()
@@ -149,6 +150,10 @@ router.get('/leads/export', async (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
   res.send(Buffer.from(buffer))
+  } catch (err) {
+    console.error('[leads/export]', err)
+    res.status(500).json({ error: String(err) })
+  }
 })
 
 export default router
