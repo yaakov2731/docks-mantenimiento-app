@@ -2288,7 +2288,7 @@ async function deleteLeadById(id) {
 }
 async function listUnassignedLeads() {
     const all = await getLeads();
-    return all.filter((l) => !l.asignadoId && !['cerrado', 'descartado'].includes(l.estado));
+    return all.filter((l) => !l.asignadoId && l.asignadoA !== 'Bot comercial' && !['cerrado', 'descartado'].includes(l.estado));
 }
 async function actualizarLead(id, data) {
     const updateData = { ...data, updatedAt: new Date() };

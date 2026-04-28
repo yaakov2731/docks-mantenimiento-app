@@ -683,6 +683,37 @@ exports.appRouter = (0, trpc_1.router)({
             }
             return { success: true, notificationSent, notificationWarning };
         }),
+        asignarBot: trpc_1.protectedProcedure
+            .input(zod_1.z.object({ id: zod_1.z.number() }))
+            .mutation(async ({ input }) => {
+            const lead = await (0, db_1.getLeadById)(input.id);
+            if (!lead)
+                throw new server_1.TRPCError({ code: 'NOT_FOUND', message: 'Lead no encontrado' });
+            const waNumber = lead.waId || lead.telefono;
+            if (!waNumber) {
+                throw new server_1.TRPCError({
+                    code: 'PRECONDITION_FAILED',
+                    message: 'El lead no tiene WhatsApp o teléfono cargado.',
+                });
+            }
+            const message = await buildBotLeadReply(lead);
+            const botQueueId = await (0, db_1.enqueueBotMessage)(waNumber, message);
+            if (!botQueueId) {
+                throw new server_1.TRPCError({
+                    code: 'PRECONDITION_FAILED',
+                    message: 'No pude normalizar el WhatsApp del lead.',
+                });
+            }
+            const now = new Date();
+            await (0, db_1.actualizarLead)(input.id, {
+                asignadoA: 'Bot comercial',
+                asignadoId: null,
+                firstContactedAt: lead.firstContactedAt ?? now,
+                lastBotMsgAt: now,
+                autoFollowupCount: Math.max(1, Number(lead.autoFollowupCount ?? 0)),
+            });
+            return { success: true, queued: true, botQueueId };
+        }),
         eliminar: trpc_1.protectedProcedure
             .input(zod_1.z.object({ id: zod_1.z.number() }))
             .mutation(async ({ input, ctx }) => {
@@ -1515,4 +1546,10 @@ function buildLeadAssignmentMessage({ lead, assignedUserName, }) {
         'Abrí el panel y seguí el lead desde la sección Leads.',
     ];
     return lines.filter(Boolean).join('\n');
+}
+async function buildBotLeadReply(lead) {
+    const fallback = 'Hola {{nombre}}, gracias por consultar por Docks del Puerto. Te respondemos por acá para ayudarte con la información de los locales comerciales.';
+    const template = (await (0, db_1.getAppConfig)('followup1_mensaje')) ?? fallback;
+    const nombre = lead.nombre && lead.nombre !== 'Sin nombre' ? lead.nombre : 'ahí';
+    return template.replace(/\{\{nombre\}\}/g, nombre);
 }
