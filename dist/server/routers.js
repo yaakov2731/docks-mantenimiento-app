@@ -1362,6 +1362,51 @@ exports.appRouter = (0, trpc_1.router)({
             const result = await (0, db_1.reiniciarMetricasOperacion)();
             return { success: true, ...result };
         }),
+        getBotComercialConfig: trpc_1.protectedProcedure
+            .query(async ({ ctx }) => {
+            assertAdmin(ctx.user);
+            const cfg = await (0, db_1.getAllBotConfig)();
+            const leads = await (0, db_1.getLeads)();
+            const stats = { hot: 0, warm: 0, cold: 0, not_fit: 0, sin_score: 0 };
+            for (const l of leads) {
+                if (l.estado === 'descartado')
+                    continue;
+                if (!l.temperature)
+                    stats.sin_score++;
+                else
+                    stats[l.temperature] = (stats[l.temperature] ?? 0) + 1;
+            }
+            return {
+                activo: cfg['bot_autoresponder_activo'] !== '0',
+                followup1Mensaje: cfg['followup1_mensaje'] ?? '',
+                followup2Mensaje: cfg['followup2_mensaje'] ?? '',
+                followup1DelayMin: Number(cfg['followup1_delay_min'] ?? 30),
+                followup2DelayHoras: Number(cfg['followup2_delay_horas'] ?? 4),
+                stats,
+            };
+        }),
+        setBotComercialConfig: trpc_1.protectedProcedure
+            .input(zod_1.z.object({
+            activo: zod_1.z.boolean().optional(),
+            followup1Mensaje: zod_1.z.string().min(10).optional(),
+            followup2Mensaje: zod_1.z.string().min(10).optional(),
+            followup1DelayMin: zod_1.z.number().int().min(5).max(1440).optional(),
+            followup2DelayHoras: zod_1.z.number().int().min(1).max(72).optional(),
+        }))
+            .mutation(async ({ ctx, input }) => {
+            assertAdmin(ctx.user);
+            if (input.activo !== undefined)
+                await (0, db_1.setAppConfig)('bot_autoresponder_activo', input.activo ? '1' : '0');
+            if (input.followup1Mensaje !== undefined)
+                await (0, db_1.setAppConfig)('followup1_mensaje', input.followup1Mensaje);
+            if (input.followup2Mensaje !== undefined)
+                await (0, db_1.setAppConfig)('followup2_mensaje', input.followup2Mensaje);
+            if (input.followup1DelayMin !== undefined)
+                await (0, db_1.setAppConfig)('followup1_delay_min', String(input.followup1DelayMin));
+            if (input.followup2DelayHoras !== undefined)
+                await (0, db_1.setAppConfig)('followup2_delay_horas', String(input.followup2DelayHoras));
+            return { success: true };
+        }),
     }),
 });
 async function notifyOperationalTaskAssignment(taskId, employee) {

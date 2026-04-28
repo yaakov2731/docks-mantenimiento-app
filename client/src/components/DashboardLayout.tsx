@@ -5,10 +5,10 @@ import BrandLogo from './BrandLogo'
 import {
   LayoutDashboard, ClipboardList, History, Users,
   Settings, LogOut, Menu, Home, UserCheck, X, ClipboardCheck, Wrench, Clock3,
-  Sun, Moon,
+  Sun, Moon, WalletCards, Bot,
 } from 'lucide-react'
 
-type PanelRole = 'admin' | 'employee' | 'sales'
+type PanelRole = 'admin' | 'employee' | 'sales' | 'collections'
 
 const navItems = [
   { href: '/',              label: 'Formulario público',  icon: Home,            roles: ['admin', 'employee'] as PanelRole[] },
@@ -18,6 +18,8 @@ const navItems = [
   { href: '/tareas-operativas', label: 'Tareas operativas', icon: Wrench,        roles: ['admin'] as PanelRole[] },
   { href: '/tareas',        label: 'Mis Tareas',          icon: ClipboardList,   roles: ['admin', 'employee'] as PanelRole[] },
   { href: '/leads',         label: 'Leads Alquiler',      icon: UserCheck,       roles: ['admin', 'sales'] as PanelRole[] },
+  { href: '/bot-comercial', label: 'Bot Comercial',       icon: Bot,             roles: ['admin'] as PanelRole[] },
+  { href: '/cobranzas',     label: 'Cobranzas',           icon: WalletCards,     roles: ['admin', 'collections'] as PanelRole[] },
   { href: '/historial',     label: 'Historial',           icon: History,         roles: ['admin', 'employee'] as PanelRole[] },
   { href: '/empleados',     label: 'Empleados',           icon: Users,           roles: ['admin'] as PanelRole[] },
   { href: '/configuracion', label: 'Configuración',       icon: Settings,        roles: ['admin'] as PanelRole[] },
@@ -27,6 +29,7 @@ const roleLabel: Record<PanelRole, string> = {
   admin:    'Administrativo',
   employee: 'Operativo',
   sales:    'Comercial / Ventas',
+  collections: 'Cobranzas / Tesorería',
 }
 
 function useTheme() {

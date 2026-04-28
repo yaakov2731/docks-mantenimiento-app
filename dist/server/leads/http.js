@@ -184,32 +184,19 @@ router.get('/leads/export', async (req, res) => {
         res.status(500).json({ error: String(err) });
     }
 });
-function buildFollowup1(nombre) {
-    const saludo = nombre && nombre !== 'Sin nombre' ? `Hola *${nombre}*` : 'Hola';
-    return [
-        `📍 *Docks del Puerto* — seguimos por acá.`,
-        ``,
-        `${saludo}, ¿pudiste revisar tu consulta sobre los locales comerciales?`,
-        ``,
-        `Si tenés alguna pregunta o querés coordinar una visita al predio,`,
-        `respondé este mensaje y te damos una mano.`,
-        ``,
-        `_Docks del Puerto · Puerto de Frutos, Tigre_ 🏢`,
-    ].join('\n');
+const DEFAULT_FOLLOWUP1 = '📍 *Docks del Puerto* — seguimos por acá.\n\nHola *{{nombre}}*, ¿pudiste revisar tu consulta sobre los locales comerciales?\n\nSi tenés alguna pregunta o querés coordinar una visita al predio,\nrespondé este mensaje y te damos una mano.\n\n_Docks del Puerto · Puerto de Frutos, Tigre_ 🏢';
+const DEFAULT_FOLLOWUP2 = '🏢 *Docks del Puerto* — último mensaje de nuestra parte.\n\nHola *{{nombre}}*, si seguís evaluando un espacio para tu marca,\npodemos mostrarte el predio y ver juntos qué tiene sentido.\n\nRespondé *"visita"* y te coordinamos un horario con\nel equipo comercial. Sin compromiso.\n\n_Docks del Puerto · Shopping & Lifestyle · Tigre_ ✨';
+function applyTemplate(template, nombre) {
+    const saludo = nombre && nombre !== 'Sin nombre' ? nombre : 'ahí';
+    return template.replace(/\{\{nombre\}\}/g, saludo);
 }
-function buildFollowup2(nombre) {
-    const saludo = nombre && nombre !== 'Sin nombre' ? `Hola *${nombre}*` : 'Hola';
-    return [
-        `🏢 *Docks del Puerto* — último mensaje de nuestra parte.`,
-        ``,
-        `${saludo}, si seguís evaluando un espacio para tu marca,`,
-        `podemos mostrarte el predio y ver juntos qué tiene sentido.`,
-        ``,
-        `Respondé *"visita"* y te coordinamos un horario con`,
-        `el equipo comercial. Sin compromiso.`,
-        ``,
-        `_Docks del Puerto · Shopping & Lifestyle · Tigre_ ✨`,
-    ].join('\n');
+async function buildFollowup1(nombre) {
+    const tpl = (await (0, db_1.getAppConfig)('followup1_mensaje')) ?? DEFAULT_FOLLOWUP1;
+    return applyTemplate(tpl, nombre);
+}
+async function buildFollowup2(nombre) {
+    const tpl = (await (0, db_1.getAppConfig)('followup2_mensaje')) ?? DEFAULT_FOLLOWUP2;
+    return applyTemplate(tpl, nombre);
 }
 function isQuietHour() {
     const argHour = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCHours();
@@ -221,6 +208,11 @@ router.get('/leads-followup', async (req, res) => {
         res.status(401).json({ error: 'Unauthorized' });
         return;
     }
+    const autoresponderActivo = await (0, db_1.getAppConfig)('bot_autoresponder_activo');
+    if (autoresponderActivo === '0') {
+        res.json({ skipped: true, reason: 'autoresponder_disabled' });
+        return;
+    }
     if (isQuietHour()) {
         res.json({ skipped: true, reason: 'quiet_hours' });
         return;
@@ -228,8 +220,10 @@ router.get('/leads-followup', async (req, res) => {
     try {
         const leads = await (0, db_1.getLeadsForFollowup)();
         const now = Date.now();
-        const THIRTY_MIN = 30 * 60 * 1000;
-        const FOUR_HOURS = 4 * 60 * 60 * 1000;
+        const delay1Min = Number((await (0, db_1.getAppConfig)('followup1_delay_min')) ?? 30);
+        const delay2Hs = Number((await (0, db_1.getAppConfig)('followup2_delay_horas')) ?? 4);
+        const DELAY1_MS = delay1Min * 60 * 1000;
+        const DELAY2_MS = delay2Hs * 60 * 60 * 1000;
         let sent = 0;
         for (const lead of leads) {
             if (!lead.waId)
@@ -237,13 +231,13 @@ router.get('/leads-followup', async (req, res) => {
             const lastMs = lead.lastBotMsgAt ? new Date(lead.lastBotMsgAt).getTime() : 0;
             const elapsed = now - lastMs;
             const count = lead.autoFollowupCount ?? 0;
-            if (count === 0 && elapsed >= THIRTY_MIN) {
-                await (0, db_1.enqueueBotMessage)(lead.waId, buildFollowup1(lead.nombre));
+            if (count === 0 && elapsed >= DELAY1_MS) {
+                await (0, db_1.enqueueBotMessage)(lead.waId, await buildFollowup1(lead.nombre));
                 await (0, db_1.updateLeadFollowup)(lead.id, 1);
                 sent++;
             }
-            else if (count === 1 && elapsed >= FOUR_HOURS) {
-                await (0, db_1.enqueueBotMessage)(lead.waId, buildFollowup2(lead.nombre));
+            else if (count === 1 && elapsed >= DELAY2_MS) {
+                await (0, db_1.enqueueBotMessage)(lead.waId, await buildFollowup2(lead.nombre));
                 await (0, db_1.updateLeadFollowup)(lead.id, 2);
                 sent++;
             }

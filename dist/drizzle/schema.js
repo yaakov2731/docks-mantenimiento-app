@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tareasOperativasEvento = exports.tareasOperativas = exports.rondasEvento = exports.rondasOcurrencia = exports.rondasProgramacion = exports.rondasPlantilla = exports.botSession = exports.botHeartbeat = exports.cobranzasNotificaciones = exports.cobranzasSaldos = exports.cobranzasImportaciones = exports.locatariosCobranza = exports.botQueue = exports.leads = exports.notificaciones = exports.marcacionesEmpleados = exports.empleadoLiquidacionCierre = exports.empleadoAsistenciaAuditoria = exports.empleadoAsistencia = exports.empleados = exports.actualizaciones = exports.reportes = exports.users = void 0;
+exports.appConfig = exports.tareasOperativasEvento = exports.tareasOperativas = exports.rondasEvento = exports.rondasOcurrencia = exports.rondasProgramacion = exports.rondasPlantilla = exports.botSession = exports.botHeartbeat = exports.cobranzasNotificaciones = exports.cobranzasSaldos = exports.cobranzasImportaciones = exports.locatariosCobranza = exports.botQueue = exports.leads = exports.notificaciones = exports.marcacionesEmpleados = exports.empleadoLiquidacionCierre = exports.empleadoAsistenciaAuditoria = exports.empleadoAsistencia = exports.empleados = exports.actualizaciones = exports.reportes = exports.users = void 0;
 const sqlite_core_1 = require("drizzle-orm/sqlite-core");
 const drizzle_orm_1 = require("drizzle-orm");
 exports.users = (0, sqlite_core_1.sqliteTable)('users', {
@@ -381,4 +381,9 @@ exports.tareasOperativasEvento = (0, sqlite_core_1.sqliteTable)('tareas_operativ
     descripcion: (0, sqlite_core_1.text)('descripcion').notNull(),
     metadataJson: (0, sqlite_core_1.text)('metadata_json'),
     createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
+});
+exports.appConfig = (0, sqlite_core_1.sqliteTable)('app_config', {
+    clave: (0, sqlite_core_1.text)('clave').primaryKey(),
+    valor: (0, sqlite_core_1.text)('valor').notNull(),
+    updatedAt: (0, sqlite_core_1.integer)('updated_at', { mode: 'timestamp' }).notNull().default((0, drizzle_orm_1.sql) `(unixepoch())`),
 });

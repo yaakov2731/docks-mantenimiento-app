@@ -424,3 +424,9 @@ export type RondaOcurrencia = typeof rondasOcurrencia.$inferSelect
 export type RondaEvento = typeof rondasEvento.$inferSelect
 export type TareaOperativa = typeof tareasOperativas.$inferSelect
 export type TareaOperativaEvento = typeof tareasOperativasEvento.$inferSelect
+
+export const appConfig = sqliteTable('app_config', {
+  clave: text('clave').primaryKey(),
+  valor: text('valor').notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+})

@@ -39,6 +39,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ATTENDANCE_ACTIONS = exports.db = void 0;
 exports.fetchWithTimeout = fetchWithTimeout;
 exports.initDb = initDb;
+exports.getAppConfig = getAppConfig;
+exports.setAppConfig = setAppConfig;
+exports.getAllBotConfig = getAllBotConfig;
 exports.getEmpleadoAttendanceEvents = getEmpleadoAttendanceEvents;
 exports.buildAttendanceTurns = buildAttendanceTurns;
 exports.getEmpleadoAttendanceStatus = getEmpleadoAttendanceStatus;
@@ -523,6 +526,11 @@ async function initDb() {
       sent_at INTEGER,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+        `CREATE TABLE IF NOT EXISTS app_config (
+      clave TEXT PRIMARY KEY,
+      valor TEXT NOT NULL,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
     ];
     for (const sql of stmts) {
         await client.execute(sql);
@@ -601,7 +609,43 @@ async function initDb() {
     catch (_error) {
         // Older databases are upgraded by the ALTER loop above; keep boot resilient.
     }
+    // Seed default bot config keys (INSERT OR IGNORE = skip if already exists)
+    const defaultConfigs = [
+        ['bot_autoresponder_activo', '1'],
+        ['followup1_delay_min', '30'],
+        ['followup2_delay_horas', '4'],
+        ['followup1_mensaje',
+            '📍 *Docks del Puerto* — seguimos por acá.\n\nHola *{{nombre}}*, ¿pudiste revisar tu consulta sobre los locales comerciales?\n\nSi tenés alguna pregunta o querés coordinar una visita al predio,\nrespondé este mensaje y te damos una mano.\n\n_Docks del Puerto · Puerto de Frutos, Tigre_ 🏢'],
+        ['followup2_mensaje',
+            '🏢 *Docks del Puerto* — último mensaje de nuestra parte.\n\nHola *{{nombre}}*, si seguís evaluando un espacio para tu marca,\npodemos mostrarte el predio y ver juntos qué tiene sentido.\n\nRespondé *"visita"* y te coordinamos un horario con\nel equipo comercial. Sin compromiso.\n\n_Docks del Puerto · Shopping & Lifestyle · Tigre_ ✨'],
+    ];
+    for (const [clave, valor] of defaultConfigs) {
+        try {
+            await client.execute({
+                sql: `INSERT OR IGNORE INTO app_config (clave, valor) VALUES (?, ?)`,
+                args: [clave, valor],
+            });
+        }
+        catch (_error) {
+            // Ignore — table may not exist on old DBs yet; ALTER loop below handles it.
+        }
+    }
     console.log('[DB] Tables ready');
+}
+// ─── App Config ───────────────────────────────────────────────────────────────
+async function getAppConfig(clave) {
+    const rows = await exports.db.select().from(schema.appConfig).where((0, drizzle_orm_1.eq)(schema.appConfig.clave, clave));
+    return rows[0]?.valor ?? null;
+}
+async function setAppConfig(clave, valor) {
+    await exports.db.insert(schema.appConfig)
+        .values({ clave, valor, updatedAt: new Date() })
+        .onConflictDoUpdate({ target: schema.appConfig.clave, set: { valor, updatedAt: new Date() } })
+        .run();
+}
+async function getAllBotConfig() {
+    const rows = await exports.db.select().from(schema.appConfig);
+    return Object.fromEntries(rows.map(r => [r.clave, r.valor]));
 }
 function assertNotFutureAttendanceDate(fechaHora) {
     if (toMs(fechaHora) > Date.now()) {

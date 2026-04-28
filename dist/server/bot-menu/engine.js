@@ -324,6 +324,8 @@ async function routeMessage(session, input) {
             return (0, leads_1.handleAdminLeadElegirVendedor)(session, input);
         if (currentMenu === 'admin_lead_confirmar')
             return (0, leads_1.handleAdminLeadConfirmar)(session, input);
+        if (currentMenu === 'admin_bot_autorespuesta')
+            return (0, leads_1.handleAdminBotAutorespuesta)(session, input);
     }
     // ── VENTAS ────────────────────────────────────────────────────────────────────
     if (userType === 'sales') {
@@ -469,6 +471,8 @@ async function buildMenuDisplay(session, menuName) {
             return (0, rondas_2.buildAdminRondasUnassigned)(session);
         if (menuName === 'admin_leads_sin_asignar')
             return (0, leads_1.buildAdminLeadsSinAsignar)(session);
+        if (menuName === 'admin_bot_autorespuesta')
+            return (0, leads_1.buildAdminBotAutorespuesta)();
         if (menuName === 'admin_nueva_tarea_p1')
             return (0, tasks_1.buildNuevaTareaP1)(session);
         if (menuName === 'admin_nueva_tarea_p2')

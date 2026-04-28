@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import ExcelJS from 'exceljs'
-import { getLeads, getLeadsForFollowup, updateLeadFollowup, enqueueBotMessage } from '../db'
+import { getLeads, getLeadsForFollowup, updateLeadFollowup, enqueueBotMessage, getAppConfig } from '../db'
 import { readEnv } from '../_core/env'
 import { JWT_COOKIE } from '../_core/trpc'
 
@@ -190,33 +190,22 @@ router.get('/leads/export', async (req: Request, res: Response) => {
   }
 })
 
-function buildFollowup1(nombre: string): string {
-  const saludo = nombre && nombre !== 'Sin nombre' ? `Hola *${nombre}*` : 'Hola'
-  return [
-    `📍 *Docks del Puerto* — seguimos por acá.`,
-    ``,
-    `${saludo}, ¿pudiste revisar tu consulta sobre los locales comerciales?`,
-    ``,
-    `Si tenés alguna pregunta o querés coordinar una visita al predio,`,
-    `respondé este mensaje y te damos una mano.`,
-    ``,
-    `_Docks del Puerto · Puerto de Frutos, Tigre_ 🏢`,
-  ].join('\n')
+const DEFAULT_FOLLOWUP1 = '📍 *Docks del Puerto* — seguimos por acá.\n\nHola *{{nombre}}*, ¿pudiste revisar tu consulta sobre los locales comerciales?\n\nSi tenés alguna pregunta o querés coordinar una visita al predio,\nrespondé este mensaje y te damos una mano.\n\n_Docks del Puerto · Puerto de Frutos, Tigre_ 🏢'
+const DEFAULT_FOLLOWUP2 = '🏢 *Docks del Puerto* — último mensaje de nuestra parte.\n\nHola *{{nombre}}*, si seguís evaluando un espacio para tu marca,\npodemos mostrarte el predio y ver juntos qué tiene sentido.\n\nRespondé *"visita"* y te coordinamos un horario con\nel equipo comercial. Sin compromiso.\n\n_Docks del Puerto · Shopping & Lifestyle · Tigre_ ✨'
+
+function applyTemplate(template: string, nombre: string): string {
+  const saludo = nombre && nombre !== 'Sin nombre' ? nombre : 'ahí'
+  return template.replace(/\{\{nombre\}\}/g, saludo)
 }
 
-function buildFollowup2(nombre: string): string {
-  const saludo = nombre && nombre !== 'Sin nombre' ? `Hola *${nombre}*` : 'Hola'
-  return [
-    `🏢 *Docks del Puerto* — último mensaje de nuestra parte.`,
-    ``,
-    `${saludo}, si seguís evaluando un espacio para tu marca,`,
-    `podemos mostrarte el predio y ver juntos qué tiene sentido.`,
-    ``,
-    `Respondé *"visita"* y te coordinamos un horario con`,
-    `el equipo comercial. Sin compromiso.`,
-    ``,
-    `_Docks del Puerto · Shopping & Lifestyle · Tigre_ ✨`,
-  ].join('\n')
+async function buildFollowup1(nombre: string): Promise<string> {
+  const tpl = (await getAppConfig('followup1_mensaje')) ?? DEFAULT_FOLLOWUP1
+  return applyTemplate(tpl, nombre)
+}
+
+async function buildFollowup2(nombre: string): Promise<string> {
+  const tpl = (await getAppConfig('followup2_mensaje')) ?? DEFAULT_FOLLOWUP2
+  return applyTemplate(tpl, nombre)
 }
 
 function isQuietHour(): boolean {
@@ -231,6 +220,12 @@ router.get('/leads-followup', async (req: Request, res: Response) => {
     return
   }
 
+  const autoresponderActivo = await getAppConfig('bot_autoresponder_activo')
+  if (autoresponderActivo === '0') {
+    res.json({ skipped: true, reason: 'autoresponder_disabled' })
+    return
+  }
+
   if (isQuietHour()) {
     res.json({ skipped: true, reason: 'quiet_hours' })
     return
@@ -239,8 +234,10 @@ router.get('/leads-followup', async (req: Request, res: Response) => {
   try {
     const leads = await getLeadsForFollowup()
     const now = Date.now()
-    const THIRTY_MIN = 30 * 60 * 1000
-    const FOUR_HOURS  = 4 * 60 * 60 * 1000
+    const delay1Min = Number((await getAppConfig('followup1_delay_min')) ?? 30)
+    const delay2Hs  = Number((await getAppConfig('followup2_delay_horas')) ?? 4)
+    const DELAY1_MS = delay1Min * 60 * 1000
+    const DELAY2_MS = delay2Hs  * 60 * 60 * 1000
     let sent = 0
 
     for (const lead of leads) {
@@ -249,12 +246,12 @@ router.get('/leads-followup', async (req: Request, res: Response) => {
       const elapsed = now - lastMs
       const count   = lead.autoFollowupCount ?? 0
 
-      if (count === 0 && elapsed >= THIRTY_MIN) {
-        await enqueueBotMessage(lead.waId, buildFollowup1(lead.nombre))
+      if (count === 0 && elapsed >= DELAY1_MS) {
+        await enqueueBotMessage(lead.waId, await buildFollowup1(lead.nombre))
         await updateLeadFollowup(lead.id, 1)
         sent++
-      } else if (count === 1 && elapsed >= FOUR_HOURS) {
-        await enqueueBotMessage(lead.waId, buildFollowup2(lead.nombre))
+      } else if (count === 1 && elapsed >= DELAY2_MS) {
+        await enqueueBotMessage(lead.waId, await buildFollowup2(lead.nombre))
         await updateLeadFollowup(lead.id, 2)
         sent++
       }

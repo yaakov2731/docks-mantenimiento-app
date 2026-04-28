@@ -22,6 +22,9 @@ import {
   createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead, deleteLeadById,
+  listLocatariosCobranza, upsertLocatarioCobranza, saveCobranzaImportacion, listCobranzaImportaciones,
+  listCobranzaSaldos, getCobranzaSaldoById, updateCobranzaSaldoEstado, updateCobranzaSaldoContacto,
+  getCobranzaNotificationsBySaldoIds, createCobranzaNotification, listCobranzaNotificaciones, clearCobranzaLista,
   createRoundTemplate, saveRoundSchedule, getRoundOverviewForDashboard, getRoundTimeline,
   deleteRoundOccurrence, reprogramarRoundOccurrence,
   createOperationalTask, createOperationalTaskFromReporte, getOperationalTaskById, listOperationalTasks, listOperationalTasksByEmployee, getOperationalTasksOverview,
@@ -32,6 +35,7 @@ import {
   completarTrabajoReporte,
   limpiarDatosDemo,
   reiniciarMetricasOperacion,
+  getAppConfig, setAppConfig, getAllBotConfig,
 } from './db'
 
 const roundsService = createRoundsService(database as any)
@@ -39,6 +43,17 @@ const attendanceActionEnum = z.enum(ATTENDANCE_ACTIONS)
 const attendancePeriodEnum = z.enum(['dia', 'semana', 'quincena', 'mes'])
 const payrollAmountSchema = z.number().int().min(0).default(0)
 const operationalTaskPriorityEnum = z.enum(['baja', 'media', 'alta', 'urgente'])
+const cobranzaSaldoEstadoEnum = z.enum(['pendiente', 'notificado', 'pagado', 'ignorado', 'error_contacto'])
+const cobranzaImportRowSchema = z.object({
+  locatarioNombre: z.string().min(1),
+  local: z.string().optional(),
+  periodo: z.string().min(1),
+  ingreso: z.number().nullable().optional(),
+  saldo: z.number().positive(),
+  diasAtraso: z.number().int().nullable().optional(),
+  telefonoWa: z.string().nullable().optional(),
+  raw: z.unknown().optional(),
+})
 const operationalTaskImportItemSchema = z.object({
   tipoTrabajo: z.string().min(2),
   titulo: z.string().min(3),
@@ -53,7 +68,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 function assertAdmin(user: { role: string }) {
   if (user.role !== 'admin') {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Solo un admin puede gestionar asistencia manual.' })
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Solo un admin puede realizar esta acción.' })
   }
 }
 
@@ -170,9 +185,6 @@ function buildEmployeePeriodDays(
   const buckets = getPeriodDayBuckets(period.startMs, period.endMs)
   const sortedEvents = [...events].sort((left, right) => toAttendanceMs(left.timestamp ?? left.createdAt) - toAttendanceMs(right.timestamp ?? right.createdAt))
 
-  let shiftStartedAt: number | null = null
-  let lunchStartedAt: number | null = null
-
   for (const event of sortedEvents) {
     const eventMs = toAttendanceMs(event.timestamp ?? event.createdAt)
     const bucket = buckets.get(formatBaDateKey(eventMs))
@@ -182,37 +194,14 @@ function buildEmployeePeriodDays(
       if (event.tipo === 'fin_almuerzo') bucket.finesAlmuerzo += 1
       if (event.tipo === 'salida') bucket.salidas += 1
     }
-
-    if (event.tipo === 'entrada') {
-      shiftStartedAt = eventMs
-      lunchStartedAt = null
-      continue
-    }
-    if (event.tipo === 'inicio_almuerzo' && shiftStartedAt !== null && lunchStartedAt === null) {
-      lunchStartedAt = eventMs
-      continue
-    }
-    if (event.tipo === 'fin_almuerzo' && shiftStartedAt !== null && lunchStartedAt !== null) {
-      addSecondsToBuckets(buckets, period.startMs, period.endMs, lunchStartedAt, eventMs, 'lunchSeconds')
-      lunchStartedAt = null
-      continue
-    }
-    if (event.tipo === 'salida' && shiftStartedAt !== null) {
-      addSecondsToBuckets(buckets, period.startMs, period.endMs, shiftStartedAt, eventMs, 'grossSeconds')
-      if (lunchStartedAt !== null) {
-        addSecondsToBuckets(buckets, period.startMs, period.endMs, lunchStartedAt, eventMs, 'lunchSeconds')
-      }
-      shiftStartedAt = null
-      lunchStartedAt = null
-    }
   }
 
-  if (shiftStartedAt !== null) {
-    const currentEnd = Math.min(Date.now(), period.endMs)
-    addSecondsToBuckets(buckets, period.startMs, period.endMs, shiftStartedAt, currentEnd, 'grossSeconds')
-    if (lunchStartedAt !== null) {
-      addSecondsToBuckets(buckets, period.startMs, period.endMs, lunchStartedAt, currentEnd, 'lunchSeconds')
-    }
+  const turns = buildAttendanceTurns(events, Date.now())
+  for (const turn of turns) {
+    const bucket = buckets.get(turn.fecha)
+    if (!bucket) continue
+    bucket.grossSeconds += Number(turn.grossSeconds ?? 0)
+    bucket.lunchSeconds += Number(turn.lunchSeconds ?? 0)
   }
 
   const todayKey = formatBaDateKey(Date.now())
@@ -1044,18 +1033,215 @@ export const appRouter = router({
     resumenHoy: protectedProcedure.query(() => getOperationalTasksOverview()),
   }),
 
+  cobranzas: router({
+    resumen: protectedProcedure.query(async ({ ctx }) => {
+      assertCollectionsAccess(ctx.user)
+      const [saldos, importaciones, notificaciones] = await Promise.all([
+        listCobranzaSaldos(),
+        listCobranzaImportaciones(),
+        listCobranzaNotificaciones(),
+      ])
+      const accionables = saldos.filter((saldo: any) => Number(saldo.saldo ?? 0) > 0 && !['pagado', 'ignorado'].includes(saldo.estado))
+      return {
+        totalSaldo: accionables.reduce((total: number, saldo: any) => total + Number(saldo.saldo ?? 0), 0),
+        pendientes: saldos.filter((saldo: any) => saldo.estado === 'pendiente').length,
+        sinWhatsapp: saldos.filter((saldo: any) => saldo.estado === 'error_contacto' || !saldo.telefonoWa).length,
+        notificados: saldos.filter((saldo: any) => saldo.estado === 'notificado').length,
+        importaciones: importaciones.length,
+        envios: notificaciones.filter((item: any) => item.status === 'queued').length,
+      }
+    }),
+
+    listarLocatarios: protectedProcedure.query(({ ctx }) => {
+      assertCollectionsAccess(ctx.user)
+      return listLocatariosCobranza()
+    }),
+
+    guardarLocatario: protectedProcedure
+      .input(z.object({
+        id: z.number().optional(),
+        nombre: z.string().min(1),
+        local: z.string().min(1),
+        telefonoWa: z.string().optional().nullable(),
+        email: z.string().optional().nullable(),
+        cuit: z.string().optional().nullable(),
+        notas: z.string().optional().nullable(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertCollectionsAccess(ctx.user)
+        const id = await upsertLocatarioCobranza(input)
+        return { success: true, id }
+      }),
+
+    guardarImportacion: protectedProcedure
+      .input(z.object({
+        filename: z.string().min(1).max(220),
+        sourceType: z.enum(['pdf', 'xlsx', 'csv', 'manual']),
+        periodLabel: z.string().min(1).max(80),
+        fechaCorte: z.string().optional().nullable(),
+        totalRows: z.number().int().min(0),
+        rows: z.array(cobranzaImportRowSchema).min(1).max(500),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertCollectionsAccess(ctx.user)
+        const result = await saveCobranzaImportacion({
+          ...input,
+          importedBy: { id: ctx.user.id, name: ctx.user.name },
+        })
+        return { success: true, ...result }
+      }),
+
+    listarImportaciones: protectedProcedure.query(({ ctx }) => {
+      assertCollectionsAccess(ctx.user)
+      return listCobranzaImportaciones()
+    }),
+
+    listarSaldos: protectedProcedure
+      .input(z.object({
+        estado: cobranzaSaldoEstadoEnum.optional(),
+        importacionId: z.number().optional(),
+        busqueda: z.string().optional(),
+      }).optional())
+      .query(({ input, ctx }) => {
+        assertCollectionsAccess(ctx.user)
+        return listCobranzaSaldos(input)
+      }),
+
+    actualizarContactoSaldo: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        telefonoWa: z.string().optional().nullable(),
+        locatarioId: z.number().optional().nullable(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertCollectionsAccess(ctx.user)
+        await updateCobranzaSaldoContacto(input.id, input.telefonoWa, input.locatarioId)
+        return { success: true }
+      }),
+
+    marcarEstado: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        estado: cobranzaSaldoEstadoEnum,
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertCollectionsAccess(ctx.user)
+        await updateCobranzaSaldoEstado(input.id, input.estado)
+        return { success: true }
+      }),
+
+    prepararMensajes: protectedProcedure
+      .input(z.object({ saldoIds: z.array(z.number()).min(1).max(100) }))
+      .query(async ({ input, ctx }) => {
+        assertCollectionsAccess(ctx.user)
+        const saldos = await Promise.all(input.saldoIds.map((id) => getCobranzaSaldoById(id)))
+        return saldos
+          .filter(Boolean)
+          .map((saldo: any) => ({
+            saldoId: saldo.id,
+            locatarioNombre: saldo.locatarioNombre,
+            local: saldo.local,
+            saldo: saldo.saldo,
+            telefonoWa: saldo.telefonoWa,
+            puedeEnviar: Boolean(saldo.telefonoWa) && Number(saldo.saldo ?? 0) > 0,
+            message: buildCobranzaMessage(saldo),
+          }))
+      }),
+
+    encolarNotificaciones: protectedProcedure
+      .input(z.object({
+        mensajes: z.array(z.object({
+          saldoId: z.number(),
+          waNumber: z.string().optional().nullable(),
+          message: z.string().min(10).max(1200),
+        })).min(1).max(100),
+        reenviar: z.boolean().default(false),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertCollectionsAccess(ctx.user)
+        const saldoIds = input.mensajes.map((item) => item.saldoId)
+        const existing = await getCobranzaNotificationsBySaldoIds(saldoIds)
+        const alreadyQueued = new Set(existing.filter((item: any) => item.status === 'queued').map((item: any) => item.saldoId))
+
+        let queued = 0
+        let skipped = 0
+        for (const item of input.mensajes) {
+          const saldo = await getCobranzaSaldoById(item.saldoId)
+          if (!saldo) {
+            skipped += 1
+            continue
+          }
+
+          const waNumber = item.waNumber || saldo.telefonoWa
+          if (!waNumber || (!input.reenviar && alreadyQueued.has(item.saldoId))) {
+            await createCobranzaNotification({
+              saldo,
+              waNumber,
+              message: item.message,
+              status: 'skipped',
+              sentBy: { id: ctx.user.id, name: ctx.user.name },
+            })
+            skipped += 1
+            continue
+          }
+
+          const botQueueId = await enqueueBotMessage(waNumber, item.message)
+          if (!botQueueId) {
+            await createCobranzaNotification({
+              saldo,
+              waNumber,
+              message: item.message,
+              status: 'skipped',
+              sentBy: { id: ctx.user.id, name: ctx.user.name },
+            })
+            await updateCobranzaSaldoEstado(saldo.id, 'error_contacto')
+            skipped += 1
+            continue
+          }
+
+          await createCobranzaNotification({
+            saldo,
+            waNumber,
+            message: item.message,
+            status: 'queued',
+            botQueueId,
+            sentBy: { id: ctx.user.id, name: ctx.user.name },
+          })
+          await updateCobranzaSaldoEstado(saldo.id, 'notificado')
+          queued += 1
+        }
+
+        return { success: true, queued, skipped }
+      }),
+
+    historialEnvios: protectedProcedure.query(({ ctx }) => {
+      assertCollectionsAccess(ctx.user)
+      return listCobranzaNotificaciones()
+    }),
+
+    borrarLista: protectedProcedure.mutation(async ({ ctx }) => {
+      assertCollectionsAccess(ctx.user)
+      const result = await clearCobranzaLista()
+      return { success: true, ...result }
+    }),
+  }),
+
   usuarios: router({
-    listar: protectedProcedure.query(() => getUsers()),
+    listar: protectedProcedure.query(({ ctx }) => {
+      assertAdmin(ctx.user)
+      return getUsers()
+    }),
     listarComerciales: protectedProcedure.query(() => getSalesUsers()),
     crear: protectedProcedure
       .input(z.object({
         username: z.string().min(3),
         password: z.string().min(6),
         name: z.string().min(1),
-        role: z.enum(['admin', 'sales']),
+        role: z.enum(['admin', 'sales', 'collections']),
         waId: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
         const existing = await getUserByUsername(input.username)
         if (existing) throw new TRPCError({ code: 'CONFLICT', message: 'Ese usuario ya existe' })
         await createPanelUser(input)
@@ -1066,7 +1252,8 @@ export const appRouter = router({
         id: z.number(),
         password: z.string().min(6),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
         const user = await getUserById(input.id)
         if (!user) throw new TRPCError({ code: 'NOT_FOUND', message: 'Usuario no encontrado' })
         await updateUserPassword(input.id, input.password)
@@ -1077,7 +1264,8 @@ export const appRouter = router({
         id: z.number(),
         waId: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
         const user = await getUserById(input.id)
         if (!user) throw new TRPCError({ code: 'NOT_FOUND', message: 'Usuario no encontrado' })
         await updateUserWhatsapp(input.id, input.waId)
@@ -1086,6 +1274,7 @@ export const appRouter = router({
     desactivar: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
         if (ctx.user.id === input.id) {
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'No podés desactivar tu propio usuario' })
         }
@@ -1301,6 +1490,43 @@ export const appRouter = router({
         const result = await reiniciarMetricasOperacion()
         return { success: true, ...result }
       }),
+    getBotComercialConfig: protectedProcedure
+      .query(async ({ ctx }) => {
+        assertAdmin(ctx.user)
+        const cfg = await getAllBotConfig()
+        const leads = await getLeads()
+        const stats = { hot: 0, warm: 0, cold: 0, not_fit: 0, sin_score: 0 }
+        for (const l of leads) {
+          if (l.estado === 'descartado') continue
+          if (!l.temperature) stats.sin_score++
+          else stats[l.temperature as keyof typeof stats] = (stats[l.temperature as keyof typeof stats] ?? 0) + 1
+        }
+        return {
+          activo: cfg['bot_autoresponder_activo'] !== '0',
+          followup1Mensaje: cfg['followup1_mensaje'] ?? '',
+          followup2Mensaje: cfg['followup2_mensaje'] ?? '',
+          followup1DelayMin: Number(cfg['followup1_delay_min'] ?? 30),
+          followup2DelayHoras: Number(cfg['followup2_delay_horas'] ?? 4),
+          stats,
+        }
+      }),
+    setBotComercialConfig: protectedProcedure
+      .input(z.object({
+        activo: z.boolean().optional(),
+        followup1Mensaje: z.string().min(10).optional(),
+        followup2Mensaje: z.string().min(10).optional(),
+        followup1DelayMin: z.number().int().min(5).max(1440).optional(),
+        followup2DelayHoras: z.number().int().min(1).max(72).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        assertAdmin(ctx.user)
+        if (input.activo !== undefined) await setAppConfig('bot_autoresponder_activo', input.activo ? '1' : '0')
+        if (input.followup1Mensaje !== undefined) await setAppConfig('followup1_mensaje', input.followup1Mensaje)
+        if (input.followup2Mensaje !== undefined) await setAppConfig('followup2_mensaje', input.followup2Mensaje)
+        if (input.followup1DelayMin !== undefined) await setAppConfig('followup1_delay_min', String(input.followup1DelayMin))
+        if (input.followup2DelayHoras !== undefined) await setAppConfig('followup2_delay_horas', String(input.followup2DelayHoras))
+        return { success: true }
+      }),
   }),
 })
 
@@ -1333,6 +1559,43 @@ async function notifyOperationalTaskAssignment(taskId: number, employee: { nombr
   ]
 
   await enqueueBotMessage(employee.waId, lines.filter(Boolean).join('\n'))
+}
+
+function formatMoneyArs(value: number) {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function buildCobranzaMessage(saldo: {
+  locatarioNombre: string
+  local?: string | null
+  periodo: string
+  saldo: number
+  createdAt?: Date | number | string | null
+}) {
+  const fechaCorte = new Date().toLocaleDateString('es-AR')
+  const referencia = [saldo.periodo, saldo.local ? `local ${saldo.local}` : ''].filter(Boolean).join(' / ')
+  return [
+    '🏢 *Docks del Puerto - Administración*',
+    '📌 *Aviso de saldo pendiente*',
+    '',
+    `Hola ${saldo.locatarioNombre}, te contactamos desde el área de Administración de Docks del Puerto.`,
+    '',
+    `💳 Según nuestro registro al ${fechaCorte}, figura un saldo pendiente de *${formatMoneyArs(Number(saldo.saldo ?? 0))}*${referencia ? ` correspondiente a ${referencia}` : ''}.`,
+    '',
+    '📲 ¿Nos confirmás por este medio la fecha estimada de regularización?',
+    '',
+    'Muchas gracias.',
+  ].join('\n')
+}
+
+function assertCollectionsAccess(user: { role: string }) {
+  if (user.role !== 'admin' && user.role !== 'collections') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'No tenés acceso al módulo de cobranzas.' })
+  }
 }
 
 async function notifyOperationalTaskBatchAssignment({
@@ -1373,6 +1636,14 @@ function buildLeadAssignmentMessage({
   lead: any
   assignedUserName: string
 }) {
+  const receivedAt = lead.createdAt
+    ? new Date(lead.createdAt).toLocaleString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    : null
   const lines = [
     '*Nuevo lead asignado — Docks del Puerto*',
     '',
@@ -1386,6 +1657,7 @@ function buildLeadAssignmentMessage({
     lead.tipoLocal ? `Tipo de local: ${lead.tipoLocal}` : '',
     `Estado: ${lead.estado ?? 'nuevo'}`,
     `Origen: ${lead.fuente ?? 'web'}`,
+    receivedAt ? `Recibido: ${receivedAt}` : '',
     lead.turnoFecha ? `Turno: ${lead.turnoFecha}${lead.turnoHora ? ` ${lead.turnoHora}` : ''}` : '',
     lead.notas ? `Notas internas: ${lead.notas}` : '',
     lead.mensaje ? `Consulta: ${lead.mensaje}` : '',

@@ -76,6 +76,8 @@ import {
   handleAdminLeadDetalle,
   handleAdminLeadElegirVendedor,
   handleAdminLeadConfirmar,
+  buildAdminBotAutorespuesta,
+  handleAdminBotAutorespuesta,
 } from './menus/admin/leads'
 import {
   buildNuevaTareaP1,
@@ -112,6 +114,12 @@ import {
   buildPublicAlquilerP6, handlePublicAlquilerP6,
   buildPublicAlquilerP7, handlePublicAlquilerP7,
   buildPublicAlquilerConfirmar, handlePublicAlquilerConfirmar,
+  buildPublicVisitaP1, handlePublicVisitaP1,
+  buildPublicVisitaP2, handlePublicVisitaP2,
+  buildPublicVisitaP3, handlePublicVisitaP3,
+  buildPublicUbicacion, handlePublicUbicacion,
+  buildPublicAsesorP1, handlePublicAsesorP1,
+  buildPublicAsesorP2, handlePublicAsesorP2,
   buildPublicReclamoP1, handlePublicReclamoP1,
   buildPublicReclamoP2, handlePublicReclamoP2,
   buildPublicMensajeP1, handlePublicMensajeP1,
@@ -355,6 +363,7 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'admin_lead_detalle') return handleAdminLeadDetalle(session, input)
     if (currentMenu === 'admin_lead_elegir_vendedor') return handleAdminLeadElegirVendedor(session, input)
     if (currentMenu === 'admin_lead_confirmar') return handleAdminLeadConfirmar(session, input)
+    if (currentMenu === 'admin_bot_autorespuesta') return handleAdminBotAutorespuesta(session, input)
   }
 
   // ── VENTAS ────────────────────────────────────────────────────────────────────
@@ -394,6 +403,12 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'public_alquiler_p6') return handlePublicAlquilerP6(session, input)
     if (currentMenu === 'public_alquiler_p7') return handlePublicAlquilerP7(session, input)
     if (currentMenu === 'public_alquiler_confirmar') return handlePublicAlquilerConfirmar(session, input)
+    if (currentMenu === 'public_visita_p1') return handlePublicVisitaP1(session, input)
+    if (currentMenu === 'public_visita_p2') return handlePublicVisitaP2(session, input)
+    if (currentMenu === 'public_visita_p3') return handlePublicVisitaP3(session, input)
+    if (currentMenu === 'public_ubicacion') return handlePublicUbicacion(session, input)
+    if (currentMenu === 'public_asesor_p1') return handlePublicAsesorP1(session, input)
+    if (currentMenu === 'public_asesor_p2') return handlePublicAsesorP2(session, input)
     if (currentMenu === 'public_reclamo_p1')  return handlePublicReclamoP1(session, input)
     if (currentMenu === 'public_reclamo_p2')  return handlePublicReclamoP2(session, input)
     if (currentMenu === 'public_mensaje_p1')  return handlePublicMensajeP1(session, input)
@@ -445,6 +460,7 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
     if (menuName === 'admin_rondas') return buildAdminRondasMenu(session)
     if (menuName === 'admin_rondas_unassigned') return buildAdminRondasUnassigned(session)
     if (menuName === 'admin_leads_sin_asignar') return buildAdminLeadsSinAsignar(session)
+    if (menuName === 'admin_bot_autorespuesta')  return buildAdminBotAutorespuesta()
     if (menuName === 'admin_nueva_tarea_p1')    return buildNuevaTareaP1(session)
     if (menuName === 'admin_nueva_tarea_p2')    return buildNuevaTareaP2(session.contextData.tareaEmpleadoNombre as string)
     if (menuName === 'admin_nueva_tarea_p3')    return buildNuevaTareaP3()
@@ -475,6 +491,12 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
     if (menuName === 'public_alquiler_p6') return buildPublicAlquilerP6()
     if (menuName === 'public_alquiler_p7') return buildPublicAlquilerP7()
     if (menuName === 'public_alquiler_confirmar') return buildPublicAlquilerConfirmar(session.contextData as Record<string, any>)
+    if (menuName === 'public_visita_p1') return buildPublicVisitaP1()
+    if (menuName === 'public_visita_p2') return buildPublicVisitaP2()
+    if (menuName === 'public_visita_p3') return buildPublicVisitaP3()
+    if (menuName === 'public_ubicacion') return buildPublicUbicacion()
+    if (menuName === 'public_asesor_p1') return buildPublicAsesorP1()
+    if (menuName === 'public_asesor_p2') return buildPublicAsesorP2()
     if (menuName === 'public_reclamo_p1')  return buildPublicReclamoP1()
     if (menuName === 'public_reclamo_p2')  return buildPublicReclamoP2()
     if (menuName === 'public_mensaje_p1')  return buildPublicMensajeP1()

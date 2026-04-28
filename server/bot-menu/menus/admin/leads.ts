@@ -10,6 +10,8 @@ import {
   getSalesUsers,
   actualizarLead,
   enqueueBotMessage,
+  getAppConfig,
+  setAppConfig,
 } from '../../../db'
 
 const PAGE_SIZE = 5
@@ -23,6 +25,33 @@ function estadoLeadEmoji(estado: string): string {
     case 'descartado': return '❌'
     default:           return '⚪'
   }
+}
+
+function formatLeadDateTime(value: unknown): string {
+  if (!value) return '—'
+  const date = value instanceof Date ? value : new Date(value as string | number)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatLeadElapsed(fromValue: unknown, toValue: unknown = new Date()): string {
+  if (!fromValue) return '—'
+  const from = fromValue instanceof Date ? fromValue : new Date(fromValue as string | number)
+  const to = toValue instanceof Date ? toValue : new Date(toValue as string | number)
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return '—'
+  const minutes = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000))
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (hours < 24) return rest ? `${hours}h ${rest}m` : `${hours}h`
+  const days = Math.floor(hours / 24)
+  const remainingHours = hours % 24
+  return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`
 }
 
 // ─── admin_leads_sin_asignar ──────────────────────────────────────────────────
@@ -51,10 +80,13 @@ export async function buildAdminLeadsSinAsignar(session: BotSession): Promise<st
     lines.push(
       `${num}️⃣  *${lead.nombre ?? 'Sin nombre'}* — ${lead.rubro ?? '—'}`,
       `   ${estadoLeadEmoji(lead.estado)} ${lead.estado} | ${lead.telefono ?? '—'}`,
+      `   🕒 Recibido: ${formatLeadDateTime(lead.createdAt)} | sin respuesta ${formatLeadElapsed(lead.createdAt)}`,
     )
   })
 
+  const activo = (await getAppConfig('bot_autoresponder_activo')) !== '0'
   lines.push(SEP)
+  lines.push(`🤖  *7*  →  Bot autorespuesta: ${activo ? '🟢 Activo' : '⏸️ Inactivo'}`)
   if (paged.hasPrev) lines.push(`8️⃣  ◀️ Anterior`)
   if (paged.hasNext) lines.push(`9️⃣  ▶️ Ver más`)
   lines.push(`0️⃣  Volver`)
@@ -74,6 +106,10 @@ export async function handleAdminLeadsSinAsignar(session: BotSession, input: str
   if (input === '9' && paged.hasNext) {
     await navigateTo(session, 'admin_leads_sin_asignar', { page: page + 1 })
     return buildAdminLeadsSinAsignar({ ...session, contextData: { page: page + 1 } })
+  }
+  if (input === '7') {
+    await navigateTo(session, 'admin_bot_autorespuesta', {})
+    return buildAdminBotAutorespuesta()
   }
   if (input === '0') return null as any
 
@@ -95,6 +131,10 @@ function buildAdminLeadDetalle(lead: any): string {
     `🏢 Tipo local: ${lead.tipoLocal ?? '—'}`,
     lead.mensaje ? `💬 Mensaje: "${lead.mensaje}"` : null,
     `📌 Estado: ${estadoLeadEmoji(lead.estado)} ${lead.estado}`,
+    `🕒 Recibido: ${formatLeadDateTime(lead.createdAt)}`,
+    lead.firstContactedAt
+      ? `✅ Primer contacto: ${formatLeadDateTime(lead.firstContactedAt)} (${formatLeadElapsed(lead.createdAt, lead.firstContactedAt)})`
+      : `⏳ Sin respuesta hace ${formatLeadElapsed(lead.createdAt)}`,
     SEP,
     `1️⃣  👤 Asignar a vendedor`,
     `0️⃣  Volver`,
@@ -223,4 +263,43 @@ export async function handleAdminLeadConfirmar(session: BotSession, input: strin
     SEP,
     `0️⃣  Volver`,
   ].join('\n')
+}
+
+// ─── admin_bot_autorespuesta ──────────────────────────────────────────────────
+
+export async function buildAdminBotAutorespuesta(): Promise<string> {
+  const activo = (await getAppConfig('bot_autoresponder_activo')) !== '0'
+  const delay1 = await getAppConfig('followup1_delay_min') ?? '30'
+  const delay2 = await getAppConfig('followup2_delay_horas') ?? '4'
+  return [
+    `🤖 *Bot Autorespuesta — Docks del Puerto*`,
+    SEP,
+    `Estado actual: ${activo ? '🟢 *ACTIVO*' : '⏸️ *INACTIVO*'}`,
+    ``,
+    `📨 Mensaje 1 → a los *${delay1} min*`,
+    `📨 Mensaje 2 → a las *${delay2} h*`,
+    SEP,
+    activo ? `1️⃣  ⏸️ Desactivar` : `1️⃣  ▶️ Activar`,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
+export async function handleAdminBotAutorespuesta(session: BotSession, input: string): Promise<string> {
+  if (input === '0') return null as any
+
+  if (input === '1') {
+    const activo = (await getAppConfig('bot_autoresponder_activo')) !== '0'
+    await setAppConfig('bot_autoresponder_activo', activo ? '0' : '1')
+    const nuevoEstado = !activo
+    await navigateTo(session, 'admin_leads_sin_asignar', { page: 1 })
+    return [
+      nuevoEstado ? `✅ *Bot autorespuesta activado.*` : `⏸️ *Bot autorespuesta desactivado.*`,
+      ``,
+      `Los seguimientos automáticos quedaron ${nuevoEstado ? 'habilitados' : 'suspendidos'}.`,
+      SEP,
+      `0️⃣  Volver`,
+    ].join('\n')
+  }
+
+  return invalidOption(await buildAdminBotAutorespuesta())
 }

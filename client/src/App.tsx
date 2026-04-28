@@ -15,10 +15,13 @@ const ImprimirAsistencia = lazy(() => import('./pages/ImprimirAsistencia'))
 const Leads = lazy(() => import('./pages/Leads'))
 const Operaciones = lazy(() => import('./pages/Operaciones'))
 const TareasOperativas = lazy(() => import('./pages/TareasOperativas'))
+const Cobranzas = lazy(() => import('./pages/Cobranzas'))
+const BotComercial = lazy(() => import('./pages/BotComercial'))
 
-type PanelRole = 'admin' | 'employee' | 'sales'
+type PanelRole = 'admin' | 'employee' | 'sales' | 'collections'
 
 function getDefaultRoute(role?: PanelRole) {
+  if (role === 'collections') return '/cobranzas'
   return role === 'sales' ? '/leads' : '/dashboard'
 }
 
@@ -58,6 +61,8 @@ export default function App() {
       <Route path="/empleados">{() => <ProtectedRoute component={Empleados} allowedRoles={['admin']} />}</Route>
       <Route path="/configuracion">{() => <ProtectedRoute component={Configuracion} allowedRoles={['admin']} />}</Route>
       <Route path="/leads">{() => <ProtectedRoute component={Leads} allowedRoles={['admin', 'sales']} />}</Route>
+      <Route path="/bot-comercial">{() => <ProtectedRoute component={BotComercial} allowedRoles={['admin']} />}</Route>
+      <Route path="/cobranzas">{() => <ProtectedRoute component={Cobranzas} allowedRoles={['admin', 'collections']} />}</Route>
       <Route path="/imprimir">{() => <ProtectedRoute component={ImprimirReclamo} allowedRoles={['admin', 'employee']} />}</Route>
       <Route>
         <div className="flex flex-col items-center justify-center h-screen">

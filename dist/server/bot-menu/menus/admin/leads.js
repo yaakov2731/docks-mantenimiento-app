@@ -5,6 +5,8 @@ exports.handleAdminLeadsSinAsignar = handleAdminLeadsSinAsignar;
 exports.handleAdminLeadDetalle = handleAdminLeadDetalle;
 exports.handleAdminLeadElegirVendedor = handleAdminLeadElegirVendedor;
 exports.handleAdminLeadConfirmar = handleAdminLeadConfirmar;
+exports.buildAdminBotAutorespuesta = buildAdminBotAutorespuesta;
+exports.handleAdminBotAutorespuesta = handleAdminBotAutorespuesta;
 /**
  * Flujo de Leads para administradores/gerentes.
  * admin_leads_sin_asignar → admin_lead_detalle → admin_lead_elegir_vendedor → admin_lead_confirmar
@@ -76,7 +78,9 @@ async function buildAdminLeadsSinAsignar(session) {
         const num = (page - 1) * PAGE_SIZE + index + 1;
         lines.push(`${num}️⃣  *${lead.nombre ?? 'Sin nombre'}* — ${lead.rubro ?? '—'}`, `   ${estadoLeadEmoji(lead.estado)} ${lead.estado} | ${lead.telefono ?? '—'}`, `   🕒 Recibido: ${formatLeadDateTime(lead.createdAt)} | sin respuesta ${formatLeadElapsed(lead.createdAt)}`);
     });
+    const activo = (await (0, db_1.getAppConfig)('bot_autoresponder_activo')) !== '0';
     lines.push(guards_1.SEP);
+    lines.push(`🤖  *7*  →  Bot autorespuesta: ${activo ? '🟢 Activo' : '⏸️ Inactivo'}`);
     if (paged.hasPrev)
         lines.push(`8️⃣  ◀️ Anterior`);
     if (paged.hasNext)
@@ -95,6 +99,10 @@ async function handleAdminLeadsSinAsignar(session, input) {
     if (input === '9' && paged.hasNext) {
         await (0, session_1.navigateTo)(session, 'admin_leads_sin_asignar', { page: page + 1 });
         return buildAdminLeadsSinAsignar({ ...session, contextData: { page: page + 1 } });
+    }
+    if (input === '7') {
+        await (0, session_1.navigateTo)(session, 'admin_bot_autorespuesta', {});
+        return buildAdminBotAutorespuesta();
     }
     if (input === '0')
         return null;
@@ -234,4 +242,39 @@ async function handleAdminLeadConfirmar(session, input) {
         guards_1.SEP,
         `0️⃣  Volver`,
     ].join('\n');
+}
+// ─── admin_bot_autorespuesta ──────────────────────────────────────────────────
+async function buildAdminBotAutorespuesta() {
+    const activo = (await (0, db_1.getAppConfig)('bot_autoresponder_activo')) !== '0';
+    const delay1 = await (0, db_1.getAppConfig)('followup1_delay_min') ?? '30';
+    const delay2 = await (0, db_1.getAppConfig)('followup2_delay_horas') ?? '4';
+    return [
+        `🤖 *Bot Autorespuesta — Docks del Puerto*`,
+        guards_1.SEP,
+        `Estado actual: ${activo ? '🟢 *ACTIVO*' : '⏸️ *INACTIVO*'}`,
+        ``,
+        `📨 Mensaje 1 → a los *${delay1} min*`,
+        `📨 Mensaje 2 → a las *${delay2} h*`,
+        guards_1.SEP,
+        activo ? `1️⃣  ⏸️ Desactivar` : `1️⃣  ▶️ Activar`,
+        `0️⃣  Volver`,
+    ].join('\n');
+}
+async function handleAdminBotAutorespuesta(session, input) {
+    if (input === '0')
+        return null;
+    if (input === '1') {
+        const activo = (await (0, db_1.getAppConfig)('bot_autoresponder_activo')) !== '0';
+        await (0, db_1.setAppConfig)('bot_autoresponder_activo', activo ? '0' : '1');
+        const nuevoEstado = !activo;
+        await (0, session_1.navigateTo)(session, 'admin_leads_sin_asignar', { page: 1 });
+        return [
+            nuevoEstado ? `✅ *Bot autorespuesta activado.*` : `⏸️ *Bot autorespuesta desactivado.*`,
+            ``,
+            `Los seguimientos automáticos quedaron ${nuevoEstado ? 'habilitados' : 'suspendidos'}.`,
+            guards_1.SEP,
+            `0️⃣  Volver`,
+        ].join('\n');
+    }
+    return (0, guards_1.invalidOption)(await buildAdminBotAutorespuesta());
 }
