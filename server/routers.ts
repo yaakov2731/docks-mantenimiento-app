@@ -761,6 +761,41 @@ export const appRouter = router({
         return { success: true, notificationSent, notificationWarning }
       }),
 
+    asignarBot: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const lead = await getLeadById(input.id)
+        if (!lead) throw new TRPCError({ code: 'NOT_FOUND', message: 'Lead no encontrado' })
+
+        const waNumber = lead.waId || lead.telefono
+        if (!waNumber) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'El lead no tiene WhatsApp o teléfono cargado.',
+          })
+        }
+
+        const message = await buildBotLeadReply(lead)
+        const botQueueId = await enqueueBotMessage(waNumber, message)
+        if (!botQueueId) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'No pude normalizar el WhatsApp del lead.',
+          })
+        }
+
+        const now = new Date()
+        await actualizarLead(input.id, {
+          asignadoA: 'Bot comercial',
+          asignadoId: null,
+          firstContactedAt: lead.firstContactedAt ?? now,
+          lastBotMsgAt: now,
+          autoFollowupCount: Math.max(1, Number(lead.autoFollowupCount ?? 0)),
+        } as any)
+
+        return { success: true, queued: true, botQueueId }
+      }),
+
     eliminar: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
@@ -1666,4 +1701,11 @@ function buildLeadAssignmentMessage({
   ]
 
   return lines.filter(Boolean).join('\n')
+}
+
+async function buildBotLeadReply(lead: any) {
+  const fallback = 'Hola {{nombre}}, gracias por consultar por Docks del Puerto. Te respondemos por acá para ayudarte con la información de los locales comerciales.'
+  const template = (await getAppConfig('followup1_mensaje')) ?? fallback
+  const nombre = lead.nombre && lead.nombre !== 'Sin nombre' ? lead.nombre : 'ahí'
+  return template.replace(/\{\{nombre\}\}/g, nombre)
 }

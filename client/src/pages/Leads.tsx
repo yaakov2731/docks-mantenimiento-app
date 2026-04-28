@@ -2,7 +2,7 @@ import { useState } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
-import { Phone, Mail, MessageCircle, Calendar, X, Trash2 } from 'lucide-react'
+import { Phone, Mail, MessageCircle, Calendar, X, Trash2, Bot } from 'lucide-react'
 
 const ESTADOS_LEAD = [
   { value: 'nuevo', label: 'Nuevo', color: '#2563EB' },
@@ -28,6 +28,7 @@ export default function Leads() {
   const [asignadoId, setAsignadoId] = useState('')
   const [feedback, setFeedback] = useState('')
 
+  const utils = trpc.useContext()
   const { data: leads = [], refetch } = trpc.leads.listar.useQuery({ estado: filterEstado || undefined })
   const { data: lead } = trpc.leads.obtener.useQuery({ id: selected! }, { enabled: !!selected })
   const { data: comerciales = [] } = trpc.usuarios.listarComerciales.useQuery()
@@ -44,6 +45,16 @@ export default function Leads() {
       } else {
         setFeedback('')
       }
+    },
+  })
+  const asignarBot = trpc.leads.asignarBot.useMutation({
+    onSuccess: async () => {
+      setFeedback('Lead asignado al bot comercial y respuesta automática encolada por WhatsApp.')
+      await refetch()
+      if (selected) await utils.leads.obtener.invalidate({ id: selected })
+    },
+    onError: (error) => {
+      setFeedback(error.message || 'No se pudo asignar el lead al bot.')
     },
   })
 
@@ -165,6 +176,32 @@ export default function Leads() {
               {lead.mensaje && (
                 <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600 italic">"{lead.mensaje}"</div>
               )}
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                  <Bot size={16} />
+                  Bot comercial
+                </div>
+                <p className="text-xs text-amber-800">
+                  Envía ahora el primer mensaje automático al WhatsApp del lead y deja activo el seguimiento del bot.
+                </p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={asignarBot.isLoading || (!lead.waId && !lead.telefono)}
+                  loading={asignarBot.isLoading}
+                  onClick={() => {
+                    setFeedback('')
+                    asignarBot.mutate({ id: lead.id })
+                  }}
+                >
+                  <Bot size={14} />
+                  Asignar al bot
+                </Button>
+                {!lead.waId && !lead.telefono && (
+                  <div className="text-xs text-amber-700">Este lead necesita WhatsApp o teléfono para que el bot responda.</div>
+                )}
+              </div>
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Asignar a comercial</label>

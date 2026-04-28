@@ -2503,7 +2503,7 @@ export async function deleteLeadById(id: number) {
 export async function listUnassignedLeads() {
   const all = await getLeads()
   return all.filter(
-    (l) => !l.asignadoId && !['cerrado', 'descartado'].includes(l.estado)
+    (l) => !l.asignadoId && l.asignadoA !== 'Bot comercial' && !['cerrado', 'descartado'].includes(l.estado)
   )
 }
 export async function actualizarLead(id: number, data: Partial<typeof schema.leads.$inferInsert>) {
