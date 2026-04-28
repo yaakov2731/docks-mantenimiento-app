@@ -421,6 +421,10 @@ export async function initDb() {
     `ALTER TABLE rondas_ocurrencia ADD COLUMN reasignado_at INTEGER`,
     `ALTER TABLE rondas_ocurrencia ADD COLUMN reasignado_por_user_id INTEGER`,
     `ALTER TABLE rondas_ocurrencia ADD COLUMN reasignado_por_nombre TEXT`,
+    `ALTER TABLE leads ADD COLUMN score INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE leads ADD COLUMN temperature TEXT`,
+    `ALTER TABLE leads ADD COLUMN auto_followup_count INTEGER`,
+    `ALTER TABLE leads ADD COLUMN last_bot_msg_at INTEGER`,
   ]
   for (const sql of alterStmts) {
     try {
