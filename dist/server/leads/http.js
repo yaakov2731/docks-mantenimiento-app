@@ -26,6 +26,38 @@ const GRN_BG = 'FFF0FFF4';
 const BORDER = 'FFE5D5C0';
 const solid = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
 const thinBorder = (argb) => ({ style: 'thin', color: { argb } });
+function formatDateTime(value) {
+    if (!value)
+        return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime()))
+        return '';
+    return date.toLocaleString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+function formatElapsed(fromValue, toValue) {
+    if (!fromValue || !toValue)
+        return '';
+    const from = fromValue instanceof Date ? fromValue : new Date(fromValue);
+    const to = toValue instanceof Date ? toValue : new Date(toValue);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()))
+        return '';
+    const minutes = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000));
+    if (minutes < 60)
+        return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (hours < 24)
+        return rest ? `${hours}h ${rest}m` : `${hours}h`;
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
+}
 const router = (0, express_1.Router)();
 router.get('/leads/export', async (req, res) => {
     const token = req.cookies?.[trpc_1.JWT_COOKIE];
@@ -54,7 +86,7 @@ router.get('/leads/export', async (req, res) => {
                 margins: { left: 0.5, right: 0.5, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 },
             },
         });
-        const COLS = 10;
+        const COLS = 12;
         ws.columns = [
             { width: 5 },
             { width: 22 },
@@ -64,7 +96,9 @@ router.get('/leads/export', async (req, res) => {
             { width: 12 },
             { width: 15 },
             { width: 15 },
-            { width: 11 },
+            { width: 18 },
+            { width: 18 },
+            { width: 16 },
             { width: 12 },
         ];
         // Row 1: Título
@@ -87,7 +121,7 @@ router.get('/leads/export', async (req, res) => {
         // Row 3: Spacer
         ws.getRow(3).height = 6;
         // Row 4: Encabezados
-        const HEADERS = ['#', 'Nombre', 'Teléfono', 'Rubro', 'Tipo Local', 'Estado', 'Turno', 'Asignado A', 'Fecha', 'Contactado ✓'];
+        const HEADERS = ['#', 'Nombre', 'Teléfono', 'Rubro', 'Tipo Local', 'Estado', 'Turno', 'Asignado A', 'Recibido', 'Primer contacto', 'Tiempo respuesta', 'Contactado ✓'];
         const hr = ws.getRow(4);
         hr.height = 24;
         HEADERS.forEach((h, i) => {
@@ -102,7 +136,9 @@ router.get('/leads/export', async (req, res) => {
         leads.forEach((l, i) => {
             const contactado = ['contactado', 'visito', 'cerrado'].includes(l.estado);
             const turno = l.turnoFecha ? `${l.turnoFecha}${l.turnoHora ? ' ' + l.turnoHora : ''}` : '';
-            const fechaLead = l.createdAt ? new Date(l.createdAt).toLocaleDateString('es-AR') : '';
+            const recibido = formatDateTime(l.createdAt);
+            const primerContacto = formatDateTime(l.firstContactedAt);
+            const tiempoRespuesta = formatElapsed(l.createdAt, l.firstContactedAt);
             const values = [
                 l.id,
                 l.nombre,
@@ -112,7 +148,9 @@ router.get('/leads/export', async (req, res) => {
                 ESTADOS[l.estado] ?? l.estado,
                 turno,
                 l.asignadoA ?? '',
-                fechaLead,
+                recibido,
+                primerContacto,
+                tiempoRespuesta,
                 contactado ? '✓' : '',
             ];
             const row = ws.getRow(i + 5);
@@ -121,7 +159,7 @@ router.get('/leads/export', async (req, res) => {
             values.forEach((v, j) => {
                 const cell = row.getCell(j + 1);
                 cell.value = v;
-                const isCheck = j === 9;
+                const isCheck = j === 11;
                 cell.fill = solid(isCheck && contactado ? GRN_BG : bg);
                 cell.font = isCheck && contactado
                     ? { name: 'Arial', size: 12, bold: true, color: { argb: GREEN } }
@@ -129,12 +167,12 @@ router.get('/leads/export', async (req, res) => {
                 cell.alignment = { horizontal: isCheck || j === 0 ? 'center' : 'left', vertical: 'middle' };
                 cell.border = {
                     bottom: thinBorder(BORDER),
-                    ...(j < 9 ? { right: thinBorder(BORDER) } : {}),
+                    ...(j < 11 ? { right: thinBorder(BORDER) } : {}),
                 };
             });
         });
         ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 4, topLeftCell: 'A5', activeCell: 'A5' }];
-        ws.pageSetup.printArea = `A1:J${leads.length + 4}`;
+        ws.pageSetup.printArea = `A1:L${leads.length + 4}`;
         const buffer = await wb.xlsx.writeBuffer();
         const filename = `Leads-Docks-${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.xlsx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -144,6 +182,77 @@ router.get('/leads/export', async (req, res) => {
     catch (err) {
         console.error('[leads/export]', err);
         res.status(500).json({ error: String(err) });
+    }
+});
+function buildFollowup1(nombre) {
+    const saludo = nombre && nombre !== 'Sin nombre' ? `Hola *${nombre}*` : 'Hola';
+    return [
+        `📍 *Docks del Puerto* — seguimos por acá.`,
+        ``,
+        `${saludo}, ¿pudiste revisar tu consulta sobre los locales comerciales?`,
+        ``,
+        `Si tenés alguna pregunta o querés coordinar una visita al predio,`,
+        `respondé este mensaje y te damos una mano.`,
+        ``,
+        `_Docks del Puerto · Puerto de Frutos, Tigre_ 🏢`,
+    ].join('\n');
+}
+function buildFollowup2(nombre) {
+    const saludo = nombre && nombre !== 'Sin nombre' ? `Hola *${nombre}*` : 'Hola';
+    return [
+        `🏢 *Docks del Puerto* — último mensaje de nuestra parte.`,
+        ``,
+        `${saludo}, si seguís evaluando un espacio para tu marca,`,
+        `podemos mostrarte el predio y ver juntos qué tiene sentido.`,
+        ``,
+        `Respondé *"visita"* y te coordinamos un horario con`,
+        `el equipo comercial. Sin compromiso.`,
+        ``,
+        `_Docks del Puerto · Shopping & Lifestyle · Tigre_ ✨`,
+    ].join('\n');
+}
+function isQuietHour() {
+    const argHour = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCHours();
+    return argHour >= 22 || argHour < 8;
+}
+router.get('/leads-followup', async (req, res) => {
+    const cronSecret = (0, env_1.readEnv)('CRON_SECRET');
+    if (!cronSecret || req.headers['x-cron-secret'] !== cronSecret) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+    }
+    if (isQuietHour()) {
+        res.json({ skipped: true, reason: 'quiet_hours' });
+        return;
+    }
+    try {
+        const leads = await (0, db_1.getLeadsForFollowup)();
+        const now = Date.now();
+        const THIRTY_MIN = 30 * 60 * 1000;
+        const FOUR_HOURS = 4 * 60 * 60 * 1000;
+        let sent = 0;
+        for (const lead of leads) {
+            if (!lead.waId)
+                continue;
+            const lastMs = lead.lastBotMsgAt ? new Date(lead.lastBotMsgAt).getTime() : 0;
+            const elapsed = now - lastMs;
+            const count = lead.autoFollowupCount ?? 0;
+            if (count === 0 && elapsed >= THIRTY_MIN) {
+                await (0, db_1.enqueueBotMessage)(lead.waId, buildFollowup1(lead.nombre));
+                await (0, db_1.updateLeadFollowup)(lead.id, 1);
+                sent++;
+            }
+            else if (count === 1 && elapsed >= FOUR_HOURS) {
+                await (0, db_1.enqueueBotMessage)(lead.waId, buildFollowup2(lead.nombre));
+                await (0, db_1.updateLeadFollowup)(lead.id, 2);
+                sent++;
+            }
+        }
+        res.json({ ok: true, sent, checked: leads.length });
+    }
+    catch (err) {
+        console.error('[leads-followup] error', err);
+        res.status(500).json({ error: 'internal error' });
     }
 });
 exports.default = router;

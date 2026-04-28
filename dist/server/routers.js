@@ -56,6 +56,17 @@ const attendanceActionEnum = zod_1.z.enum(db_1.ATTENDANCE_ACTIONS);
 const attendancePeriodEnum = zod_1.z.enum(['dia', 'semana', 'quincena', 'mes']);
 const payrollAmountSchema = zod_1.z.number().int().min(0).default(0);
 const operationalTaskPriorityEnum = zod_1.z.enum(['baja', 'media', 'alta', 'urgente']);
+const cobranzaSaldoEstadoEnum = zod_1.z.enum(['pendiente', 'notificado', 'pagado', 'ignorado', 'error_contacto']);
+const cobranzaImportRowSchema = zod_1.z.object({
+    locatarioNombre: zod_1.z.string().min(1),
+    local: zod_1.z.string().optional(),
+    periodo: zod_1.z.string().min(1),
+    ingreso: zod_1.z.number().nullable().optional(),
+    saldo: zod_1.z.number().positive(),
+    diasAtraso: zod_1.z.number().int().nullable().optional(),
+    telefonoWa: zod_1.z.string().nullable().optional(),
+    raw: zod_1.z.unknown().optional(),
+});
 const operationalTaskImportItemSchema = zod_1.z.object({
     tipoTrabajo: zod_1.z.string().min(2),
     titulo: zod_1.z.string().min(3),
@@ -69,7 +80,7 @@ const BA_OFFSET_MS = 3 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 function assertAdmin(user) {
     if (user.role !== 'admin') {
-        throw new server_1.TRPCError({ code: 'FORBIDDEN', message: 'Solo un admin puede gestionar asistencia manual.' });
+        throw new server_1.TRPCError({ code: 'FORBIDDEN', message: 'Solo un admin puede realizar esta acción.' });
     }
 }
 function toAttendanceMs(value) {
@@ -909,18 +920,198 @@ exports.appRouter = (0, trpc_1.router)({
         }),
         resumenHoy: trpc_1.protectedProcedure.query(() => (0, db_1.getOperationalTasksOverview)()),
     }),
+    cobranzas: (0, trpc_1.router)({
+        resumen: trpc_1.protectedProcedure.query(async ({ ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            const [saldos, importaciones, notificaciones] = await Promise.all([
+                (0, db_1.listCobranzaSaldos)(),
+                (0, db_1.listCobranzaImportaciones)(),
+                (0, db_1.listCobranzaNotificaciones)(),
+            ]);
+            const accionables = saldos.filter((saldo) => Number(saldo.saldo ?? 0) > 0 && !['pagado', 'ignorado'].includes(saldo.estado));
+            return {
+                totalSaldo: accionables.reduce((total, saldo) => total + Number(saldo.saldo ?? 0), 0),
+                pendientes: saldos.filter((saldo) => saldo.estado === 'pendiente').length,
+                sinWhatsapp: saldos.filter((saldo) => saldo.estado === 'error_contacto' || !saldo.telefonoWa).length,
+                notificados: saldos.filter((saldo) => saldo.estado === 'notificado').length,
+                importaciones: importaciones.length,
+                envios: notificaciones.filter((item) => item.status === 'queued').length,
+            };
+        }),
+        listarLocatarios: trpc_1.protectedProcedure.query(({ ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            return (0, db_1.listLocatariosCobranza)();
+        }),
+        guardarLocatario: trpc_1.protectedProcedure
+            .input(zod_1.z.object({
+            id: zod_1.z.number().optional(),
+            nombre: zod_1.z.string().min(1),
+            local: zod_1.z.string().min(1),
+            telefonoWa: zod_1.z.string().optional().nullable(),
+            email: zod_1.z.string().optional().nullable(),
+            cuit: zod_1.z.string().optional().nullable(),
+            notas: zod_1.z.string().optional().nullable(),
+        }))
+            .mutation(async ({ input, ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            const id = await (0, db_1.upsertLocatarioCobranza)(input);
+            return { success: true, id };
+        }),
+        guardarImportacion: trpc_1.protectedProcedure
+            .input(zod_1.z.object({
+            filename: zod_1.z.string().min(1).max(220),
+            sourceType: zod_1.z.enum(['pdf', 'xlsx', 'csv', 'manual']),
+            periodLabel: zod_1.z.string().min(1).max(80),
+            fechaCorte: zod_1.z.string().optional().nullable(),
+            totalRows: zod_1.z.number().int().min(0),
+            rows: zod_1.z.array(cobranzaImportRowSchema).min(1).max(500),
+        }))
+            .mutation(async ({ input, ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            const result = await (0, db_1.saveCobranzaImportacion)({
+                ...input,
+                importedBy: { id: ctx.user.id, name: ctx.user.name },
+            });
+            return { success: true, ...result };
+        }),
+        listarImportaciones: trpc_1.protectedProcedure.query(({ ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            return (0, db_1.listCobranzaImportaciones)();
+        }),
+        listarSaldos: trpc_1.protectedProcedure
+            .input(zod_1.z.object({
+            estado: cobranzaSaldoEstadoEnum.optional(),
+            importacionId: zod_1.z.number().optional(),
+            busqueda: zod_1.z.string().optional(),
+        }).optional())
+            .query(({ input, ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            return (0, db_1.listCobranzaSaldos)(input);
+        }),
+        actualizarContactoSaldo: trpc_1.protectedProcedure
+            .input(zod_1.z.object({
+            id: zod_1.z.number(),
+            telefonoWa: zod_1.z.string().optional().nullable(),
+            locatarioId: zod_1.z.number().optional().nullable(),
+        }))
+            .mutation(async ({ input, ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            await (0, db_1.updateCobranzaSaldoContacto)(input.id, input.telefonoWa, input.locatarioId);
+            return { success: true };
+        }),
+        marcarEstado: trpc_1.protectedProcedure
+            .input(zod_1.z.object({
+            id: zod_1.z.number(),
+            estado: cobranzaSaldoEstadoEnum,
+        }))
+            .mutation(async ({ input, ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            await (0, db_1.updateCobranzaSaldoEstado)(input.id, input.estado);
+            return { success: true };
+        }),
+        prepararMensajes: trpc_1.protectedProcedure
+            .input(zod_1.z.object({ saldoIds: zod_1.z.array(zod_1.z.number()).min(1).max(100) }))
+            .query(async ({ input, ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            const saldos = await Promise.all(input.saldoIds.map((id) => (0, db_1.getCobranzaSaldoById)(id)));
+            return saldos
+                .filter(Boolean)
+                .map((saldo) => ({
+                saldoId: saldo.id,
+                locatarioNombre: saldo.locatarioNombre,
+                local: saldo.local,
+                saldo: saldo.saldo,
+                telefonoWa: saldo.telefonoWa,
+                puedeEnviar: Boolean(saldo.telefonoWa) && Number(saldo.saldo ?? 0) > 0,
+                message: buildCobranzaMessage(saldo),
+            }));
+        }),
+        encolarNotificaciones: trpc_1.protectedProcedure
+            .input(zod_1.z.object({
+            mensajes: zod_1.z.array(zod_1.z.object({
+                saldoId: zod_1.z.number(),
+                waNumber: zod_1.z.string().optional().nullable(),
+                message: zod_1.z.string().min(10).max(1200),
+            })).min(1).max(100),
+            reenviar: zod_1.z.boolean().default(false),
+        }))
+            .mutation(async ({ input, ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            const saldoIds = input.mensajes.map((item) => item.saldoId);
+            const existing = await (0, db_1.getCobranzaNotificationsBySaldoIds)(saldoIds);
+            const alreadyQueued = new Set(existing.filter((item) => item.status === 'queued').map((item) => item.saldoId));
+            let queued = 0;
+            let skipped = 0;
+            for (const item of input.mensajes) {
+                const saldo = await (0, db_1.getCobranzaSaldoById)(item.saldoId);
+                if (!saldo) {
+                    skipped += 1;
+                    continue;
+                }
+                const waNumber = item.waNumber || saldo.telefonoWa;
+                if (!waNumber || (!input.reenviar && alreadyQueued.has(item.saldoId))) {
+                    await (0, db_1.createCobranzaNotification)({
+                        saldo,
+                        waNumber,
+                        message: item.message,
+                        status: 'skipped',
+                        sentBy: { id: ctx.user.id, name: ctx.user.name },
+                    });
+                    skipped += 1;
+                    continue;
+                }
+                const botQueueId = await (0, db_1.enqueueBotMessage)(waNumber, item.message);
+                if (!botQueueId) {
+                    await (0, db_1.createCobranzaNotification)({
+                        saldo,
+                        waNumber,
+                        message: item.message,
+                        status: 'skipped',
+                        sentBy: { id: ctx.user.id, name: ctx.user.name },
+                    });
+                    await (0, db_1.updateCobranzaSaldoEstado)(saldo.id, 'error_contacto');
+                    skipped += 1;
+                    continue;
+                }
+                await (0, db_1.createCobranzaNotification)({
+                    saldo,
+                    waNumber,
+                    message: item.message,
+                    status: 'queued',
+                    botQueueId,
+                    sentBy: { id: ctx.user.id, name: ctx.user.name },
+                });
+                await (0, db_1.updateCobranzaSaldoEstado)(saldo.id, 'notificado');
+                queued += 1;
+            }
+            return { success: true, queued, skipped };
+        }),
+        historialEnvios: trpc_1.protectedProcedure.query(({ ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            return (0, db_1.listCobranzaNotificaciones)();
+        }),
+        borrarLista: trpc_1.protectedProcedure.mutation(async ({ ctx }) => {
+            assertCollectionsAccess(ctx.user);
+            const result = await (0, db_1.clearCobranzaLista)();
+            return { success: true, ...result };
+        }),
+    }),
     usuarios: (0, trpc_1.router)({
-        listar: trpc_1.protectedProcedure.query(() => (0, db_1.getUsers)()),
+        listar: trpc_1.protectedProcedure.query(({ ctx }) => {
+            assertAdmin(ctx.user);
+            return (0, db_1.getUsers)();
+        }),
         listarComerciales: trpc_1.protectedProcedure.query(() => (0, db_1.getSalesUsers)()),
         crear: trpc_1.protectedProcedure
             .input(zod_1.z.object({
             username: zod_1.z.string().min(3),
             password: zod_1.z.string().min(6),
             name: zod_1.z.string().min(1),
-            role: zod_1.z.enum(['admin', 'sales']),
+            role: zod_1.z.enum(['admin', 'sales', 'collections']),
             waId: zod_1.z.string().optional(),
         }))
-            .mutation(async ({ input }) => {
+            .mutation(async ({ input, ctx }) => {
+            assertAdmin(ctx.user);
             const existing = await (0, db_1.getUserByUsername)(input.username);
             if (existing)
                 throw new server_1.TRPCError({ code: 'CONFLICT', message: 'Ese usuario ya existe' });
@@ -932,7 +1123,8 @@ exports.appRouter = (0, trpc_1.router)({
             id: zod_1.z.number(),
             password: zod_1.z.string().min(6),
         }))
-            .mutation(async ({ input }) => {
+            .mutation(async ({ input, ctx }) => {
+            assertAdmin(ctx.user);
             const user = await (0, db_1.getUserById)(input.id);
             if (!user)
                 throw new server_1.TRPCError({ code: 'NOT_FOUND', message: 'Usuario no encontrado' });
@@ -944,7 +1136,8 @@ exports.appRouter = (0, trpc_1.router)({
             id: zod_1.z.number(),
             waId: zod_1.z.string().optional(),
         }))
-            .mutation(async ({ input }) => {
+            .mutation(async ({ input, ctx }) => {
+            assertAdmin(ctx.user);
             const user = await (0, db_1.getUserById)(input.id);
             if (!user)
                 throw new server_1.TRPCError({ code: 'NOT_FOUND', message: 'Usuario no encontrado' });
@@ -954,6 +1147,7 @@ exports.appRouter = (0, trpc_1.router)({
         desactivar: trpc_1.protectedProcedure
             .input(zod_1.z.object({ id: zod_1.z.number() }))
             .mutation(async ({ input, ctx }) => {
+            assertAdmin(ctx.user);
             if (ctx.user.id === input.id) {
                 throw new server_1.TRPCError({ code: 'BAD_REQUEST', message: 'No podés desactivar tu propio usuario' });
             }
@@ -1197,6 +1391,34 @@ async function notifyOperationalTaskAssignment(taskId, employee) {
     ];
     await (0, db_1.enqueueBotMessage)(employee.waId, lines.filter(Boolean).join('\n'));
 }
+function formatMoneyArs(value) {
+    return new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: 'ARS',
+        maximumFractionDigits: 0,
+    }).format(value);
+}
+function buildCobranzaMessage(saldo) {
+    const fechaCorte = new Date().toLocaleDateString('es-AR');
+    const referencia = [saldo.periodo, saldo.local ? `local ${saldo.local}` : ''].filter(Boolean).join(' / ');
+    return [
+        '🏢 *Docks del Puerto - Administración*',
+        '📌 *Aviso de saldo pendiente*',
+        '',
+        `Hola ${saldo.locatarioNombre}, te contactamos desde el área de Administración de Docks del Puerto.`,
+        '',
+        `💳 Según nuestro registro al ${fechaCorte}, figura un saldo pendiente de *${formatMoneyArs(Number(saldo.saldo ?? 0))}*${referencia ? ` correspondiente a ${referencia}` : ''}.`,
+        '',
+        '📲 ¿Nos confirmás por este medio la fecha estimada de regularización?',
+        '',
+        'Muchas gracias.',
+    ].join('\n');
+}
+function assertCollectionsAccess(user) {
+    if (user.role !== 'admin' && user.role !== 'collections') {
+        throw new server_1.TRPCError({ code: 'FORBIDDEN', message: 'No tenés acceso al módulo de cobranzas.' });
+    }
+}
 async function notifyOperationalTaskBatchAssignment({ employee, tasks, sourceName, }) {
     if (!employee.waId || tasks.length === 0)
         return false;
@@ -1219,6 +1441,14 @@ async function notifyOperationalTaskBatchAssignment({ employee, tasks, sourceNam
     return true;
 }
 function buildLeadAssignmentMessage({ lead, assignedUserName, }) {
+    const receivedAt = lead.createdAt
+        ? new Date(lead.createdAt).toLocaleString('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        })
+        : null;
     const lines = [
         '*Nuevo lead asignado — Docks del Puerto*',
         '',
@@ -1232,6 +1462,7 @@ function buildLeadAssignmentMessage({ lead, assignedUserName, }) {
         lead.tipoLocal ? `Tipo de local: ${lead.tipoLocal}` : '',
         `Estado: ${lead.estado ?? 'nuevo'}`,
         `Origen: ${lead.fuente ?? 'web'}`,
+        receivedAt ? `Recibido: ${receivedAt}` : '',
         lead.turnoFecha ? `Turno: ${lead.turnoFecha}${lead.turnoHora ? ` ${lead.turnoHora}` : ''}` : '',
         lead.notas ? `Notas internas: ${lead.notas}` : '',
         lead.mensaje ? `Consulta: ${lead.mensaje}` : '',

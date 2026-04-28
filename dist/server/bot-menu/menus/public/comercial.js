@@ -48,7 +48,9 @@ exports.handlePublicMensajeP2 = handlePublicMensajeP2;
 const session_1 = require("../../session");
 const guards_1 = require("../../shared/guards");
 const db_1 = require("../../../db");
+const scoring_1 = require("../../../leads/scoring");
 const MAX_INPUT = 300;
+const DSEP = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
 function trimSafe(v) {
     return v.trim().slice(0, MAX_INPUT);
 }
@@ -88,24 +90,71 @@ function nowAr() {
         timeZone: 'America/Argentina/Buenos_Aires',
     });
 }
+// --- Closing messages por temperatura -------------------------------------------
+function buildClosingByTemperature(temperature, nombre) {
+    const n = nombre && nombre !== 'Sin nombre' ? ` *${nombre}*` : '';
+    switch (temperature) {
+        case 'hot':
+            return [
+                `🔥 *¡Tu consulta fue registrada!*`,
+                DSEP,
+                `Gracias${n}. Con lo que nos contás, Docks del Puerto`,
+                `puede ser exactamente lo que buscás.`,
+                ``,
+                `Un asesor comercial te va a contactar *hoy* para`,
+                `coordinar una visita personalizada al predio.`,
+                DSEP,
+                `_Docks del Puerto · Shopping & Lifestyle · Tigre_ 🏢✨`,
+            ].join('\n');
+        case 'warm':
+            return [
+                `✅ *¡Consulta registrada!*`,
+                DSEP,
+                `Gracias${n}. Tiene sentido que conozcas el predio.`,
+                `Un asesor va a contactarte para ver juntos qué`,
+                `espacios tienen más sentido para tu propuesta.`,
+                DSEP,
+                `_Docks del Puerto · Puerto de Frutos, Tigre_ 🏢`,
+            ].join('\n');
+        case 'cold':
+            return [
+                `✅ *Consulta registrada*`,
+                DSEP,
+                `Gracias${n}. Registramos tu consulta.`,
+                `Cuando estés más cerca de avanzar,`,
+                `nuestro equipo te va a estar esperando.`,
+                DSEP,
+                `_Docks del Puerto · Puerto de Frutos, Tigre_ 🏢`,
+            ].join('\n');
+        default:
+            return [
+                `✅ *Consulta registrada*`,
+                DSEP,
+                `Gracias${n}. Tomamos nota de tu consulta.`,
+                `Por ahora no tenemos espacios que encajen con tu perfil,`,
+                `pero si la situación cambia no dudes en escribirnos.`,
+                DSEP,
+                `_Docks del Puerto 🏢_`,
+            ].join('\n');
+    }
+}
 // --- Menu principal publico --------------------------------------------------
 function buildPublicMainMenu() {
     return [
-        `🏢 *Docks del Puerto*`,
-        `_Shopping & Lifestyle · Tigre_`,
-        guards_1.SEP,
-        `Locales y stands comerciales frente al río`,
-        `para marcas, emprendedores y propuestas lifestyle.`,
-        ``,
-        `¿Qué querés hacer?`,
-        ``,
-        `1️⃣  🏪 Alquilar local o stand`,
-        `2️⃣  📅 Coordinar una visita`,
-        `3️⃣  ℹ️ Ubicación y horarios`,
-        `4️⃣  💬 Hablar con un asesor`,
-        `5️⃣  📢 Soy locatario y necesito ayuda`,
-        guards_1.SEP,
-        `0️⃣  Salir`,
+        `🏢 *DOCKS DEL PUERTO*`,
+        `✨ _Shopping & Lifestyle · Puerto de Frutos, Tigre_`,
+        DSEP,
+        `Más de *200 locales comerciales* frente al río.`,
+        `Un predio único en la Zona Norte de Buenos Aires.`,
+        DSEP,
+        `🏪  *1*  →  Quiero alquilar un local`,
+        `📅  *2*  →  Coordinar una visita al predio`,
+        `📍  *3*  →  Cómo llegar · Horarios`,
+        `💬  *4*  →  Hablar con un asesor comercial`,
+        `🔧  *5*  →  Soy locatario · Necesito ayuda`,
+        DSEP,
+        `_Respondé con el número de tu opción_ 👇`,
+        `0️⃣   Salir`,
     ].join('\n');
 }
 async function handlePublicMain(session, input) {
@@ -134,7 +183,7 @@ async function handlePublicMain(session, input) {
             `👋 *Hasta luego.*`,
             ``,
             `Si necesitás ayuda en otro momento, escribinos a este número.`,
-            `Docks del Puerto 🏢`,
+            `_Docks del Puerto 🏢_`,
         ].join('\n');
     }
     return `❓ *Opción no válida.* Ingresá el número de la opción:\n\n${buildPublicMainMenu()}`;
@@ -142,11 +191,15 @@ async function handlePublicMain(session, input) {
 // --- Flujo: alquiler comercial ----------------------------------------------
 function buildPublicAlquilerP1() {
     return [
-        `🏪 *Consulta comercial*`,
-        guards_1.SEP,
-        `*Paso 1 de 7*`,
+        `🏪 *Consulta comercial — Docks del Puerto*`,
+        DSEP,
+        `📍 *Paso 1 de 7*`,
+        ``,
+        `¡Buena elección! Te vamos a hacer *7 preguntas rápidas*`,
+        `para entender tu proyecto y ver si Docks es la opción ideal.`,
+        ``,
         `¿Cuál es tu *nombre y apellido*?`,
-        guards_1.SEP,
+        DSEP,
         `0️⃣  Volver`,
     ].join('\n');
 }
@@ -164,10 +217,12 @@ async function handlePublicAlquilerP1(session, input) {
 function buildPublicAlquilerP2() {
     return [
         `🏪 *Consulta comercial*`,
-        guards_1.SEP,
-        `*Paso 2 de 7*`,
+        DSEP,
+        `📍 *Paso 2 de 7*`,
+        ``,
         `¿Cuál es el *nombre de tu marca o comercio*?`,
-        guards_1.SEP,
+        `_(ej: "Studio Alma", "Tienda Roots", "Café Río")_`,
+        DSEP,
         `0️⃣  Cancelar`,
     ].join('\n');
 }
@@ -198,10 +253,14 @@ const RUBROS_ALQUILER = {
 function buildPublicAlquilerP3() {
     return [
         `🏪 *Consulta comercial*`,
-        guards_1.SEP,
-        `*Paso 3 de 7*`,
+        DSEP,
+        `📍 *Paso 3 de 7*`,
+        ``,
+        `En Docks trabajamos con *rubros seleccionados* para`,
+        `mantener la identidad y la propuesta del predio.`,
+        ``,
         `¿A qué *rubro* pertenece tu negocio?`,
-        guards_1.SEP,
+        DSEP,
         `1️⃣  👗 Indumentaria / Moda`,
         `2️⃣  👟 Calzado / Accesorios`,
         `3️⃣  🏠 Deco / Hogar`,
@@ -209,8 +268,8 @@ function buildPublicAlquilerP3() {
         `5️⃣  🧒 Infantil / Juguetería`,
         `6️⃣  🎨 Arte / Artesanías`,
         `7️⃣  🛍️ Regalos / Lifestyle`,
-        `8️⃣  ✏️ Otro (escribir)`,
-        guards_1.SEP,
+        `8️⃣  ✏️  Otro rubro (escribir)`,
+        DSEP,
         `_Escribí *cancelar* para salir_`,
     ].join('\n');
 }
@@ -228,11 +287,12 @@ async function handlePublicAlquilerP3(session, input) {
         });
         return [
             `🏪 *Consulta comercial*`,
-            guards_1.SEP,
-            `*Paso 3 de 7*`,
+            DSEP,
+            `📍 *Paso 3 de 7*`,
+            ``,
             `¿Cuál es el rubro de tu negocio?`,
-            `_(Describilo con tus palabras)_`,
-            guards_1.SEP,
+            `_(Describilo con tus palabras, ej: "Perfumería", "Juguetes importados")_`,
+            DSEP,
             `_Escribí *cancelar* para salir_`,
         ].join('\n');
     }
@@ -266,12 +326,16 @@ async function handlePublicAlquilerP3Otro(session, input) {
 function buildPublicAlquilerP4() {
     return [
         `🏪 *Consulta comercial*`,
-        guards_1.SEP,
-        `*Paso 4 de 7*`,
+        DSEP,
+        `📍 *Paso 4 de 7*`,
+        ``,
+        `Una referencia online nos ayuda a conocer tu propuesta`,
+        `antes de la visita y darle mejor contexto al equipo comercial.`,
+        ``,
         `¿Tenés *Instagram o página web*?`,
         `Podés pegar el link, escribir _@usuario_ o la URL.`,
         `Si no tenés, escribí _"ninguno"_.`,
-        guards_1.SEP,
+        DSEP,
         `_Escribí *cancelar* para salir_`,
     ].join('\n');
 }
@@ -301,15 +365,19 @@ const ESPACIOS_ALQUILER = {
 function buildPublicAlquilerP5() {
     return [
         `🏪 *Consulta comercial*`,
-        guards_1.SEP,
-        `*Paso 5 de 7*`,
+        DSEP,
+        `📍 *Paso 5 de 7*`,
+        ``,
+        `Tenemos desde locales íntimos hasta espacios amplios`,
+        `con frente al río y terrazas exteriores.`,
+        ``,
         `¿Qué tipo de *espacio* estás buscando?`,
-        guards_1.SEP,
-        `1️⃣  Local`,
-        `2️⃣  Stand / Módulo`,
-        `3️⃣  Espacio exterior`,
-        `4️⃣  No lo tengo claro todavía`,
-        guards_1.SEP,
+        DSEP,
+        `1️⃣  🏬 Local`,
+        `2️⃣  🛖 Stand / Módulo`,
+        `3️⃣  🌿 Espacio exterior`,
+        `4️⃣  🤔 No lo tengo claro todavía`,
+        DSEP,
         `_Escribí *cancelar* para salir_`,
     ].join('\n');
 }
@@ -335,11 +403,12 @@ async function handlePublicAlquilerP5(session, input) {
 function buildPublicAlquilerP6() {
     return [
         `🏪 *Consulta comercial*`,
-        guards_1.SEP,
-        `*Paso 6 de 7*`,
+        DSEP,
+        `📍 *Paso 6 de 7*`,
+        ``,
         `¿*Desde cuándo* te gustaría comenzar?`,
-        `_(ej: marzo 2026, lo antes posible, en 3 meses)_`,
-        guards_1.SEP,
+        `_(ej: "lo antes posible", "en 3 meses", "para septiembre")_`,
+        DSEP,
         `0️⃣  Cancelar`,
     ].join('\n');
 }
@@ -366,14 +435,18 @@ const SEGUIMIENTO_ALQUILER = {
 function buildPublicAlquilerP7() {
     return [
         `🏪 *Consulta comercial*`,
-        guards_1.SEP,
-        `*Paso 7 de 7*`,
-        `¿Cómo preferís seguir?`,
-        guards_1.SEP,
-        `1️⃣  Coordinar una visita`,
-        `2️⃣  Que me llamen`,
-        `3️⃣  Recibir información por WhatsApp`,
-        guards_1.SEP,
+        DSEP,
+        `📍 *Paso 7 de 7 — ¡Último paso!*`,
+        ``,
+        `La visita al predio es clave para evaluar ubicación,`,
+        `circulación y qué espacio tiene más sentido para tu marca.`,
+        ``,
+        `¿Cómo preferís *seguir adelante*?`,
+        DSEP,
+        `1️⃣  📅 Coordinar una visita al predio`,
+        `2️⃣  📞 Que me llamen`,
+        `3️⃣  💬 Recibir información por WhatsApp`,
+        DSEP,
         `_Escribí *cancelar* para salir_`,
     ].join('\n');
 }
@@ -393,20 +466,20 @@ async function handlePublicAlquilerP7(session, input) {
 function buildPublicAlquilerConfirmar(ctx) {
     const instagram = String(ctx.alquilerInstagram ?? '');
     const lines = [
-        `🏪 *Confirmar consulta comercial*`,
-        guards_1.SEP,
+        `🏪 *Confirmar consulta — Docks del Puerto*`,
+        DSEP,
         `👤 *${ctx.alquilerNombre ?? ''}*`,
-        ctx.alquilerMarca ? `🏷️ Marca: ${ctx.alquilerMarca}` : null,
+        ctx.alquilerMarca ? `🏷️  Marca: *${ctx.alquilerMarca}*` : null,
         ctx.alquilerRubro ? `🏬 Rubro: ${ctx.alquilerRubro}` : null,
         instagram && instagram !== 'No tiene' ? `📸 ${instagram}` : null,
         ctx.alquilerTipoEspacio ? `📐 Espacio: ${ctx.alquilerTipoEspacio}` : null,
         ctx.alquilerDesdeCuando ? `📅 Inicio: ${ctx.alquilerDesdeCuando}` : null,
         ctx.alquilerSeguimiento ? `📌 Seguimiento: ${ctx.alquilerSeguimiento}` : null,
-        guards_1.SEP,
+        DSEP,
         `¿Los datos están bien?`,
         ``,
-        `1️⃣  ✅ Enviar consulta`,
-        `2️⃣  ✏️ Corregir algo`,
+        `1️⃣  ✅ *Enviar consulta*`,
+        `2️⃣  ✏️  Corregir algo`,
     ];
     return lines.filter(Boolean).join('\n');
 }
@@ -426,6 +499,9 @@ async function handlePublicAlquilerConfirmar(session, input) {
     const desdeCuando = String(ctx.alquilerDesdeCuando ?? '');
     const seguimiento = String(ctx.alquilerSeguimiento ?? '');
     const phone = fmtPhone(session.waNumber);
+    const score = (0, scoring_1.calcularScore)({ rubro, instagramOrWeb: instagram, tipoEspacio, desdeCuando, seguimiento });
+    const temperature = (0, scoring_1.getTemperature)(score);
+    const tempEmoji = { hot: '🔥', warm: '🌡️', cold: '❄️', not_fit: '⛔' };
     const mensaje = [
         marca ? `Marca: ${marca}` : null,
         instagram && instagram !== 'No tiene' ? `Instagram/web: ${instagram}` : null,
@@ -442,11 +518,19 @@ async function handlePublicAlquilerConfirmar(session, input) {
             mensaje,
             fuente: 'whatsapp',
             estado: 'nuevo',
+            score,
+            temperature,
+            lastBotMsgAt: new Date(),
         });
+        const urgencyLine = temperature === 'hot'
+            ? `⚡ _Contactar en los próximos 15 minutos_`
+            : temperature === 'warm'
+                ? `⏰ _Contactar hoy_`
+                : null;
         await notifyAdmins([
-            `🏪 *Nueva consulta comercial*`,
+            `${tempEmoji[temperature]} *Nueva consulta comercial* · Score: ${score}/100`,
             `🏢 Docks del Puerto`,
-            guards_1.SEP,
+            DSEP,
             `👤 *${nombre}*  |  🏷️ ${marca}`,
             `📞 ${phone}`,
             `🏬 Rubro: ${rubro}`,
@@ -454,21 +538,12 @@ async function handlePublicAlquilerConfirmar(session, input) {
             `📐 Busca: ${tipoEspacio}`,
             `📅 Inicio: ${desdeCuando}`,
             seguimiento ? `📌 ${seguimiento}` : null,
-            guards_1.SEP,
+            urgencyLine,
+            DSEP,
             `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
         ].filter((l) => !!l).join('\n'));
         await (0, session_1.navigateTo)(session, 'main', {});
-        return [
-            `✅ *¡Consulta registrada!*`,
-            guards_1.SEP,
-            `Gracias *${nombre}*, recibimos tu consulta.`,
-            seguimiento ? `Quedó registrado: *${seguimiento}*.` : null,
-            `Nuestro equipo comercial te va a contactar a la brevedad.`,
-            ``,
-            `📞 Escribinos cuando quieras.`,
-            guards_1.SEP,
-            `_Docks del Puerto · Shopping & Lifestyle · Tigre_`,
-        ].filter((l) => !!l).join('\n');
+        return buildClosingByTemperature(temperature, nombre);
     }
     catch {
         return (0, guards_1.errorMsg)('No se pudo registrar la consulta. Intentá nuevamente.');
@@ -477,10 +552,14 @@ async function handlePublicAlquilerConfirmar(session, input) {
 // --- Flujo: coordinar visita -------------------------------------------------
 function buildPublicVisitaP1() {
     return [
-        `📅 *Coordinar visita*`,
-        guards_1.SEP,
+        `📅 *Coordinar visita — Docks del Puerto*`,
+        DSEP,
+        `Una visita corta te permite ver ubicación dentro`,
+        `del predio, circulación, tipo de público y espacios reales.`,
+        `Sin compromiso.`,
+        ``,
         `¿Cuál es tu *nombre y apellido*?`,
-        guards_1.SEP,
+        DSEP,
         `0️⃣  Volver`,
     ].join('\n');
 }
@@ -498,10 +577,10 @@ async function handlePublicVisitaP1(session, input) {
 function buildPublicVisitaP2() {
     return [
         `📅 *Coordinar visita*`,
-        guards_1.SEP,
+        DSEP,
         `¿Cuál es tu *marca o rubro*?`,
-        `(ej: indumentaria, deco, cafetería, accesorios)`,
-        guards_1.SEP,
+        `_(ej: indumentaria, deco, accesorios, showroom)_`,
+        DSEP,
         `0️⃣  Cancelar`,
     ].join('\n');
 }
@@ -529,14 +608,15 @@ const HORARIOS_VISITA = {
 function buildPublicVisitaP3() {
     return [
         `📅 *Coordinar visita*`,
-        guards_1.SEP,
-        `¿Qué horario te queda mejor?`,
-        guards_1.SEP,
-        `1️⃣  Mañana`,
-        `2️⃣  Tarde`,
-        `3️⃣  Fin de semana`,
-        `4️⃣  Que me contacten`,
-        guards_1.SEP,
+        DSEP,
+        `¿Qué *horario* te queda mejor para visitar?`,
+        `_(El predio atiende vie-dom y feriados 10-20 hs)_`,
+        DSEP,
+        `1️⃣  ☀️  Mañana`,
+        `2️⃣  🌅  Tarde`,
+        `3️⃣  🗓️  Fin de semana`,
+        `4️⃣  📞 Que me contacten para coordinar`,
+        DSEP,
         `_Escribí *cancelar* para salir_`,
     ].join('\n');
 }
@@ -552,6 +632,9 @@ async function handlePublicVisitaP3(session, input) {
     const nombre = String(ctx.visitaNombre ?? 'Sin nombre');
     const marcaRubro = String(ctx.visitaMarcaRubro ?? '');
     const phone = fmtPhone(session.waNumber);
+    const score = (0, scoring_1.calcularScore)({ rubro: marcaRubro, seguimiento: 'Quiere coordinar una visita' });
+    const temperature = (0, scoring_1.getTemperature)(Math.max(score, 50));
+    const tempEmoji = { hot: '🔥', warm: '🌡️', cold: '❄️', not_fit: '⛔' };
     const mensaje = [`Marca/rubro: ${marcaRubro}`, `Preferencia visita: ${horario}`].join(' | ');
     try {
         const leadId = await (0, db_1.crearLead)({
@@ -562,28 +645,34 @@ async function handlePublicVisitaP3(session, input) {
             mensaje,
             fuente: 'whatsapp',
             estado: 'nuevo',
+            score,
+            temperature,
+            lastBotMsgAt: new Date(),
         });
         await notifyAdmins([
-            `📅 *Nueva visita comercial*`,
+            `${tempEmoji[temperature]} *Visita solicitada* · Score: ${score}/100`,
             `🏢 Docks del Puerto`,
-            guards_1.SEP,
+            DSEP,
             `👤 *${nombre}*`,
             `📞 ${phone}`,
             `🏷️ ${marcaRubro}`,
             `🕐 Preferencia: ${horario}`,
-            guards_1.SEP,
+            temperature === 'hot' ? `⚡ _Confirmar visita en los próximos 60 minutos_` : null,
+            DSEP,
             `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
-        ].join('\n'));
+        ].filter((l) => !!l).join('\n'));
         await (0, session_1.navigateTo)(session, 'main', {});
         return [
-            `✅ *Visita solicitada*`,
-            guards_1.SEP,
-            `Gracias *${nombre}*. Registramos tu interés para visitar Docks del Puerto.`,
+            `📅 *¡Visita solicitada!*`,
+            DSEP,
+            `Gracias *${nombre}*. Registramos tu interés para`,
+            `visitar Docks del Puerto. 🏢`,
+            ``,
             `Preferencia: *${horario}*.`,
             ``,
-            `Un asesor comercial te va a contactar para confirmar día y horario.`,
-            guards_1.SEP,
-            `_Docks del Puerto · Shopping & Lifestyle · Tigre_`,
+            `Un asesor comercial te va a confirmar día y horario.`,
+            DSEP,
+            `_Docks del Puerto · Shopping & Lifestyle · Tigre_ ✨`,
         ].join('\n');
     }
     catch {
@@ -593,16 +682,21 @@ async function handlePublicVisitaP3(session, input) {
 // --- Info: ubicacion y horarios ---------------------------------------------
 function buildPublicUbicacion() {
     return [
-        `ℹ️ *Ubicación y horarios*`,
-        guards_1.SEP,
-        `📍 Docks del Puerto`,
-        `Puerto de Frutos, Tigre.`,
+        `📍 *Ubicación y horarios — Docks del Puerto*`,
+        DSEP,
+        `🗺️ *Dónde estamos*`,
+        `Pedro Guareschi 22, Puerto de Frutos`,
+        `Tigre, Buenos Aires B1648`,
         ``,
-        `Los horarios comerciales pueden variar según temporada, feriados y operación del complejo.`,
-        `Para información actualizada, coordiná con un asesor.`,
-        guards_1.SEP,
-        `1️⃣  Coordinar visita`,
-        `2️⃣  Hablar con asesor`,
+        `📌 *Google Maps:*`,
+        `https://maps.google.com/?q=Pedro+Guareschi+22,+Tigre,+Buenos+Aires`,
+        DSEP,
+        `🕐 *Horarios*`,
+        `Viernes a domingos y feriados`,
+        `*10:00 a 20:00 hs*`,
+        DSEP,
+        `1️⃣  📅 Coordinar una visita`,
+        `2️⃣  💬 Hablar con un asesor`,
         `0️⃣  Volver`,
     ].join('\n');
 }
@@ -622,10 +716,13 @@ async function handlePublicUbicacion(session, input) {
 // --- Flujo: hablar con asesor ------------------------------------------------
 function buildPublicAsesorP1() {
     return [
-        `💬 *Hablar con un asesor*`,
-        guards_1.SEP,
+        `💬 *Hablar con un asesor comercial*`,
+        DSEP,
+        `Te vamos a conectar con alguien del equipo`,
+        `que puede orientarte sobre disponibilidad y propuestas.`,
+        ``,
         `¿Cuál es tu *nombre y apellido*?`,
-        guards_1.SEP,
+        DSEP,
         `0️⃣  Volver`,
     ].join('\n');
 }
@@ -642,11 +739,11 @@ async function handlePublicAsesorP1(session, input) {
 }
 function buildPublicAsesorP2(nombre) {
     return [
-        `💬 *Hablar con un asesor*`,
-        guards_1.SEP,
+        `💬 *Hablar con un asesor comercial*`,
+        DSEP,
         `Hola${nombre ? ` *${trimSafe(nombre)}*` : ''}. ¿Sobre qué querés consultar?`,
-        `(ej: alquiler, visita, disponibilidad, propuesta comercial)`,
-        guards_1.SEP,
+        `_(ej: alquiler, disponibilidad, propuesta comercial, precios)_`,
+        DSEP,
         `0️⃣  Volver`,
     ].join('\n');
 }
@@ -668,24 +765,26 @@ async function handlePublicAsesorP2(session, input) {
             mensaje: consulta,
             fuente: 'whatsapp',
             estado: 'nuevo',
+            lastBotMsgAt: new Date(),
         });
         await notifyAdmins([
             `💬 *Solicitud de asesor comercial*`,
             `🏢 Docks del Puerto`,
-            guards_1.SEP,
+            DSEP,
             `👤 *${nombre}*`,
             `📞 ${phone}`,
             `💬 _"${consulta}"_`,
-            guards_1.SEP,
+            DSEP,
             `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
         ].join('\n'));
         await (0, session_1.navigateTo)(session, 'main', {});
         return [
             `✅ *Consulta registrada*`,
-            guards_1.SEP,
-            `Gracias *${nombre}*. Un asesor comercial te va a responder a la brevedad.`,
-            guards_1.SEP,
-            `_Docks del Puerto · Shopping & Lifestyle · Tigre_`,
+            DSEP,
+            `Gracias *${nombre}*. Un asesor comercial`,
+            `te va a responder a la brevedad.`,
+            DSEP,
+            `_Docks del Puerto · Shopping & Lifestyle · Tigre_ 🏢`,
         ].join('\n');
     }
     catch {
@@ -695,11 +794,13 @@ async function handlePublicAsesorP2(session, input) {
 // --- Flujo: reclamo de locatario --------------------------------------------
 function buildPublicReclamoP1() {
     return [
-        `📢 *Ayuda para locatarios*`,
-        guards_1.SEP,
+        `🔧 *Ayuda para locatarios*`,
+        DSEP,
+        `Registramos tu consulta y la derivamos al área correspondiente.`,
+        ``,
         `Por favor, ¿cuál es tu *nombre* y el *número de tu local*?`,
-        `(ej: _Carlos Rodríguez - Local 214_)`,
-        guards_1.SEP,
+        `_(ej: "Carlos Rodríguez - Local 214")_`,
+        DSEP,
         `0️⃣  Volver`,
     ].join('\n');
 }
@@ -716,11 +817,11 @@ async function handlePublicReclamoP1(session, input) {
 }
 function buildPublicReclamoP2() {
     return [
-        `📢 *Ayuda para locatarios*`,
-        guards_1.SEP,
+        `🔧 *Ayuda para locatarios*`,
+        DSEP,
         `Describí brevemente el *problema o reclamo*:`,
-        `(ej: _Falla la luz en el depósito desde ayer_)`,
-        guards_1.SEP,
+        `_(ej: "Falla la luz en el depósito desde ayer")_`,
+        DSEP,
         `0️⃣  Volver`,
     ].join('\n');
 }
@@ -746,22 +847,23 @@ async function handlePublicReclamoP2(session, input) {
         await notifyAdmins([
             `📢 *Reclamo de locatario*`,
             `🏢 Docks del Puerto`,
-            guards_1.SEP,
+            DSEP,
             `👤 *${nombre}*`,
             `📞 ${phone}`,
             `🔧 _"${reclamo}"_`,
-            guards_1.SEP,
+            DSEP,
             `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
-        ].join('\n'));
+        ].filter((l) => !!l).join('\n'));
         await (0, session_1.navigateTo)(session, 'main', {});
         return [
             `✅ *¡Reclamo registrado!*`,
-            guards_1.SEP,
-            `Recibimos tu reclamo y lo vamos a derivar al área correspondiente.`,
-            `Te vamos a contactar para informarte el estado.`,
+            DSEP,
+            `Recibimos tu reclamo y lo vamos a derivar`,
+            `al área correspondiente. Te contactamos para`,
+            `informarte el estado.`,
             ``,
-            `📞 Si es urgente, también podés llamar a administración.`,
-            guards_1.SEP,
+            `📞 Si es urgente, comunicarte con administración.`,
+            DSEP,
             `_Docks del Puerto 🏢_`,
         ].join('\n');
     }
@@ -773,9 +875,9 @@ async function handlePublicReclamoP2(session, input) {
 function buildPublicMensajeP1() {
     return [
         `✉️  *Dejar un mensaje*`,
-        guards_1.SEP,
+        DSEP,
         `¿Cómo es tu nombre?`,
-        guards_1.SEP,
+        DSEP,
         `0️⃣  Volver`,
     ].join('\n');
 }
@@ -793,10 +895,10 @@ async function handlePublicMensajeP1(session, input) {
 function buildPublicMensajeP2(nombre) {
     return [
         `✉️  *Dejar un mensaje*`,
-        guards_1.SEP,
+        DSEP,
         `Hola${nombre ? ` *${nombre}*` : ''}! ¿Qué querés contarnos?`,
         `(Escribí tu mensaje y lo recibimos enseguida)`,
-        guards_1.SEP,
+        DSEP,
         `0️⃣  Volver`,
     ].join('\n');
 }
@@ -822,21 +924,21 @@ async function handlePublicMensajeP2(session, input) {
         await notifyAdmins([
             `✉️ *Nuevo mensaje de contacto*`,
             `🏢 Docks del Puerto`,
-            guards_1.SEP,
+            DSEP,
             `👤 *${nombre}*`,
             `📞 ${phone}`,
             `💬 _"${mensaje}"_`,
-            guards_1.SEP,
+            DSEP,
             `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
-        ].join('\n'));
+        ].filter((l) => !!l).join('\n'));
         await (0, session_1.navigateTo)(session, 'main', {});
         return [
             `✅ *¡Mensaje recibido!*`,
-            guards_1.SEP,
+            DSEP,
             `Gracias *${nombre}*. Le vamos a dar respuesta a la brevedad.`,
             ``,
             `📞 Si necesitás algo más, escribinos cuando quieras.`,
-            guards_1.SEP,
+            DSEP,
             `_Docks del Puerto 🏢_`,
         ].join('\n');
     }

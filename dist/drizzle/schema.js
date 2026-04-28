@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tareasOperativasEvento = exports.tareasOperativas = exports.rondasEvento = exports.rondasOcurrencia = exports.rondasProgramacion = exports.rondasPlantilla = exports.botSession = exports.botHeartbeat = exports.botQueue = exports.leads = exports.notificaciones = exports.marcacionesEmpleados = exports.empleadoLiquidacionCierre = exports.empleadoAsistenciaAuditoria = exports.empleadoAsistencia = exports.empleados = exports.actualizaciones = exports.reportes = exports.users = void 0;
+exports.tareasOperativasEvento = exports.tareasOperativas = exports.rondasEvento = exports.rondasOcurrencia = exports.rondasProgramacion = exports.rondasPlantilla = exports.botSession = exports.botHeartbeat = exports.cobranzasNotificaciones = exports.cobranzasSaldos = exports.cobranzasImportaciones = exports.locatariosCobranza = exports.botQueue = exports.leads = exports.notificaciones = exports.marcacionesEmpleados = exports.empleadoLiquidacionCierre = exports.empleadoAsistenciaAuditoria = exports.empleadoAsistencia = exports.empleados = exports.actualizaciones = exports.reportes = exports.users = void 0;
 const sqlite_core_1 = require("drizzle-orm/sqlite-core");
 const drizzle_orm_1 = require("drizzle-orm");
 exports.users = (0, sqlite_core_1.sqliteTable)('users', {
@@ -8,7 +8,7 @@ exports.users = (0, sqlite_core_1.sqliteTable)('users', {
     username: (0, sqlite_core_1.text)('username').notNull().unique(),
     password: (0, sqlite_core_1.text)('password').notNull(),
     name: (0, sqlite_core_1.text)('name').notNull(),
-    role: (0, sqlite_core_1.text)('role', { enum: ['admin', 'employee', 'sales'] }).default('employee').notNull(),
+    role: (0, sqlite_core_1.text)('role', { enum: ['admin', 'employee', 'sales', 'collections'] }).default('employee').notNull(),
     waId: (0, sqlite_core_1.text)('wa_id'),
     activo: (0, sqlite_core_1.integer)('activo', { mode: 'boolean' }).default(true).notNull(),
     createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
@@ -160,6 +160,13 @@ exports.leads = (0, sqlite_core_1.sqliteTable)('leads', {
     }).default('nuevo').notNull(),
     notas: (0, sqlite_core_1.text)('notas'),
     fuente: (0, sqlite_core_1.text)('fuente', { enum: ['whatsapp', 'web', 'otro'] }).default('web').notNull(),
+    firstContactedAt: (0, sqlite_core_1.integer)('first_contacted_at', { mode: 'timestamp' }),
+    // Scoring automático
+    score: (0, sqlite_core_1.integer)('score').default(0),
+    temperature: (0, sqlite_core_1.text)('temperature', { enum: ['hot', 'warm', 'cold', 'not_fit'] }),
+    // Follow-up automático
+    autoFollowupCount: (0, sqlite_core_1.integer)('auto_followup_count').default(0),
+    lastBotMsgAt: (0, sqlite_core_1.integer)('last_bot_msg_at', { mode: 'timestamp' }),
     createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
     updatedAt: (0, sqlite_core_1.integer)('updated_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
 });
@@ -174,6 +181,62 @@ exports.botQueue = (0, sqlite_core_1.sqliteTable)('bot_queue', {
     lastAttemptAt: (0, sqlite_core_1.integer)('last_attempt_at', { mode: 'timestamp' }),
     // Heartbeat tracking (para saber si el bot sigue conectado)
     priority: (0, sqlite_core_1.integer)('priority').default(0).notNull(), // 0=normal, 1=alta, 2=urgente
+    createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
+});
+exports.locatariosCobranza = (0, sqlite_core_1.sqliteTable)('locatarios_cobranza', {
+    id: (0, sqlite_core_1.integer)('id').primaryKey({ autoIncrement: true }),
+    nombre: (0, sqlite_core_1.text)('nombre').notNull(),
+    local: (0, sqlite_core_1.text)('local').notNull(),
+    telefonoWa: (0, sqlite_core_1.text)('telefono_wa'),
+    email: (0, sqlite_core_1.text)('email'),
+    cuit: (0, sqlite_core_1.text)('cuit'),
+    activo: (0, sqlite_core_1.integer)('activo', { mode: 'boolean' }).default(true).notNull(),
+    notas: (0, sqlite_core_1.text)('notas'),
+    createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
+    updatedAt: (0, sqlite_core_1.integer)('updated_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
+});
+exports.cobranzasImportaciones = (0, sqlite_core_1.sqliteTable)('cobranzas_importaciones', {
+    id: (0, sqlite_core_1.integer)('id').primaryKey({ autoIncrement: true }),
+    filename: (0, sqlite_core_1.text)('filename').notNull(),
+    sourceType: (0, sqlite_core_1.text)('source_type', { enum: ['pdf', 'xlsx', 'csv', 'manual'] }).notNull(),
+    importedById: (0, sqlite_core_1.integer)('imported_by_id'),
+    importedByName: (0, sqlite_core_1.text)('imported_by_name').notNull(),
+    periodLabel: (0, sqlite_core_1.text)('period_label').notNull(),
+    fechaCorte: (0, sqlite_core_1.text)('fecha_corte'),
+    status: (0, sqlite_core_1.text)('status', { enum: ['importada', 'revisada'] }).default('importada').notNull(),
+    totalRows: (0, sqlite_core_1.integer)('total_rows').default(0).notNull(),
+    parsedRows: (0, sqlite_core_1.integer)('parsed_rows').default(0).notNull(),
+    createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
+});
+exports.cobranzasSaldos = (0, sqlite_core_1.sqliteTable)('cobranzas_saldos', {
+    id: (0, sqlite_core_1.integer)('id').primaryKey({ autoIncrement: true }),
+    importacionId: (0, sqlite_core_1.integer)('importacion_id').notNull(),
+    locatarioId: (0, sqlite_core_1.integer)('locatario_id'),
+    locatarioNombre: (0, sqlite_core_1.text)('locatario_nombre').notNull(),
+    local: (0, sqlite_core_1.text)('local'),
+    periodo: (0, sqlite_core_1.text)('periodo').notNull(),
+    ingreso: (0, sqlite_core_1.integer)('ingreso'),
+    saldo: (0, sqlite_core_1.integer)('saldo').notNull(),
+    diasAtraso: (0, sqlite_core_1.integer)('dias_atraso'),
+    telefonoWa: (0, sqlite_core_1.text)('telefono_wa'),
+    estado: (0, sqlite_core_1.text)('estado', {
+        enum: ['pendiente', 'notificado', 'pagado', 'ignorado', 'error_contacto'],
+    }).default('pendiente').notNull(),
+    rawJson: (0, sqlite_core_1.text)('raw_json'),
+    createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
+    updatedAt: (0, sqlite_core_1.integer)('updated_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
+});
+exports.cobranzasNotificaciones = (0, sqlite_core_1.sqliteTable)('cobranzas_notificaciones', {
+    id: (0, sqlite_core_1.integer)('id').primaryKey({ autoIncrement: true }),
+    saldoId: (0, sqlite_core_1.integer)('saldo_id').notNull(),
+    locatarioId: (0, sqlite_core_1.integer)('locatario_id'),
+    waNumber: (0, sqlite_core_1.text)('wa_number'),
+    message: (0, sqlite_core_1.text)('message').notNull(),
+    status: (0, sqlite_core_1.text)('status', { enum: ['draft', 'queued', 'sent', 'failed', 'skipped'] }).default('draft').notNull(),
+    botQueueId: (0, sqlite_core_1.integer)('bot_queue_id'),
+    sentById: (0, sqlite_core_1.integer)('sent_by_id'),
+    sentByName: (0, sqlite_core_1.text)('sent_by_name').notNull(),
+    sentAt: (0, sqlite_core_1.integer)('sent_at', { mode: 'timestamp' }),
     createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
 });
 // Heartbeat del bot local — registra última vez que el bot hizo polling

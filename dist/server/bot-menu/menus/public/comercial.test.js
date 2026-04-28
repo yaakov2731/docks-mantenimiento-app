@@ -42,11 +42,11 @@ function publicSession(contextData = {}, currentMenu = 'main') {
     });
     (0, vitest_1.it)('shows the conversion-focused public menu', () => {
         const menu = (0, comercial_1.buildPublicMainMenu)();
-        (0, vitest_1.expect)(menu).toContain('Alquilar local o stand');
+        (0, vitest_1.expect)(menu).toContain('alquilar un local');
         (0, vitest_1.expect)(menu).toContain('Coordinar una visita');
-        (0, vitest_1.expect)(menu).toContain('Ubicación y horarios');
+        (0, vitest_1.expect)(menu).toContain('llegar');
         (0, vitest_1.expect)(menu).toContain('Hablar con un asesor');
-        (0, vitest_1.expect)(menu).toContain('Soy locatario y necesito ayuda');
+        (0, vitest_1.expect)(menu).toContain('locatario');
     });
     (0, vitest_1.it)('routes main menu options to the new public flows', async () => {
         const session = publicSession();
@@ -71,7 +71,7 @@ function publicSession(contextData = {}, currentMenu = 'main') {
             alquilerDesdeCuando: 'lo antes posible',
             alquilerSeguimiento: 'Quiere coordinar una visita',
         }, 'public_alquiler_confirmar');
-        await (0, vitest_1.expect)((0, comercial_1.handlePublicAlquilerConfirmar)(session, '1')).resolves.toContain('Consulta registrada');
+        await (0, vitest_1.expect)((0, comercial_1.handlePublicAlquilerConfirmar)(session, '1')).resolves.toContain('registrada');
         (0, vitest_1.expect)(dbMock.crearLead).toHaveBeenCalledWith(vitest_1.expect.objectContaining({
             nombre: 'Laura Perez',
             telefono: '5491111111111',

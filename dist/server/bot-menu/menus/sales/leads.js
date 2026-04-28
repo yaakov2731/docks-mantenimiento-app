@@ -77,6 +77,37 @@ function estadoLeadEmoji(estado) {
         default: return '⚪';
     }
 }
+function formatLeadDateTime(value) {
+    if (!value)
+        return '—';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime()))
+        return '—';
+    return date.toLocaleString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+function formatLeadElapsed(fromValue, toValue = new Date()) {
+    if (!fromValue)
+        return '—';
+    const from = fromValue instanceof Date ? fromValue : new Date(fromValue);
+    const to = toValue instanceof Date ? toValue : new Date(toValue);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()))
+        return '—';
+    const minutes = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000));
+    if (minutes < 60)
+        return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (hours < 24)
+        return rest ? `${hours}h ${rest}m` : `${hours}h`;
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
+}
 async function getMisLeads(userId) {
     const todos = await db.select().from(schema.leads).where((0, drizzle_orm_1.eq)(schema.leads.asignadoId, userId));
     return todos.sort((a, b) => {
@@ -106,7 +137,7 @@ async function buildLeadsLista(session) {
     paged.items.forEach((l, i) => {
         const n = i + 1;
         const contacto = l.telefono ?? l.email ?? l.waId ?? '—';
-        lines.push(`${n}️⃣  ${estadoLeadEmoji(l.estado)} *${l.nombre}*`, `   📞 ${contacto} | ${l.rubro ?? 'Sin rubro'} | ${l.estado}`);
+        lines.push(`${n}️⃣  ${estadoLeadEmoji(l.estado)} *${l.nombre}*`, `   📞 ${contacto} | ${l.rubro ?? 'Sin rubro'} | ${l.estado}`, `   🕒 Recibido: ${formatLeadDateTime(l.createdAt)} | ${l.firstContactedAt ? `respondido en ${formatLeadElapsed(l.createdAt, l.firstContactedAt)}` : `sin respuesta ${formatLeadElapsed(l.createdAt)}`}`);
     });
     lines.push(guards_1.SEP);
     if (paged.hasPrev)
@@ -148,6 +179,10 @@ function buildLeadDetalle(lead) {
         lead.rubro ? `🏪 Rubro: ${lead.rubro}` : '',
         lead.tipoLocal ? `🏢 Tipo de local: ${lead.tipoLocal}` : '',
         lead.mensaje ? `💬 Consulta: ${lead.mensaje}` : '',
+        `🕒 Recibido: ${formatLeadDateTime(lead.createdAt)}`,
+        lead.firstContactedAt
+            ? `✅ Primer contacto: ${formatLeadDateTime(lead.firstContactedAt)} (${formatLeadElapsed(lead.createdAt, lead.firstContactedAt)})`
+            : `⏳ Sin respuesta hace ${formatLeadElapsed(lead.createdAt)}`,
         guards_1.SEP,
         `Estado: ${estadoLeadEmoji(lead.estado)} *${lead.estado}*`,
         lead.notas ? `📝 Notas: ${lead.notas}` : '',
@@ -177,10 +212,7 @@ async function handleLeadDetalle(session, input) {
     const nuevoEstado = ESTADOS[input];
     if (nuevoEstado) {
         try {
-            await db.update(schema.leads).set({
-                estado: nuevoEstado,
-                updatedAt: new Date(),
-            }).where((0, drizzle_orm_1.eq)(schema.leads.id, leadId)).run();
+            await (0, db_1.actualizarLead)(leadId, { estado: nuevoEstado });
             await (0, session_1.navigateBack)(session);
             return `✅ Lead actualizado a *${nuevoEstado}*.\n\n0️⃣  Volver`;
         }
@@ -496,6 +528,7 @@ function buildLeadLibreDetalle(lead) {
         lead.rubro ? `🏪 Rubro: ${lead.rubro}` : '',
         lead.mensaje ? `💬 "${lead.mensaje}"` : '',
         lead.fuente === 'whatsapp' ? `📱 Vino por WhatsApp` : `🌐 Vino por web`,
+        `🕒 Recibido: ${formatLeadDateTime(lead.createdAt)} | ${lead.firstContactedAt ? `respondido en ${formatLeadElapsed(lead.createdAt, lead.firstContactedAt)}` : `sin respuesta ${formatLeadElapsed(lead.createdAt)}`}`,
         guards_1.SEP,
         `1️⃣  ✋ Tomar este lead`,
         `0️⃣  Volver`,

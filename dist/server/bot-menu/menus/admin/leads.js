@@ -23,6 +23,37 @@ function estadoLeadEmoji(estado) {
         default: return '⚪';
     }
 }
+function formatLeadDateTime(value) {
+    if (!value)
+        return '—';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime()))
+        return '—';
+    return date.toLocaleString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+function formatLeadElapsed(fromValue, toValue = new Date()) {
+    if (!fromValue)
+        return '—';
+    const from = fromValue instanceof Date ? fromValue : new Date(fromValue);
+    const to = toValue instanceof Date ? toValue : new Date(toValue);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()))
+        return '—';
+    const minutes = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000));
+    if (minutes < 60)
+        return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (hours < 24)
+        return rest ? `${hours}h ${rest}m` : `${hours}h`;
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
+}
 // ─── admin_leads_sin_asignar ──────────────────────────────────────────────────
 async function buildAdminLeadsSinAsignar(session) {
     const leads = await (0, db_1.listUnassignedLeads)();
@@ -43,7 +74,7 @@ async function buildAdminLeadsSinAsignar(session) {
     ];
     paged.items.forEach((lead, index) => {
         const num = (page - 1) * PAGE_SIZE + index + 1;
-        lines.push(`${num}️⃣  *${lead.nombre ?? 'Sin nombre'}* — ${lead.rubro ?? '—'}`, `   ${estadoLeadEmoji(lead.estado)} ${lead.estado} | ${lead.telefono ?? '—'}`);
+        lines.push(`${num}️⃣  *${lead.nombre ?? 'Sin nombre'}* — ${lead.rubro ?? '—'}`, `   ${estadoLeadEmoji(lead.estado)} ${lead.estado} | ${lead.telefono ?? '—'}`, `   🕒 Recibido: ${formatLeadDateTime(lead.createdAt)} | sin respuesta ${formatLeadElapsed(lead.createdAt)}`);
     });
     lines.push(guards_1.SEP);
     if (paged.hasPrev)
@@ -83,6 +114,10 @@ function buildAdminLeadDetalle(lead) {
         `🏢 Tipo local: ${lead.tipoLocal ?? '—'}`,
         lead.mensaje ? `💬 Mensaje: "${lead.mensaje}"` : null,
         `📌 Estado: ${estadoLeadEmoji(lead.estado)} ${lead.estado}`,
+        `🕒 Recibido: ${formatLeadDateTime(lead.createdAt)}`,
+        lead.firstContactedAt
+            ? `✅ Primer contacto: ${formatLeadDateTime(lead.firstContactedAt)} (${formatLeadElapsed(lead.createdAt, lead.firstContactedAt)})`
+            : `⏳ Sin respuesta hace ${formatLeadElapsed(lead.createdAt)}`,
         guards_1.SEP,
         `1️⃣  👤 Asignar a vendedor`,
         `0️⃣  Volver`,

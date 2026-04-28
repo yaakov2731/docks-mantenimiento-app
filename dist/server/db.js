@@ -103,6 +103,18 @@ exports.getNotificaciones = getNotificaciones;
 exports.crearNotificacion = crearNotificacion;
 exports.actualizarNotificacion = actualizarNotificacion;
 exports.eliminarNotificacion = eliminarNotificacion;
+exports.listLocatariosCobranza = listLocatariosCobranza;
+exports.upsertLocatarioCobranza = upsertLocatarioCobranza;
+exports.saveCobranzaImportacion = saveCobranzaImportacion;
+exports.listCobranzaImportaciones = listCobranzaImportaciones;
+exports.listCobranzaSaldos = listCobranzaSaldos;
+exports.getCobranzaSaldoById = getCobranzaSaldoById;
+exports.updateCobranzaSaldoEstado = updateCobranzaSaldoEstado;
+exports.updateCobranzaSaldoContacto = updateCobranzaSaldoContacto;
+exports.getCobranzaNotificationsBySaldoIds = getCobranzaNotificationsBySaldoIds;
+exports.createCobranzaNotification = createCobranzaNotification;
+exports.listCobranzaNotificaciones = listCobranzaNotificaciones;
+exports.clearCobranzaLista = clearCobranzaLista;
 exports.enqueueBotMessage = enqueueBotMessage;
 exports.getPendingBotMessages = getPendingBotMessages;
 exports.markBotMessageSent = markBotMessageSent;
@@ -141,6 +153,8 @@ exports.getLeadById = getLeadById;
 exports.deleteLeadById = deleteLeadById;
 exports.listUnassignedLeads = listUnassignedLeads;
 exports.actualizarLead = actualizarLead;
+exports.getLeadsForFollowup = getLeadsForFollowup;
+exports.updateLeadFollowup = updateLeadFollowup;
 exports.crearTareaOperativaManual = crearTareaOperativaManual;
 exports.limpiarDatosDemo = limpiarDatosDemo;
 exports.reiniciarMetricasOperacion = reiniciarMetricasOperacion;
@@ -340,6 +354,7 @@ async function initDb() {
       estado TEXT NOT NULL DEFAULT 'nuevo',
       notas TEXT,
       fuente TEXT NOT NULL DEFAULT 'web',
+      first_contacted_at INTEGER,
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
@@ -454,6 +469,60 @@ async function initDb() {
       metadata_json TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+        `CREATE TABLE IF NOT EXISTS locatarios_cobranza (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      local TEXT NOT NULL,
+      telefono_wa TEXT,
+      email TEXT,
+      cuit TEXT,
+      activo INTEGER NOT NULL DEFAULT 1,
+      notas TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+        `CREATE TABLE IF NOT EXISTS cobranzas_importaciones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      imported_by_id INTEGER,
+      imported_by_name TEXT NOT NULL,
+      period_label TEXT NOT NULL,
+      fecha_corte TEXT,
+      status TEXT NOT NULL DEFAULT 'importada',
+      total_rows INTEGER NOT NULL DEFAULT 0,
+      parsed_rows INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+        `CREATE TABLE IF NOT EXISTS cobranzas_saldos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      importacion_id INTEGER NOT NULL,
+      locatario_id INTEGER,
+      locatario_nombre TEXT NOT NULL,
+      local TEXT,
+      periodo TEXT NOT NULL,
+      ingreso INTEGER,
+      saldo INTEGER NOT NULL,
+      dias_atraso INTEGER,
+      telefono_wa TEXT,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      raw_json TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+        `CREATE TABLE IF NOT EXISTS cobranzas_notificaciones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      saldo_id INTEGER NOT NULL,
+      locatario_id INTEGER,
+      wa_number TEXT,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'draft',
+      bot_queue_id INTEGER,
+      sent_by_id INTEGER,
+      sent_by_name TEXT NOT NULL,
+      sent_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
     ];
     for (const sql of stmts) {
         await client.execute(sql);
@@ -462,6 +531,9 @@ async function initDb() {
         `CREATE UNIQUE INDEX IF NOT EXISTS tareas_operativas_unica_activa_por_empleado
       ON tareas_operativas(empleado_id)
       WHERE estado = 'en_progreso'`,
+        `CREATE INDEX IF NOT EXISTS cobranzas_saldos_importacion_idx ON cobranzas_saldos(importacion_id)`,
+        `CREATE INDEX IF NOT EXISTS cobranzas_saldos_estado_idx ON cobranzas_saldos(estado)`,
+        `CREATE INDEX IF NOT EXISTS cobranzas_notificaciones_saldo_idx ON cobranzas_notificaciones(saldo_id)`,
     ];
     for (const sql of indexStmts) {
         try {
@@ -480,6 +552,7 @@ async function initDb() {
         `ALTER TABLE reportes ADD COLUMN asignacion_respondida_at INTEGER`,
         `ALTER TABLE leads ADD COLUMN asignado_a TEXT`,
         `ALTER TABLE leads ADD COLUMN asignado_id INTEGER`,
+        `ALTER TABLE leads ADD COLUMN first_contacted_at INTEGER`,
         `ALTER TABLE bot_queue ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0`,
         `ALTER TABLE bot_queue ADD COLUMN error_msg TEXT`,
         `ALTER TABLE bot_queue ADD COLUMN last_attempt_at INTEGER`,
@@ -504,6 +577,10 @@ async function initDb() {
         `ALTER TABLE rondas_ocurrencia ADD COLUMN reasignado_at INTEGER`,
         `ALTER TABLE rondas_ocurrencia ADD COLUMN reasignado_por_user_id INTEGER`,
         `ALTER TABLE rondas_ocurrencia ADD COLUMN reasignado_por_nombre TEXT`,
+        `ALTER TABLE leads ADD COLUMN score INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE leads ADD COLUMN temperature TEXT`,
+        `ALTER TABLE leads ADD COLUMN auto_followup_count INTEGER`,
+        `ALTER TABLE leads ADD COLUMN last_bot_msg_at INTEGER`,
     ];
     for (const sql of alterStmts) {
         try {
@@ -512,6 +589,17 @@ async function initDb() {
         catch (_error) {
             // Column already exists in upgraded databases.
         }
+    }
+    try {
+        await client.execute(`
+      UPDATE leads
+      SET first_contacted_at = updated_at
+      WHERE first_contacted_at IS NULL
+        AND estado IN ('contactado', 'visito', 'cerrado')
+    `);
+    }
+    catch (_error) {
+        // Older databases are upgraded by the ALTER loop above; keep boot resilient.
     }
     console.log('[DB] Tables ready');
 }
@@ -1541,12 +1629,164 @@ async function actualizarNotificacion(id, data) {
 async function eliminarNotificacion(id) {
     await exports.db.delete(schema.notificaciones).where((0, drizzle_orm_1.eq)(schema.notificaciones.id, id)).run();
 }
+function normalizeCobranzaKey(value) {
+    return String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+function findMatchingLocatario(row, locatarios) {
+    const localKey = normalizeCobranzaKey(row.local);
+    if (localKey) {
+        const byLocal = locatarios.filter((locatario) => normalizeCobranzaKey(locatario.local) === localKey);
+        if (byLocal.length === 1)
+            return byLocal[0];
+    }
+    const nameKey = normalizeCobranzaKey(row.locatarioNombre);
+    if (!nameKey)
+        return null;
+    const byName = locatarios.filter((locatario) => normalizeCobranzaKey(locatario.nombre) === nameKey);
+    if (byName.length === 1)
+        return byName[0];
+    return null;
+}
+async function listLocatariosCobranza() {
+    const rows = await exports.db.select().from(schema.locatariosCobranza);
+    return rows
+        .filter((row) => row.activo === true)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+async function upsertLocatarioCobranza(data) {
+    const payload = {
+        nombre: data.nombre.trim(),
+        local: data.local.trim(),
+        telefonoWa: normalizeWaNumber(data.telefonoWa) || null,
+        email: data.email?.trim() || null,
+        cuit: data.cuit?.trim() || null,
+        notas: data.notas?.trim() || null,
+        updatedAt: new Date(),
+    };
+    if (data.id) {
+        await exports.db.update(schema.locatariosCobranza).set(payload).where((0, drizzle_orm_1.eq)(schema.locatariosCobranza.id, data.id)).run();
+        return data.id;
+    }
+    const rows = await exports.db.insert(schema.locatariosCobranza).values({
+        ...payload,
+        activo: true,
+    }).returning({ id: schema.locatariosCobranza.id });
+    return rows[0].id;
+}
+async function saveCobranzaImportacion(input) {
+    const locatarios = await listLocatariosCobranza();
+    const importRows = await exports.db.insert(schema.cobranzasImportaciones).values({
+        filename: input.filename,
+        sourceType: input.sourceType,
+        importedById: input.importedBy.id,
+        importedByName: input.importedBy.name,
+        periodLabel: input.periodLabel,
+        fechaCorte: input.fechaCorte || null,
+        totalRows: input.totalRows,
+        parsedRows: input.rows.length,
+    }).returning({ id: schema.cobranzasImportaciones.id });
+    const importacionId = importRows[0].id;
+    for (const row of input.rows) {
+        const locatario = findMatchingLocatario(row, locatarios);
+        const telefonoWa = normalizeWaNumber(row.telefonoWa) || locatario?.telefonoWa || null;
+        await exports.db.insert(schema.cobranzasSaldos).values({
+            importacionId,
+            locatarioId: locatario?.id ?? null,
+            locatarioNombre: row.locatarioNombre.trim(),
+            local: row.local?.trim() || locatario?.local || null,
+            periodo: row.periodo || input.periodLabel,
+            ingreso: row.ingreso ?? null,
+            saldo: Math.round(row.saldo),
+            diasAtraso: row.diasAtraso ?? null,
+            telefonoWa,
+            estado: telefonoWa ? 'pendiente' : 'error_contacto',
+            rawJson: JSON.stringify(row.raw ?? row),
+        }).run();
+    }
+    return { id: importacionId, creados: input.rows.length };
+}
+async function listCobranzaImportaciones() {
+    return exports.db.select().from(schema.cobranzasImportaciones).orderBy((0, drizzle_orm_1.desc)(schema.cobranzasImportaciones.createdAt));
+}
+async function listCobranzaSaldos(filters) {
+    const conds = [];
+    if (filters?.estado)
+        conds.push((0, drizzle_orm_1.eq)(schema.cobranzasSaldos.estado, filters.estado));
+    if (filters?.importacionId)
+        conds.push((0, drizzle_orm_1.eq)(schema.cobranzasSaldos.importacionId, filters.importacionId));
+    if (filters?.busqueda) {
+        conds.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema.cobranzasSaldos.locatarioNombre, `%${filters.busqueda}%`), (0, drizzle_orm_1.like)(schema.cobranzasSaldos.local, `%${filters.busqueda}%`)));
+    }
+    return exports.db.select().from(schema.cobranzasSaldos)
+        .where(conds.length ? (0, drizzle_orm_1.and)(...conds) : undefined)
+        .orderBy((0, drizzle_orm_1.desc)(schema.cobranzasSaldos.createdAt));
+}
+async function getCobranzaSaldoById(id) {
+    const rows = await exports.db.select().from(schema.cobranzasSaldos).where((0, drizzle_orm_1.eq)(schema.cobranzasSaldos.id, id));
+    return rows[0] ?? null;
+}
+async function updateCobranzaSaldoEstado(id, estado) {
+    await exports.db.update(schema.cobranzasSaldos).set({ estado, updatedAt: new Date() }).where((0, drizzle_orm_1.eq)(schema.cobranzasSaldos.id, id)).run();
+}
+async function updateCobranzaSaldoContacto(id, telefonoWa, locatarioId) {
+    await exports.db.update(schema.cobranzasSaldos).set({
+        telefonoWa: normalizeWaNumber(telefonoWa) || null,
+        locatarioId: locatarioId ?? null,
+        estado: normalizeWaNumber(telefonoWa) ? 'pendiente' : 'error_contacto',
+        updatedAt: new Date(),
+    }).where((0, drizzle_orm_1.eq)(schema.cobranzasSaldos.id, id)).run();
+}
+async function getCobranzaNotificationsBySaldoIds(saldoIds) {
+    if (saldoIds.length === 0)
+        return [];
+    return exports.db.select().from(schema.cobranzasNotificaciones)
+        .where((0, drizzle_orm_1.inArray)(schema.cobranzasNotificaciones.saldoId, saldoIds));
+}
+async function createCobranzaNotification(input) {
+    const rows = await exports.db.insert(schema.cobranzasNotificaciones).values({
+        saldoId: input.saldo.id,
+        locatarioId: input.saldo.locatarioId ?? null,
+        waNumber: normalizeWaNumber(input.waNumber) || null,
+        message: input.message,
+        status: input.status,
+        botQueueId: input.botQueueId ?? null,
+        sentById: input.sentBy.id,
+        sentByName: input.sentBy.name,
+        sentAt: input.status === 'queued' ? new Date() : null,
+    }).returning({ id: schema.cobranzasNotificaciones.id });
+    return rows[0].id;
+}
+async function listCobranzaNotificaciones() {
+    return exports.db.select().from(schema.cobranzasNotificaciones).orderBy((0, drizzle_orm_1.desc)(schema.cobranzasNotificaciones.createdAt));
+}
+async function clearCobranzaLista() {
+    const [notificaciones, saldos, importaciones] = await Promise.all([
+        exports.db.select().from(schema.cobranzasNotificaciones),
+        exports.db.select().from(schema.cobranzasSaldos),
+        exports.db.select().from(schema.cobranzasImportaciones),
+    ]);
+    await exports.db.delete(schema.cobranzasNotificaciones).run();
+    await exports.db.delete(schema.cobranzasSaldos).run();
+    await exports.db.delete(schema.cobranzasImportaciones).run();
+    return {
+        notificaciones: notificaciones.length,
+        saldos: saldos.length,
+        importaciones: importaciones.length,
+        total: notificaciones.length + saldos.length + importaciones.length,
+    };
+}
 // --- BOT QUEUE ---
 async function enqueueBotMessage(waNumber, message) {
     const normalized = normalizeWaNumber(waNumber);
     if (!normalized)
-        return;
-    await exports.db.insert(schema.botQueue).values({ waNumber: normalized, message }).run();
+        return null;
+    const rows = await exports.db.insert(schema.botQueue).values({ waNumber: normalized, message }).returning({ id: schema.botQueue.id });
+    return rows[0]?.id ?? null;
 }
 async function getPendingBotMessages() {
     return exports.db.select().from(schema.botQueue).where((0, drizzle_orm_1.eq)(schema.botQueue.status, 'pending'));
@@ -2007,7 +2247,34 @@ async function listUnassignedLeads() {
     return all.filter((l) => !l.asignadoId && !['cerrado', 'descartado'].includes(l.estado));
 }
 async function actualizarLead(id, data) {
-    await exports.db.update(schema.leads).set({ ...data, updatedAt: new Date() }).where((0, drizzle_orm_1.eq)(schema.leads.id, id)).run();
+    const updateData = { ...data, updatedAt: new Date() };
+    if (data.estado &&
+        ['contactado', 'visito', 'cerrado'].includes(data.estado) &&
+        data.firstContactedAt === undefined) {
+        const current = await getLeadById(id);
+        if (current && !current.firstContactedAt) {
+            updateData.firstContactedAt = new Date();
+        }
+    }
+    await exports.db.update(schema.leads).set(updateData).where((0, drizzle_orm_1.eq)(schema.leads.id, id)).run();
+}
+async function getLeadsForFollowup() {
+    const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+    const cutoff = new Date(Date.now() - TWO_DAYS_MS);
+    const rows = await exports.db
+        .select()
+        .from(schema.leads)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.leads.estado, 'nuevo'), (0, drizzle_orm_1.isNotNull)(schema.leads.waId), (0, drizzle_orm_1.isNotNull)(schema.leads.temperature), (0, drizzle_orm_1.isNotNull)(schema.leads.lastBotMsgAt), (0, drizzle_orm_1.lt)(schema.leads.autoFollowupCount ?? 0, 2)));
+    return rows.filter(l => l.temperature !== 'not_fit' &&
+        l.createdAt != null &&
+        new Date(l.createdAt).getTime() >= cutoff.getTime());
+}
+async function updateLeadFollowup(id, newCount) {
+    await exports.db
+        .update(schema.leads)
+        .set({ autoFollowupCount: newCount, lastBotMsgAt: new Date(), updatedAt: new Date() })
+        .where((0, drizzle_orm_1.eq)(schema.leads.id, id))
+        .run();
 }
 async function crearTareaOperativaManual(data) {
     const rows = await exports.db.insert(schema.tareasOperativas).values({
@@ -2367,7 +2634,18 @@ function isDemoRecord(values) {
 function normalizeWaNumber(value) {
     if (!value)
         return '';
-    return value.replace(/\D/g, '');
+    const digits = value.replace(/\D/g, '');
+    if (!digits)
+        return '';
+    if (digits.startsWith('549'))
+        return digits;
+    if (digits.startsWith('54'))
+        return `549${digits.slice(2)}`;
+    if (digits.startsWith('9'))
+        return `54${digits}`;
+    if (digits.length >= 8)
+        return `549${digits.replace(/^0+/, '')}`;
+    return digits;
 }
 function mapLegacyFuenteToAttendanceChannel(fuente) {
     return fuente === 'whatsapp' ? 'whatsapp' : 'panel';
