@@ -2,7 +2,7 @@ import { useState } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
-import { Phone, Mail, MessageCircle, Calendar, X, Trash2, Bot } from 'lucide-react'
+import { Phone, Mail, MessageCircle, Calendar, X, Trash2, Clock, Bot } from 'lucide-react'
 
 const ESTADOS_LEAD = [
   { value: 'nuevo', label: 'Nuevo', color: '#2563EB' },
@@ -21,17 +21,51 @@ function Badge({ value }: { value: string }) {
   )
 }
 
+function toDate(value: unknown): Date | null {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value as string | number)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function formatDateTime(value: unknown) {
+  const date = toDate(value)
+  if (!date) return ''
+  return date.toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatElapsed(fromValue: unknown, toValue: unknown = new Date()) {
+  const from = toDate(fromValue)
+  const to = toDate(toValue)
+  if (!from || !to) return ''
+  const minutes = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000))
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (hours < 24) return rest ? `${hours}h ${rest}m` : `${hours}h`
+  const days = Math.floor(hours / 24)
+  const remainingHours = hours % 24
+  return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`
+}
+
 export default function Leads() {
   const [filterEstado, setFilterEstado] = useState('')
   const [selected, setSelected] = useState<number | null>(null)
   const [turnoForm, setTurnoForm] = useState({ fecha: '', hora: '', notas: '' })
   const [asignadoId, setAsignadoId] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [botLeadId, setBotLeadId] = useState<number | null>(null)
 
   const utils = trpc.useContext()
   const { data: leads = [], refetch } = trpc.leads.listar.useQuery({ estado: filterEstado || undefined })
   const { data: lead } = trpc.leads.obtener.useQuery({ id: selected! }, { enabled: !!selected })
   const { data: comerciales = [] } = trpc.usuarios.listarComerciales.useQuery()
+  const botLead = botLeadId ? leads.find(l => l.id === botLeadId) : null
   const eliminar = trpc.leads.eliminar.useMutation({
     onSuccess: () => { setSelected(null); refetch() },
   })
@@ -50,6 +84,7 @@ export default function Leads() {
   const asignarBot = trpc.leads.asignarBot.useMutation({
     onSuccess: async () => {
       setFeedback('Lead asignado al bot comercial y respuesta automática encolada por WhatsApp.')
+      setBotLeadId(null)
       await refetch()
       if (selected) await utils.leads.obtener.invalidate({ id: selected })
     },
@@ -91,13 +126,49 @@ export default function Leads() {
         <Button variant="secondary" onClick={exportLeads}>Exportar Excel</Button>
       </div>
 
+      <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-col md:flex-row md:items-center gap-3 justify-between">
+        <div>
+          <div className="text-sm font-semibold text-amber-950">Mensaje automático del bot</div>
+          <div className="text-xs text-amber-800">
+            Seleccioná un lead de la lista y el bot le envía el primer mensaje para generar interés.
+          </div>
+          {botLead && (
+            <div className="mt-1 text-xs text-amber-900">
+              Seleccionado: <strong>{botLead.nombre}</strong>
+            </div>
+          )}
+        </div>
+        <Button
+          size="sm"
+          disabled={!botLead || asignarBot.isLoading || (!botLead.waId && !botLead.telefono)}
+          loading={asignarBot.isLoading}
+          onClick={() => {
+            if (!botLead) return
+            setFeedback('')
+            asignarBot.mutate({ id: botLead.id })
+          }}
+        >
+          <Bot size={14} />
+          Enviar mensaje del bot
+        </Button>
+        {botLead && !botLead.waId && !botLead.telefono && (
+          <div className="text-xs text-amber-700">Ese lead no tiene WhatsApp o teléfono cargado.</div>
+        )}
+      </div>
+
+      {feedback && !selected && (
+        <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {feedback}
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {leads.length === 0 ? (
           <div className="col-span-3 bg-white rounded-xl p-12 text-center shadow-sm text-gray-400">
             No hay leads registrados
           </div>
         ) : leads.map(l => (
-          <div key={l.id} className="bg-white rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+          <div key={l.id} className={`bg-white rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow border ${botLeadId === l.id ? 'border-amber-400 ring-2 ring-amber-100' : 'border-gray-100'}`}
             onClick={() => setSelected(l.id)}>
             <div className="flex items-start justify-between mb-2">
               <div className="min-w-0 flex-1">
@@ -123,11 +194,32 @@ export default function Leads() {
               {l.telefono && <div className="flex items-center gap-1.5"><Phone size={11}/>{l.telefono}</div>}
               {l.email && <div className="flex items-center gap-1.5"><Mail size={11}/>{l.email}</div>}
               {l.waId && <div className="flex items-center gap-1.5"><MessageCircle size={11}/>WA: {l.waId}</div>}
-                {l.turnoFecha && <div className="flex items-center gap-1.5 text-primary font-medium"><Calendar size={11}/>Turno: {l.turnoFecha} {l.turnoHora}</div>}
+              {l.turnoFecha && <div className="flex items-center gap-1.5 text-primary font-medium"><Calendar size={11}/>Turno: {l.turnoFecha} {l.turnoHora}</div>}
               {(l as any).asignadoA && <div className="text-[11px] text-emerald-600 font-medium">Asignado a {(l as any).asignadoA}</div>}
             </div>
-            <div className="mt-3 text-xs text-gray-400">
-              {l.fuente === 'whatsapp' ? '📱 WhatsApp' : '🌐 Web'} · {l.createdAt ? new Date(l.createdAt).toLocaleDateString('es-AR') : ''}
+            <div className="mt-3 space-y-1 text-xs text-gray-400">
+              <div>{l.fuente === 'whatsapp' ? '📱 WhatsApp' : '🌐 Web'} · Recibido {formatDateTime(l.createdAt)}</div>
+              <div className={`flex items-center gap-1.5 ${(l as any).firstContactedAt ? 'text-emerald-600' : 'text-amber-600'}`}>
+                <Clock size={11}/>
+                {(l as any).firstContactedAt
+                  ? `Respondido en ${formatElapsed(l.createdAt, (l as any).firstContactedAt)}`
+                  : `Sin respuesta hace ${formatElapsed(l.createdAt)}`}
+              </div>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <Button
+                size="sm"
+                variant={botLeadId === l.id ? 'default' : 'outline'}
+                disabled={!l.waId && !l.telefono}
+                onClick={e => {
+                  e.stopPropagation()
+                  setBotLeadId(botLeadId === l.id ? null : l.id)
+                  setFeedback('')
+                }}
+              >
+                <Bot size={13} />
+                {botLeadId === l.id ? 'Seleccionado' : 'Seleccionar bot'}
+              </Button>
             </div>
           </div>
         ))}
@@ -172,6 +264,13 @@ export default function Leads() {
                 {lead.rubro && <div><span className="text-gray-400">Rubro:</span> {lead.rubro}</div>}
                 {lead.tipoLocal && <div><span className="text-gray-400">Tipo local:</span> {lead.tipoLocal}</div>}
                 {(lead as any).asignadoA && <div><span className="text-gray-400">Asignado a:</span> {(lead as any).asignadoA}</div>}
+                <div><span className="text-gray-400">Recibido:</span> {formatDateTime(lead.createdAt)}</div>
+                <div>
+                  <span className="text-gray-400">Respuesta:</span>{' '}
+                  {(lead as any).firstContactedAt
+                    ? `${formatDateTime((lead as any).firstContactedAt)} (${formatElapsed(lead.createdAt, (lead as any).firstContactedAt)})`
+                    : `pendiente hace ${formatElapsed(lead.createdAt)}`}
+                </div>
               </div>
               {lead.mensaje && (
                 <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600 italic">"{lead.mensaje}"</div>
@@ -230,7 +329,6 @@ export default function Leads() {
                         id: lead.id,
                         asignadoId: comercial.id,
                         asignadoA: comercial.name,
-                        estado: lead.estado === 'nuevo' ? 'contactado' : lead.estado,
                       })
                     }}
                     loading={actualizar.isLoading}
