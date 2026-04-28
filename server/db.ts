@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client'
 import { drizzle } from 'drizzle-orm/libsql'
-import { eq, and, or, like, inArray, sql, desc, not, isNull } from 'drizzle-orm'
+import { eq, and, or, like, inArray, sql, desc, not, isNull, isNotNull, lt } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import * as schema from '../drizzle/schema'
 import { readEnv } from './_core/env'
@@ -177,6 +177,10 @@ export async function initDb() {
       wa_number TEXT NOT NULL,
       message TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      error_msg TEXT,
+      last_attempt_at INTEGER,
+      priority INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
     `CREATE TABLE IF NOT EXISTS leads (
@@ -195,6 +199,7 @@ export async function initDb() {
       estado TEXT NOT NULL DEFAULT 'nuevo',
       notas TEXT,
       fuente TEXT NOT NULL DEFAULT 'web',
+      first_contacted_at INTEGER,
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
@@ -309,6 +314,60 @@ export async function initDb() {
       metadata_json TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    `CREATE TABLE IF NOT EXISTS locatarios_cobranza (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      local TEXT NOT NULL,
+      telefono_wa TEXT,
+      email TEXT,
+      cuit TEXT,
+      activo INTEGER NOT NULL DEFAULT 1,
+      notas TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS cobranzas_importaciones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      imported_by_id INTEGER,
+      imported_by_name TEXT NOT NULL,
+      period_label TEXT NOT NULL,
+      fecha_corte TEXT,
+      status TEXT NOT NULL DEFAULT 'importada',
+      total_rows INTEGER NOT NULL DEFAULT 0,
+      parsed_rows INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS cobranzas_saldos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      importacion_id INTEGER NOT NULL,
+      locatario_id INTEGER,
+      locatario_nombre TEXT NOT NULL,
+      local TEXT,
+      periodo TEXT NOT NULL,
+      ingreso INTEGER,
+      saldo INTEGER NOT NULL,
+      dias_atraso INTEGER,
+      telefono_wa TEXT,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      raw_json TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS cobranzas_notificaciones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      saldo_id INTEGER NOT NULL,
+      locatario_id INTEGER,
+      wa_number TEXT,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'draft',
+      bot_queue_id INTEGER,
+      sent_by_id INTEGER,
+      sent_by_name TEXT NOT NULL,
+      sent_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
   ]
   for (const sql of stmts) {
     await client.execute(sql)
@@ -317,6 +376,9 @@ export async function initDb() {
     `CREATE UNIQUE INDEX IF NOT EXISTS tareas_operativas_unica_activa_por_empleado
       ON tareas_operativas(empleado_id)
       WHERE estado = 'en_progreso'`,
+    `CREATE INDEX IF NOT EXISTS cobranzas_saldos_importacion_idx ON cobranzas_saldos(importacion_id)`,
+    `CREATE INDEX IF NOT EXISTS cobranzas_saldos_estado_idx ON cobranzas_saldos(estado)`,
+    `CREATE INDEX IF NOT EXISTS cobranzas_notificaciones_saldo_idx ON cobranzas_notificaciones(saldo_id)`,
   ]
   for (const sql of indexStmts) {
     try {
@@ -334,6 +396,11 @@ export async function initDb() {
     `ALTER TABLE reportes ADD COLUMN asignacion_respondida_at INTEGER`,
     `ALTER TABLE leads ADD COLUMN asignado_a TEXT`,
     `ALTER TABLE leads ADD COLUMN asignado_id INTEGER`,
+    `ALTER TABLE leads ADD COLUMN first_contacted_at INTEGER`,
+    `ALTER TABLE bot_queue ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bot_queue ADD COLUMN error_msg TEXT`,
+    `ALTER TABLE bot_queue ADD COLUMN last_attempt_at INTEGER`,
+    `ALTER TABLE bot_queue ADD COLUMN priority INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE empleado_asistencia ADD COLUMN timestamp INTEGER`,
     `ALTER TABLE empleados ADD COLUMN pago_diario INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE empleados ADD COLUMN pago_semanal INTEGER NOT NULL DEFAULT 0`,
@@ -361,6 +428,16 @@ export async function initDb() {
     } catch (_error) {
       // Column already exists in upgraded databases.
     }
+  }
+  try {
+    await client.execute(`
+      UPDATE leads
+      SET first_contacted_at = updated_at
+      WHERE first_contacted_at IS NULL
+        AND estado IN ('contactado', 'visito', 'cerrado')
+    `)
+  } catch (_error) {
+    // Older databases are upgraded by the ALTER loop above; keep boot resilient.
   }
   console.log('[DB] Tables ready')
 }
@@ -787,10 +864,10 @@ export async function getUserById(id: number) {
   const rows = await db.select().from(schema.users).where(eq(schema.users.id, id))
   return rows[0] ?? null
 }
-export async function createUser(data: { username: string; password: string; name: string; role?: 'admin' | 'employee' | 'sales'; waId?: string }) {
+export async function createUser(data: { username: string; password: string; name: string; role?: 'admin' | 'employee' | 'sales' | 'collections'; waId?: string }) {
   await db.insert(schema.users).values(data).run()
 }
-export async function createPanelUser(data: { username: string; password: string; name: string; role: 'admin' | 'sales'; waId?: string }) {
+export async function createPanelUser(data: { username: string; password: string; name: string; role: 'admin' | 'sales' | 'collections'; waId?: string }) {
   const hash = await bcrypt.hash(data.password, 10)
   await db.insert(schema.users).values({
     username: data.username,
@@ -1562,11 +1639,221 @@ export async function eliminarNotificacion(id: number) {
   await db.delete(schema.notificaciones).where(eq(schema.notificaciones.id, id)).run()
 }
 
+// --- COBRANZAS ---
+type CobranzaSaldoInput = {
+  locatarioNombre: string
+  local?: string
+  periodo: string
+  ingreso?: number | null
+  saldo: number
+  diasAtraso?: number | null
+  telefonoWa?: string | null
+  raw?: unknown
+}
+
+function normalizeCobranzaKey(value?: string | null) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function findMatchingLocatario(
+  row: CobranzaSaldoInput,
+  locatarios: Array<typeof schema.locatariosCobranza.$inferSelect>,
+) {
+  const localKey = normalizeCobranzaKey(row.local)
+  if (localKey) {
+    const byLocal = locatarios.filter((locatario) => normalizeCobranzaKey(locatario.local) === localKey)
+    if (byLocal.length === 1) return byLocal[0]
+  }
+
+  const nameKey = normalizeCobranzaKey(row.locatarioNombre)
+  if (!nameKey) return null
+  const byName = locatarios.filter((locatario) => normalizeCobranzaKey(locatario.nombre) === nameKey)
+  if (byName.length === 1) return byName[0]
+  return null
+}
+
+export async function listLocatariosCobranza() {
+  const rows = await db.select().from(schema.locatariosCobranza)
+  return rows
+    .filter((row) => row.activo === true)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+}
+
+export async function upsertLocatarioCobranza(data: {
+  id?: number
+  nombre: string
+  local: string
+  telefonoWa?: string | null
+  email?: string | null
+  cuit?: string | null
+  notas?: string | null
+}) {
+  const payload = {
+    nombre: data.nombre.trim(),
+    local: data.local.trim(),
+    telefonoWa: normalizeWaNumber(data.telefonoWa) || null,
+    email: data.email?.trim() || null,
+    cuit: data.cuit?.trim() || null,
+    notas: data.notas?.trim() || null,
+    updatedAt: new Date(),
+  }
+
+  if (data.id) {
+    await db.update(schema.locatariosCobranza).set(payload as any).where(eq(schema.locatariosCobranza.id, data.id)).run()
+    return data.id
+  }
+
+  const rows = await db.insert(schema.locatariosCobranza).values({
+    ...payload,
+    activo: true,
+  } as any).returning({ id: schema.locatariosCobranza.id })
+  return rows[0].id
+}
+
+export async function saveCobranzaImportacion(input: {
+  filename: string
+  sourceType: 'pdf' | 'xlsx' | 'csv' | 'manual'
+  periodLabel: string
+  fechaCorte?: string | null
+  totalRows: number
+  rows: CobranzaSaldoInput[]
+  importedBy: { id: number; name: string }
+}) {
+  const locatarios = await listLocatariosCobranza()
+  const importRows = await db.insert(schema.cobranzasImportaciones).values({
+    filename: input.filename,
+    sourceType: input.sourceType,
+    importedById: input.importedBy.id,
+    importedByName: input.importedBy.name,
+    periodLabel: input.periodLabel,
+    fechaCorte: input.fechaCorte || null,
+    totalRows: input.totalRows,
+    parsedRows: input.rows.length,
+  }).returning({ id: schema.cobranzasImportaciones.id })
+  const importacionId = importRows[0].id
+
+  for (const row of input.rows) {
+    const locatario = findMatchingLocatario(row, locatarios)
+    const telefonoWa = normalizeWaNumber(row.telefonoWa) || locatario?.telefonoWa || null
+    await db.insert(schema.cobranzasSaldos).values({
+      importacionId,
+      locatarioId: locatario?.id ?? null,
+      locatarioNombre: row.locatarioNombre.trim(),
+      local: row.local?.trim() || locatario?.local || null,
+      periodo: row.periodo || input.periodLabel,
+      ingreso: row.ingreso ?? null,
+      saldo: Math.round(row.saldo),
+      diasAtraso: row.diasAtraso ?? null,
+      telefonoWa,
+      estado: telefonoWa ? 'pendiente' : 'error_contacto',
+      rawJson: JSON.stringify(row.raw ?? row),
+    }).run()
+  }
+
+  return { id: importacionId, creados: input.rows.length }
+}
+
+export async function listCobranzaImportaciones() {
+  return db.select().from(schema.cobranzasImportaciones).orderBy(desc(schema.cobranzasImportaciones.createdAt))
+}
+
+export async function listCobranzaSaldos(filters?: {
+  estado?: string
+  importacionId?: number
+  busqueda?: string
+}) {
+  const conds: any[] = []
+  if (filters?.estado) conds.push(eq(schema.cobranzasSaldos.estado, filters.estado as any))
+  if (filters?.importacionId) conds.push(eq(schema.cobranzasSaldos.importacionId, filters.importacionId))
+  if (filters?.busqueda) {
+    conds.push(or(
+      like(schema.cobranzasSaldos.locatarioNombre, `%${filters.busqueda}%`),
+      like(schema.cobranzasSaldos.local, `%${filters.busqueda}%`),
+    ))
+  }
+  return db.select().from(schema.cobranzasSaldos)
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(desc(schema.cobranzasSaldos.createdAt))
+}
+
+export async function getCobranzaSaldoById(id: number) {
+  const rows = await db.select().from(schema.cobranzasSaldos).where(eq(schema.cobranzasSaldos.id, id))
+  return rows[0] ?? null
+}
+
+export async function updateCobranzaSaldoEstado(id: number, estado: typeof schema.cobranzasSaldos.$inferInsert.estado) {
+  await db.update(schema.cobranzasSaldos).set({ estado, updatedAt: new Date() } as any).where(eq(schema.cobranzasSaldos.id, id)).run()
+}
+
+export async function updateCobranzaSaldoContacto(id: number, telefonoWa?: string | null, locatarioId?: number | null) {
+  await db.update(schema.cobranzasSaldos).set({
+    telefonoWa: normalizeWaNumber(telefonoWa) || null,
+    locatarioId: locatarioId ?? null,
+    estado: normalizeWaNumber(telefonoWa) ? 'pendiente' : 'error_contacto',
+    updatedAt: new Date(),
+  } as any).where(eq(schema.cobranzasSaldos.id, id)).run()
+}
+
+export async function getCobranzaNotificationsBySaldoIds(saldoIds: number[]) {
+  if (saldoIds.length === 0) return []
+  return db.select().from(schema.cobranzasNotificaciones)
+    .where(inArray(schema.cobranzasNotificaciones.saldoId, saldoIds))
+}
+
+export async function createCobranzaNotification(input: {
+  saldo: typeof schema.cobranzasSaldos.$inferSelect
+  waNumber?: string | null
+  message: string
+  status: 'queued' | 'skipped'
+  botQueueId?: number | null
+  sentBy: { id: number; name: string }
+}) {
+  const rows = await db.insert(schema.cobranzasNotificaciones).values({
+    saldoId: input.saldo.id,
+    locatarioId: input.saldo.locatarioId ?? null,
+    waNumber: normalizeWaNumber(input.waNumber) || null,
+    message: input.message,
+    status: input.status,
+    botQueueId: input.botQueueId ?? null,
+    sentById: input.sentBy.id,
+    sentByName: input.sentBy.name,
+    sentAt: input.status === 'queued' ? new Date() : null,
+  }).returning({ id: schema.cobranzasNotificaciones.id })
+  return rows[0].id
+}
+
+export async function listCobranzaNotificaciones() {
+  return db.select().from(schema.cobranzasNotificaciones).orderBy(desc(schema.cobranzasNotificaciones.createdAt))
+}
+
+export async function clearCobranzaLista() {
+  const [notificaciones, saldos, importaciones] = await Promise.all([
+    db.select().from(schema.cobranzasNotificaciones),
+    db.select().from(schema.cobranzasSaldos),
+    db.select().from(schema.cobranzasImportaciones),
+  ])
+  await db.delete(schema.cobranzasNotificaciones).run()
+  await db.delete(schema.cobranzasSaldos).run()
+  await db.delete(schema.cobranzasImportaciones).run()
+  return {
+    notificaciones: notificaciones.length,
+    saldos: saldos.length,
+    importaciones: importaciones.length,
+    total: notificaciones.length + saldos.length + importaciones.length,
+  }
+}
+
 // --- BOT QUEUE ---
 export async function enqueueBotMessage(waNumber: string, message: string) {
   const normalized = normalizeWaNumber(waNumber)
-  if (!normalized) return
-  await db.insert(schema.botQueue).values({ waNumber: normalized, message }).run()
+  if (!normalized) return null
+  const rows = await db.insert(schema.botQueue).values({ waNumber: normalized, message }).returning({ id: schema.botQueue.id })
+  return rows[0]?.id ?? null
 }
 export async function getPendingBotMessages() {
   return db.select().from(schema.botQueue).where(eq(schema.botQueue.status, 'pending'))
@@ -2172,7 +2459,49 @@ export async function listUnassignedLeads() {
   )
 }
 export async function actualizarLead(id: number, data: Partial<typeof schema.leads.$inferInsert>) {
-  await db.update(schema.leads).set({ ...data, updatedAt: new Date() } as any).where(eq(schema.leads.id, id)).run()
+  const updateData: Partial<typeof schema.leads.$inferInsert> = { ...data, updatedAt: new Date() }
+  if (
+    data.estado &&
+    ['contactado', 'visito', 'cerrado'].includes(data.estado) &&
+    data.firstContactedAt === undefined
+  ) {
+    const current = await getLeadById(id)
+    if (current && !current.firstContactedAt) {
+      updateData.firstContactedAt = new Date()
+    }
+  }
+  await db.update(schema.leads).set(updateData as any).where(eq(schema.leads.id, id)).run()
+}
+
+export async function getLeadsForFollowup() {
+  const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000
+  const cutoff = new Date(Date.now() - TWO_DAYS_MS)
+  const rows = await db
+    .select()
+    .from(schema.leads)
+    .where(
+      and(
+        eq(schema.leads.estado, 'nuevo'),
+        isNotNull(schema.leads.waId),
+        isNotNull(schema.leads.temperature),
+        isNotNull(schema.leads.lastBotMsgAt),
+        lt(schema.leads.autoFollowupCount ?? 0, 2),
+      )
+    )
+  return rows.filter(
+    l =>
+      l.temperature !== 'not_fit' &&
+      l.createdAt != null &&
+      new Date(l.createdAt as any).getTime() >= cutoff.getTime()
+  )
+}
+
+export async function updateLeadFollowup(id: number, newCount: number) {
+  await db
+    .update(schema.leads)
+    .set({ autoFollowupCount: newCount, lastBotMsgAt: new Date(), updatedAt: new Date() } as any)
+    .where(eq(schema.leads.id, id))
+    .run()
 }
 
 export async function crearTareaOperativaManual(data: {
@@ -2604,7 +2933,13 @@ function isDemoRecord(values: any[]) {
 
 function normalizeWaNumber(value?: string | null) {
   if (!value) return ''
-  return value.replace(/\D/g, '')
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('549')) return digits
+  if (digits.startsWith('54')) return `549${digits.slice(2)}`
+  if (digits.startsWith('9')) return `54${digits}`
+  if (digits.length >= 8) return `549${digits.replace(/^0+/, '')}`
+  return digits
 }
 
 function mapLegacyFuenteToAttendanceChannel(fuente?: 'whatsapp' | 'panel' | 'otro') {
