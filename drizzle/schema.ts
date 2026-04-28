@@ -6,7 +6,7 @@ export const users = sqliteTable('users', {
   username: text('username').notNull().unique(),
   password: text('password').notNull(),
   name: text('name').notNull(),
-  role: text('role', { enum: ['admin', 'employee', 'sales'] }).default('employee').notNull(),
+  role: text('role', { enum: ['admin', 'employee', 'sales', 'collections'] }).default('employee').notNull(),
   waId: text('wa_id'),
   activo: integer('activo', { mode: 'boolean' }).default(true).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
@@ -167,6 +167,13 @@ export const leads = sqliteTable('leads', {
   }).default('nuevo').notNull(),
   notas: text('notas'),
   fuente: text('fuente', { enum: ['whatsapp', 'web', 'otro'] }).default('web').notNull(),
+  firstContactedAt: integer('first_contacted_at', { mode: 'timestamp' }),
+  // Scoring automático
+  score: integer('score').default(0),
+  temperature: text('temperature', { enum: ['hot', 'warm', 'cold', 'not_fit'] }),
+  // Follow-up automático
+  autoFollowupCount: integer('auto_followup_count').default(0),
+  lastBotMsgAt: integer('last_bot_msg_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
@@ -182,6 +189,66 @@ export const botQueue = sqliteTable('bot_queue', {
   lastAttemptAt: integer('last_attempt_at', { mode: 'timestamp' }),
   // Heartbeat tracking (para saber si el bot sigue conectado)
   priority: integer('priority').default(0).notNull(), // 0=normal, 1=alta, 2=urgente
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+export const locatariosCobranza = sqliteTable('locatarios_cobranza', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  nombre: text('nombre').notNull(),
+  local: text('local').notNull(),
+  telefonoWa: text('telefono_wa'),
+  email: text('email'),
+  cuit: text('cuit'),
+  activo: integer('activo', { mode: 'boolean' }).default(true).notNull(),
+  notas: text('notas'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+export const cobranzasImportaciones = sqliteTable('cobranzas_importaciones', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  filename: text('filename').notNull(),
+  sourceType: text('source_type', { enum: ['pdf', 'xlsx', 'csv', 'manual'] }).notNull(),
+  importedById: integer('imported_by_id'),
+  importedByName: text('imported_by_name').notNull(),
+  periodLabel: text('period_label').notNull(),
+  fechaCorte: text('fecha_corte'),
+  status: text('status', { enum: ['importada', 'revisada'] }).default('importada').notNull(),
+  totalRows: integer('total_rows').default(0).notNull(),
+  parsedRows: integer('parsed_rows').default(0).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+export const cobranzasSaldos = sqliteTable('cobranzas_saldos', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  importacionId: integer('importacion_id').notNull(),
+  locatarioId: integer('locatario_id'),
+  locatarioNombre: text('locatario_nombre').notNull(),
+  local: text('local'),
+  periodo: text('periodo').notNull(),
+  ingreso: integer('ingreso'),
+  saldo: integer('saldo').notNull(),
+  diasAtraso: integer('dias_atraso'),
+  telefonoWa: text('telefono_wa'),
+  estado: text('estado', {
+    enum: ['pendiente', 'notificado', 'pagado', 'ignorado', 'error_contacto'],
+  }).default('pendiente').notNull(),
+  rawJson: text('raw_json'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+export const cobranzasNotificaciones = sqliteTable('cobranzas_notificaciones', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  saldoId: integer('saldo_id').notNull(),
+  locatarioId: integer('locatario_id'),
+  waNumber: text('wa_number'),
+  message: text('message').notNull(),
+  status: text('status', { enum: ['draft', 'queued', 'sent', 'failed', 'skipped'] }).default('draft').notNull(),
+  botQueueId: integer('bot_queue_id'),
+  sentById: integer('sent_by_id'),
+  sentByName: text('sent_by_name').notNull(),
+  sentAt: integer('sent_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
 
@@ -347,6 +414,10 @@ export type MarcacionEmpleado = typeof marcacionesEmpleados.$inferSelect
 export type Notificacion = typeof notificaciones.$inferSelect
 export type Lead = typeof leads.$inferSelect
 export type BotQueueItem = typeof botQueue.$inferSelect
+export type LocatarioCobranza = typeof locatariosCobranza.$inferSelect
+export type CobranzaImportacion = typeof cobranzasImportaciones.$inferSelect
+export type CobranzaSaldo = typeof cobranzasSaldos.$inferSelect
+export type CobranzaNotificacion = typeof cobranzasNotificaciones.$inferSelect
 export type RondaPlantilla = typeof rondasPlantilla.$inferSelect
 export type RondaProgramacion = typeof rondasProgramacion.$inferSelect
 export type RondaOcurrencia = typeof rondasOcurrencia.$inferSelect
