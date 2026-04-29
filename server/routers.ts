@@ -8,6 +8,7 @@ import { notifyOwner, notifyCompleted } from './_core/notification'
 import { readEnv } from './_core/env'
 import * as database from './db'
 import * as schema from '../drizzle/schema'
+import { buildFollowup1, buildFollowup2 } from './leads/http'
 import { createRoundsService } from './rounds/service'
 import { saveRoundScheduleAndSyncToday } from './rounds/schedule'
 import { assignReporteToEmployee } from './reporte-assignment'
@@ -22,6 +23,7 @@ import {
   createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead, deleteLeadById, getLeadEventos,
+  getLeadsForFollowup, updateLeadFollowup, createLeadEvento,
   listLocatariosCobranza, upsertLocatarioCobranza, saveCobranzaImportacion, listCobranzaImportaciones,
   listCobranzaSaldos, getCobranzaSaldoById, updateCobranzaSaldoEstado, updateCobranzaSaldoContacto,
   getCobranzaNotificationsBySaldoIds, createCobranzaNotification, listCobranzaNotificaciones, clearCobranzaLista,
@@ -807,6 +809,67 @@ export const appRouter = router({
     eventos: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(({ input }) => getLeadEventos(input.id)),
+
+    sendFollowup: protectedProcedure
+      .input(z.object({
+        leadId: z.number(),
+        tipo: z.enum(['followup1_sent', 'followup2_sent']),
+      }))
+      .mutation(async ({ input }) => {
+        const lead = await getLeadById(input.leadId)
+        if (!lead) throw new TRPCError({ code: 'NOT_FOUND', message: 'Lead no encontrado' })
+        if (!lead.waId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Lead sin WhatsApp' })
+
+        const newCount = input.tipo === 'followup1_sent' ? 1 : 2
+        const buildMsg = input.tipo === 'followup1_sent' ? buildFollowup1 : buildFollowup2
+        const msg = await buildMsg(lead.nombre)
+
+        await enqueueBotMessage(lead.waId, msg)
+        await createLeadEvento({
+          leadId: lead.id,
+          tipo: input.tipo,
+          descripcion: `${input.tipo === 'followup1_sent' ? 'Follow-up 1' : 'Follow-up 2'} enviado manualmente a ${lead.nombre}`,
+          metadataJson: JSON.stringify({ message: msg, manual: true }),
+        })
+        await updateLeadFollowup(lead.id, newCount)
+        return { ok: true }
+      }),
+
+    processFollowupBatch: protectedProcedure
+      .mutation(async () => {
+        const leads = await getLeadsForFollowup()
+        const now = Date.now()
+        const delay1Min = Number((await getAppConfig('followup1_delay_min')) ?? 30)
+        const delay2Hs  = Number((await getAppConfig('followup2_delay_horas')) ?? 4)
+        const DELAY1_MS = delay1Min * 60 * 1000
+        const DELAY2_MS = delay2Hs  * 60 * 60 * 1000
+        let sent = 0
+
+        for (const lead of leads) {
+          if (!lead.waId) continue
+          const lastMs  = lead.lastBotMsgAt ? new Date(lead.lastBotMsgAt as any).getTime() : 0
+          const elapsed = now - lastMs
+          const count   = lead.autoFollowupCount ?? 0
+          try {
+            if (count === 0 && elapsed >= DELAY1_MS) {
+              const msg = await buildFollowup1(lead.nombre)
+              await enqueueBotMessage(lead.waId, msg)
+              await createLeadEvento({ leadId: lead.id, tipo: 'followup1_sent', descripcion: `Follow-up 1 enviado automáticamente a ${lead.nombre}`, metadataJson: JSON.stringify({ message: msg }) })
+              await updateLeadFollowup(lead.id, 1)
+              sent++
+            } else if (count === 1 && elapsed >= DELAY2_MS) {
+              const msg = await buildFollowup2(lead.nombre)
+              await enqueueBotMessage(lead.waId, msg)
+              await createLeadEvento({ leadId: lead.id, tipo: 'followup2_sent', descripcion: `Follow-up 2 enviado automáticamente a ${lead.nombre}`, metadataJson: JSON.stringify({ message: msg }) })
+              await updateLeadFollowup(lead.id, 2)
+              sent++
+            }
+          } catch (e) {
+            console.error(`[processFollowupBatch] lead ${lead.id}:`, e)
+          }
+        }
+        return { sent, checked: leads.length }
+      }),
   }),
 
   rondas: router({

@@ -198,12 +198,12 @@ function applyTemplate(template: string, nombre: string): string {
   return template.replace(/\{\{nombre\}\}/g, saludo)
 }
 
-async function buildFollowup1(nombre: string): Promise<string> {
+export async function buildFollowup1(nombre: string): Promise<string> {
   const tpl = (await getAppConfig('followup1_mensaje')) ?? DEFAULT_FOLLOWUP1
   return applyTemplate(tpl, nombre)
 }
 
-async function buildFollowup2(nombre: string): Promise<string> {
+export async function buildFollowup2(nombre: string): Promise<string> {
   const tpl = (await getAppConfig('followup2_mensaje')) ?? DEFAULT_FOLLOWUP2
   return applyTemplate(tpl, nombre)
 }
