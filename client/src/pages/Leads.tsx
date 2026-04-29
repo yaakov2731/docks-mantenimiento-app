@@ -39,6 +39,11 @@ function formatDateTime(value: unknown) {
   })
 }
 
+const EVENTO_LABELS: Record<string, string> = {
+  followup1_sent: 'Follow-up 1 enviado',
+  followup2_sent: 'Follow-up 2 enviado',
+}
+
 function formatElapsed(fromValue: unknown, toValue: unknown = new Date()) {
   const from = toDate(fromValue)
   const to = toDate(toValue)
@@ -64,6 +69,10 @@ export default function Leads() {
   const utils = trpc.useContext()
   const { data: leads = [], refetch } = trpc.leads.listar.useQuery({ estado: filterEstado || undefined })
   const { data: lead } = trpc.leads.obtener.useQuery({ id: selected! }, { enabled: !!selected })
+  const { data: eventos = [] } = trpc.leads.eventos.useQuery(
+    { id: selected! },
+    { enabled: !!selected }
+  )
   const { data: comerciales = [] } = trpc.usuarios.listarComerciales.useQuery()
   const botLead = botLeadId ? leads.find(l => l.id === botLeadId) : null
   const eliminar = trpc.leads.eliminar.useMutation({
@@ -371,6 +380,27 @@ export default function Leads() {
                   <Calendar size={14}/> Guardar turno
                 </Button>
               </div>
+
+              {eventos.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-2">
+                    Seguimiento automático
+                  </p>
+                  <ul className="space-y-1.5">
+                    {eventos.map(ev => (
+                      <li key={ev.id} className="flex items-start gap-2 text-sm">
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {EVENTO_LABELS[ev.tipo] ?? ev.tipo}
+                        </span>
+                        <span className="ml-auto text-xs text-gray-400 whitespace-nowrap">
+                          {formatDateTime(ev.createdAt)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </div>
