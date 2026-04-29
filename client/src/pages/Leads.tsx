@@ -67,6 +67,14 @@ export default function Leads() {
   const [botLeadId, setBotLeadId] = useState<number | null>(null)
 
   const utils = trpc.useContext()
+  const processFollowups = trpc.leads.processFollowupBatch.useMutation({
+    onSuccess: (data) => {
+      alert(`✓ ${data.sent} follow-up${data.sent !== 1 ? 's' : ''} enviado${data.sent !== 1 ? 's' : ''}. (${data.checked} leads revisados)`)
+    },
+  })
+  const sendFollowup = trpc.leads.sendFollowup.useMutation({
+    onSuccess: () => utils.leads.eventos.invalidate({ id: selected! }),
+  })
   const { data: leads = [], refetch } = trpc.leads.listar.useQuery({ estado: filterEstado || undefined })
   const { data: lead } = trpc.leads.obtener.useQuery({ id: selected! }, { enabled: !!selected })
   const { data: eventos = [] } = trpc.leads.eventos.useQuery(
@@ -132,7 +140,16 @@ export default function Leads() {
             {ESTADOS_LEAD.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
           </select>
         </div>
-        <Button variant="secondary" onClick={exportLeads}>Exportar Excel</Button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => processFollowups.mutate()}
+            disabled={processFollowups.isPending}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 disabled:opacity-50"
+          >
+            {processFollowups.isPending ? 'Procesando...' : '↺ Follow-ups'}
+          </button>
+          <Button variant="secondary" onClick={exportLeads}>Exportar Excel</Button>
+        </div>
       </div>
 
       <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-col md:flex-row md:items-center gap-3 justify-between">
@@ -380,6 +397,25 @@ export default function Leads() {
                   <Calendar size={14}/> Guardar turno
                 </Button>
               </div>
+
+              {lead?.waId && (
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => sendFollowup.mutate({ leadId: selected!, tipo: 'followup1_sent' })}
+                    disabled={sendFollowup.isPending}
+                    className="flex-1 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 disabled:opacity-50"
+                  >
+                    Enviar FU1
+                  </button>
+                  <button
+                    onClick={() => sendFollowup.mutate({ leadId: selected!, tipo: 'followup2_sent' })}
+                    disabled={sendFollowup.isPending}
+                    className="flex-1 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 disabled:opacity-50"
+                  >
+                    Enviar FU2
+                  </button>
+                </div>
+              )}
 
               {eventos.length > 0 && (
                 <div className="mt-4">
