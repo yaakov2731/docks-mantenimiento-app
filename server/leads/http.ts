@@ -246,28 +246,32 @@ router.get('/leads-followup', async (req: Request, res: Response) => {
       const elapsed = now - lastMs
       const count   = lead.autoFollowupCount ?? 0
 
-      if (count === 0 && elapsed >= DELAY1_MS) {
-        const msg = await buildFollowup1(lead.nombre)
-        await enqueueBotMessage(lead.waId, msg)
-        await updateLeadFollowup(lead.id, 1)
-        await createLeadEvento({
-          leadId: lead.id,
-          tipo: 'followup1_sent',
-          descripcion: `Follow-up 1 enviado automáticamente a ${lead.nombre}`,
-          metadataJson: JSON.stringify({ message: msg }),
-        })
-        sent++
-      } else if (count === 1 && elapsed >= DELAY2_MS) {
-        const msg = await buildFollowup2(lead.nombre)
-        await enqueueBotMessage(lead.waId, msg)
-        await updateLeadFollowup(lead.id, 2)
-        await createLeadEvento({
-          leadId: lead.id,
-          tipo: 'followup2_sent',
-          descripcion: `Follow-up 2 enviado automáticamente a ${lead.nombre}`,
-          metadataJson: JSON.stringify({ message: msg }),
-        })
-        sent++
+      try {
+        if (count === 0 && elapsed >= DELAY1_MS) {
+          const msg = await buildFollowup1(lead.nombre)
+          await enqueueBotMessage(lead.waId, msg)
+          await createLeadEvento({
+            leadId: lead.id,
+            tipo: 'followup1_sent',
+            descripcion: `Follow-up 1 enviado automáticamente a ${lead.nombre}`,
+            metadataJson: JSON.stringify({ message: msg }),
+          })
+          await updateLeadFollowup(lead.id, 1)
+          sent++
+        } else if (count === 1 && elapsed >= DELAY2_MS) {
+          const msg = await buildFollowup2(lead.nombre)
+          await enqueueBotMessage(lead.waId, msg)
+          await createLeadEvento({
+            leadId: lead.id,
+            tipo: 'followup2_sent',
+            descripcion: `Follow-up 2 enviado automáticamente a ${lead.nombre}`,
+            metadataJson: JSON.stringify({ message: msg }),
+          })
+          await updateLeadFollowup(lead.id, 2)
+          sent++
+        }
+      } catch (leadErr) {
+        console.error(`[leads-followup] error procesando lead ${lead.id}:`, leadErr)
       }
     }
 
