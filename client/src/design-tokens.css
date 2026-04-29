@@ -1,51 +1,51 @@
 /* ============================================================
    DOCKS DEL PUERTO — Design System Tokens
-   Palette: Bloomberg Terminal Dark
+   Palette: Estancia Operacional — warm graphite + amber gold
    Fonts: IBM Plex Mono (headings/data), IBM Plex Sans (body)
    ============================================================ */
 
-/* ── BASE / LIGHT (Bloomberg charcoal) ────────────────────── */
+/* ── BASE (warm charcoal dark) ─────────────────────────────── */
 :root {
-  /* ── PRIMARY: Bloomberg Orange ── */
-  --color-primary:        oklch(0.672 0.210 48);
-  --color-primary-dark:   oklch(0.590 0.208 44);
-  --color-primary-light:  oklch(0.155 0.045 48);
+  /* ── PRIMARY: Amber Gold ── */
+  --color-primary:        oklch(0.775 0.175 68);
+  --color-primary-dark:   oklch(0.700 0.172 64);
+  --color-primary-light:  oklch(0.150 0.040 68);
 
-  /* ── SIDEBAR / BRAND DARK ── */
-  --color-sidebar:        oklch(0.068 0.008 238);
-  --color-sidebar-mid:    oklch(0.095 0.008 238);
+  /* ── SIDEBAR / BRAND DARK (warm espresso) ── */
+  --color-sidebar:        oklch(0.060 0.010 48);
+  --color-sidebar-mid:    oklch(0.085 0.009 48);
 
-  /* ── ACCENT: Data Blue ── */
-  --color-accent:         oklch(0.645 0.145 230);
-  --color-accent-light:   oklch(0.155 0.038 230);
+  /* ── ACCENT: Warm Slate (informational, replaces terminal cyan) ── */
+  --color-accent:         oklch(0.640 0.095 195);
+  --color-accent-light:   oklch(0.150 0.028 195);
 
-  /* ── SECONDARY: Terminal Cyan ── */
-  --color-secondary:      oklch(0.700 0.120 198);
-  --color-secondary-light:oklch(0.155 0.035 198);
+  /* ── SECONDARY: Muted Sage ── */
+  --color-secondary:      oklch(0.655 0.075 170);
+  --color-secondary-light:oklch(0.150 0.025 170);
 
   /* ── STATUS ── */
-  --color-success:        oklch(0.715 0.195 152);
-  --color-success-light:  oklch(0.155 0.048 152);
-  --color-warning:        oklch(0.745 0.155 72);
-  --color-warning-light:  oklch(0.155 0.040 72);
-  --color-danger:         oklch(0.545 0.218 27);
-  --color-danger-light:   oklch(0.155 0.048 27);
+  --color-success:        oklch(0.720 0.190 148);
+  --color-success-light:  oklch(0.152 0.045 148);
+  --color-warning:        oklch(0.760 0.165 78);
+  --color-warning-light:  oklch(0.152 0.038 78);
+  --color-danger:         oklch(0.552 0.215 26);
+  --color-danger-light:   oklch(0.152 0.045 26);
 
-  /* ── SURFACES (terminal dark) ── */
-  --color-bg:             oklch(0.095 0.006 238);
-  --color-surface:        oklch(0.128 0.007 238);
-  --color-border:         oklch(0.195 0.007 238);
-  --color-border-strong:  oklch(0.255 0.007 238);
+  /* ── SURFACES (warm graphite) ── */
+  --color-bg:             oklch(0.092 0.008 52);
+  --color-surface:        oklch(0.122 0.009 52);
+  --color-border:         oklch(0.192 0.008 52);
+  --color-border-strong:  oklch(0.252 0.008 52);
 
-  /* ── NEUTRALS ── */
-  --color-gray-50:        oklch(0.128 0.007 238);
-  --color-gray-100:       oklch(0.155 0.007 238);
-  --color-gray-200:       oklch(0.195 0.007 238);
-  --color-gray-400:       oklch(0.340 0.007 238);
-  --color-gray-500:       oklch(0.440 0.007 238);
-  --color-gray-600:       oklch(0.545 0.007 238);
-  --color-gray-800:       oklch(0.740 0.006 72);
-  --color-gray-900:       oklch(0.920 0.006 72);
+  /* ── NEUTRALS (warm-tinted) ── */
+  --color-gray-50:        oklch(0.122 0.009 52);
+  --color-gray-100:       oklch(0.152 0.009 52);
+  --color-gray-200:       oklch(0.192 0.008 52);
+  --color-gray-400:       oklch(0.338 0.008 52);
+  --color-gray-500:       oklch(0.438 0.008 52);
+  --color-gray-600:       oklch(0.542 0.008 52);
+  --color-gray-800:       oklch(0.742 0.012 68);
+  --color-gray-900:       oklch(0.928 0.014 68);
 
   /* ── LOGO ARCH COLORS (unchanged) ── */
   --color-logo-red:       #D94F3B;
@@ -53,13 +53,13 @@
   --color-logo-yellow:    #E8B830;
   --color-logo-blue:      #1E72B8;
 
-  /* ── SHADOWS (flat terminal style) ── */
-  --shadow-ds-card:         0 1px 0 oklch(0 0 0 / 0.40), 0 2px 8px oklch(0 0 0 / 0.30);
-  --shadow-ds-card-strong:  0 1px 0 oklch(0 0 0 / 0.50), 0 4px 20px oklch(0 0 0 / 0.40);
-  --shadow-ds-modal:        0 0 0 1px oklch(0.195 0.007 238), 0 8px 48px oklch(0 0 0 / 0.70);
-  --shadow-ds-btn-primary:  0 0 16px oklch(0.672 0.210 48 / 0.35);
+  /* ── SHADOWS (warm depth) ── */
+  --shadow-ds-card:         0 1px 0 oklch(0 0 0 / 0.45), 0 2px 8px oklch(0 0 0 / 0.35);
+  --shadow-ds-card-strong:  0 1px 0 oklch(0 0 0 / 0.55), 0 4px 20px oklch(0 0 0 / 0.45);
+  --shadow-ds-modal:        0 0 0 1px oklch(0.192 0.008 52), 0 8px 48px oklch(0 0 0 / 0.75);
+  --shadow-ds-btn-primary:  0 0 18px oklch(0.775 0.175 68 / 0.45);
 
-  /* ── BORDER RADIUS: sharp terminal style ── */
+  /* ── BORDER RADIUS: sharp operational style ── */
   --radius-sm:    2px;
   --radius-md:    3px;
   --radius-lg:    4px;
@@ -73,11 +73,11 @@
   --font-mono:    'IBM Plex Mono', monospace;
 
   /* ── SEMANTIC: Foreground ── */
-  --fg-base:        oklch(0.920 0.006 72);
-  --fg-muted:       oklch(0.555 0.008 72);
-  --fg-subtle:      oklch(0.380 0.008 72);
-  --fg-on-dark:     oklch(0.920 0.006 72);
-  --fg-on-dark-dim: oklch(0.920 0.006 72 / 0.45);
+  --fg-base:        oklch(0.928 0.014 68);
+  --fg-muted:       oklch(0.558 0.010 68);
+  --fg-subtle:      oklch(0.382 0.009 68);
+  --fg-on-dark:     oklch(0.928 0.014 68);
+  --fg-on-dark-dim: oklch(0.928 0.014 68 / 0.45);
 
   /* ── SEMANTIC: Backgrounds ── */
   --bg-app:         var(--color-bg);
@@ -85,40 +85,43 @@
   --bg-sidebar:     var(--color-sidebar);
 }
 
-/* ── DARK MODE (deeper Bloomberg) ──────────────────────────── */
+/* ── DARK MODE (deeper espresso) ───────────────────────────── */
 .dark {
-  --color-bg:             oklch(0.068 0.006 238);
-  --color-surface:        oklch(0.100 0.007 238);
-  --color-border:         oklch(0.175 0.007 238);
-  --color-border-strong:  oklch(0.228 0.007 238);
+  --color-bg:             oklch(0.068 0.008 50);
+  --color-surface:        oklch(0.098 0.009 50);
+  --color-border:         oklch(0.170 0.008 50);
+  --color-border-strong:  oklch(0.225 0.008 50);
 
-  --color-sidebar:        oklch(0.050 0.008 238);
-  --color-sidebar-mid:    oklch(0.072 0.008 238);
+  --color-sidebar:        oklch(0.045 0.010 46);
+  --color-sidebar-mid:    oklch(0.068 0.009 46);
 
-  --color-gray-50:        oklch(0.100 0.007 238);
-  --color-gray-100:       oklch(0.130 0.007 238);
-  --color-gray-200:       oklch(0.175 0.007 238);
-  --color-gray-400:       oklch(0.310 0.007 238);
-  --color-gray-500:       oklch(0.410 0.007 238);
-  --color-gray-600:       oklch(0.520 0.007 238);
-  --color-gray-800:       oklch(0.720 0.006 72);
-  --color-gray-900:       oklch(0.910 0.006 72);
+  --color-gray-50:        oklch(0.098 0.009 50);
+  --color-gray-100:       oklch(0.128 0.009 50);
+  --color-gray-200:       oklch(0.170 0.008 50);
+  --color-gray-400:       oklch(0.308 0.008 50);
+  --color-gray-500:       oklch(0.408 0.008 50);
+  --color-gray-600:       oklch(0.518 0.008 50);
+  --color-gray-800:       oklch(0.722 0.012 68);
+  --color-gray-900:       oklch(0.912 0.014 68);
 
-  --fg-base:    oklch(0.910 0.006 72);
-  --fg-muted:   oklch(0.530 0.008 72);
-  --fg-subtle:  oklch(0.360 0.008 72);
+  --color-primary:        oklch(0.795 0.175 68);
+  --color-primary-dark:   oklch(0.715 0.172 64);
+  --color-primary-light:  oklch(0.128 0.038 68);
 
-  --color-primary-light:  oklch(0.130 0.042 48);
-  --color-success-light:  oklch(0.130 0.045 152);
-  --color-warning-light:  oklch(0.130 0.038 72);
-  --color-danger-light:   oklch(0.130 0.045 27);
-  --color-secondary-light:oklch(0.130 0.032 198);
-  --color-accent-light:   oklch(0.130 0.035 230);
+  --fg-base:    oklch(0.912 0.014 68);
+  --fg-muted:   oklch(0.532 0.010 68);
+  --fg-subtle:  oklch(0.360 0.009 68);
+
+  --color-success-light:  oklch(0.128 0.042 148);
+  --color-warning-light:  oklch(0.128 0.036 78);
+  --color-danger-light:   oklch(0.128 0.042 26);
+  --color-secondary-light:oklch(0.128 0.028 170);
+  --color-accent-light:   oklch(0.128 0.028 195);
 
   --bg-app:   var(--color-bg);
   --bg-card:  var(--color-surface);
 
-  --shadow-ds-card:        0 1px 0 oklch(0 0 0 / 0.60), 0 2px 12px oklch(0 0 0 / 0.50);
-  --shadow-ds-card-strong: 0 1px 0 oklch(0 0 0 / 0.70), 0 4px 24px oklch(0 0 0 / 0.60);
-  --shadow-ds-modal:       0 0 0 1px oklch(0.175 0.007 238), 0 8px 48px oklch(0 0 0 / 0.80);
+  --shadow-ds-card:        0 1px 0 oklch(0 0 0 / 0.65), 0 2px 12px oklch(0 0 0 / 0.55);
+  --shadow-ds-card-strong: 0 1px 0 oklch(0 0 0 / 0.75), 0 4px 24px oklch(0 0 0 / 0.65);
+  --shadow-ds-modal:       0 0 0 1px oklch(0.170 0.008 50), 0 8px 48px oklch(0 0 0 / 0.82);
 }
