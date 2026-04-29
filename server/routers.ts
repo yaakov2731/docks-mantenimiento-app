@@ -21,7 +21,7 @@ import {
   ATTENDANCE_ACTIONS, getEmpleadoAttendanceStatus, getEmpleadoAttendanceEvents, registerEmpleadoAttendance,
   createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
-  crearLead, getLeads, getLeadById, actualizarLead, deleteLeadById,
+  crearLead, getLeads, getLeadById, actualizarLead, deleteLeadById, getLeadEventos,
   listLocatariosCobranza, upsertLocatarioCobranza, saveCobranzaImportacion, listCobranzaImportaciones,
   listCobranzaSaldos, getCobranzaSaldoById, updateCobranzaSaldoEstado, updateCobranzaSaldoContacto,
   getCobranzaNotificationsBySaldoIds, createCobranzaNotification, listCobranzaNotificaciones, clearCobranzaLista,
@@ -803,6 +803,10 @@ export const appRouter = router({
         await deleteLeadById(input.id)
         return { success: true }
       }),
+
+    eventos: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(({ input }) => getLeadEventos(input.id)),
   }),
 
   rondas: router({

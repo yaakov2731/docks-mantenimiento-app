@@ -90,10 +90,8 @@ describe('leads eventos', () => {
       descripcion: 'Follow-up 1 enviado automáticamente a Trpc Evento Test',
     })
 
-    // This test is a placeholder until Task 4 adds leads.eventos to tRPC
-    // For now just verify the evento was created
-    const eventos = await getLeadEventos(leadId)
+    const eventos = await caller.leads.eventos({ id: leadId })
     expect(eventos).toHaveLength(1)
-    expect(eventos[0].tipo).toBe('followup1_sent')
+    expect(eventos[0]).toMatchObject({ tipo: 'followup1_sent', leadId })
   })
 })
