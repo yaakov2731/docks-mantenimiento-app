@@ -1,51 +1,51 @@
 /* ============================================================
    DOCKS DEL PUERTO — Design System Tokens
-   Palette: Warm Graphite + Amber Gold
-   Fonts: Syne (headings), DM Sans (body) — loaded in index.html
+   Palette: Bloomberg Terminal Dark
+   Fonts: IBM Plex Mono (headings/data), IBM Plex Sans (body)
    ============================================================ */
 
-/* ── LIGHT MODE (default) ──────────────────────────────────── */
+/* ── BASE / LIGHT (Bloomberg charcoal) ────────────────────── */
 :root {
-  /* ── PRIMARY: Amber Gold ── */
-  --color-primary:        oklch(0.725 0.148 68);
-  --color-primary-dark:   oklch(0.640 0.152 65);
-  --color-primary-light:  oklch(0.970 0.040 72);
+  /* ── PRIMARY: Bloomberg Orange ── */
+  --color-primary:        oklch(0.672 0.210 48);
+  --color-primary-dark:   oklch(0.590 0.208 44);
+  --color-primary-light:  oklch(0.155 0.045 48);
 
   /* ── SIDEBAR / BRAND DARK ── */
-  --color-sidebar:        oklch(0.310 0.072 248);
-  --color-sidebar-mid:    oklch(0.370 0.065 248);
+  --color-sidebar:        oklch(0.068 0.008 238);
+  --color-sidebar-mid:    oklch(0.095 0.008 238);
 
-  /* ── ACCENT: Steel Blue ── */
-  --color-accent:         oklch(0.548 0.082 216);
-  --color-accent-light:   oklch(0.948 0.028 216);
+  /* ── ACCENT: Data Blue ── */
+  --color-accent:         oklch(0.645 0.145 230);
+  --color-accent-light:   oklch(0.155 0.038 230);
 
-  /* ── SECONDARY: Ocean ── */
-  --color-secondary:      oklch(0.555 0.068 195);
-  --color-secondary-light:oklch(0.952 0.024 195);
+  /* ── SECONDARY: Terminal Cyan ── */
+  --color-secondary:      oklch(0.700 0.120 198);
+  --color-secondary-light:oklch(0.155 0.035 198);
 
   /* ── STATUS ── */
-  --color-success:        oklch(0.530 0.130 150);
-  --color-success-light:  oklch(0.948 0.042 150);
-  --color-warning:        oklch(0.720 0.150 72);
-  --color-warning-light:  oklch(0.968 0.040 75);
-  --color-danger:         oklch(0.520 0.185 25);
-  --color-danger-light:   oklch(0.958 0.040 25);
+  --color-success:        oklch(0.715 0.195 152);
+  --color-success-light:  oklch(0.155 0.048 152);
+  --color-warning:        oklch(0.745 0.155 72);
+  --color-warning-light:  oklch(0.155 0.040 72);
+  --color-danger:         oklch(0.545 0.218 27);
+  --color-danger-light:   oklch(0.155 0.048 27);
 
-  /* ── SURFACES (light) ── */
-  --color-bg:             oklch(0.976 0.007 78);
-  --color-surface:        oklch(1.000 0.000 0);
-  --color-border:         oklch(0.875 0.009 72);
-  --color-border-strong:  oklch(0.820 0.012 72);
+  /* ── SURFACES (terminal dark) ── */
+  --color-bg:             oklch(0.095 0.006 238);
+  --color-surface:        oklch(0.128 0.007 238);
+  --color-border:         oklch(0.195 0.007 238);
+  --color-border-strong:  oklch(0.255 0.007 238);
 
   /* ── NEUTRALS ── */
-  --color-gray-50:        oklch(0.976 0.007 78);
-  --color-gray-100:       oklch(0.948 0.008 72);
-  --color-gray-200:       oklch(0.900 0.010 72);
-  --color-gray-400:       oklch(0.718 0.012 65);
-  --color-gray-500:       oklch(0.596 0.012 60);
-  --color-gray-600:       oklch(0.470 0.012 55);
-  --color-gray-800:       oklch(0.268 0.014 50);
-  --color-gray-900:       oklch(0.195 0.014 45);
+  --color-gray-50:        oklch(0.128 0.007 238);
+  --color-gray-100:       oklch(0.155 0.007 238);
+  --color-gray-200:       oklch(0.195 0.007 238);
+  --color-gray-400:       oklch(0.340 0.007 238);
+  --color-gray-500:       oklch(0.440 0.007 238);
+  --color-gray-600:       oklch(0.545 0.007 238);
+  --color-gray-800:       oklch(0.740 0.006 72);
+  --color-gray-900:       oklch(0.920 0.006 72);
 
   /* ── LOGO ARCH COLORS (unchanged) ── */
   --color-logo-red:       #D94F3B;
@@ -53,31 +53,31 @@
   --color-logo-yellow:    #E8B830;
   --color-logo-blue:      #1E72B8;
 
-  /* ── SHADOWS ── */
-  --shadow-ds-card:         0 1px 3px oklch(0.148 0.012 45 / 0.06), 0 4px 16px oklch(0.148 0.012 45 / 0.05);
-  --shadow-ds-card-strong:  0 2px 8px oklch(0.148 0.012 45 / 0.07), 0 8px 28px oklch(0.148 0.012 45 / 0.06);
-  --shadow-ds-modal:        0 8px 48px oklch(0.148 0.012 45 / 0.18);
-  --shadow-ds-btn-primary:  0 4px 14px oklch(0.725 0.148 68 / 0.40);
+  /* ── SHADOWS (flat terminal style) ── */
+  --shadow-ds-card:         0 1px 0 oklch(0 0 0 / 0.40), 0 2px 8px oklch(0 0 0 / 0.30);
+  --shadow-ds-card-strong:  0 1px 0 oklch(0 0 0 / 0.50), 0 4px 20px oklch(0 0 0 / 0.40);
+  --shadow-ds-modal:        0 0 0 1px oklch(0.195 0.007 238), 0 8px 48px oklch(0 0 0 / 0.70);
+  --shadow-ds-btn-primary:  0 0 16px oklch(0.672 0.210 48 / 0.35);
 
-  /* ── BORDER RADIUS ── */
-  --radius-sm:    8px;
-  --radius-md:    12px;
-  --radius-lg:    16px;
-  --radius-xl:    20px;
-  --radius-2xl:   24px;
-  --radius-modal: 28px;
+  /* ── BORDER RADIUS: sharp terminal style ── */
+  --radius-sm:    2px;
+  --radius-md:    3px;
+  --radius-lg:    4px;
+  --radius-xl:    6px;
+  --radius-2xl:   8px;
+  --radius-modal: 6px;
 
   /* ── TYPOGRAPHY ── */
-  --font-heading: 'Syne', sans-serif;
-  --font-body:    'DM Sans', sans-serif;
-  --font-mono:    'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+  --font-heading: 'IBM Plex Mono', monospace;
+  --font-body:    'IBM Plex Sans', sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
 
-  /* ── SEMANTIC: Foreground (light) ── */
-  --fg-base:        oklch(0.195 0.014 45);
-  --fg-muted:       oklch(0.460 0.012 48);
-  --fg-subtle:      oklch(0.638 0.010 52);
-  --fg-on-dark:     oklch(0.968 0.006 72 / 0.92);
-  --fg-on-dark-dim: oklch(0.968 0.006 72 / 0.46);
+  /* ── SEMANTIC: Foreground ── */
+  --fg-base:        oklch(0.920 0.006 72);
+  --fg-muted:       oklch(0.555 0.008 72);
+  --fg-subtle:      oklch(0.380 0.008 72);
+  --fg-on-dark:     oklch(0.920 0.006 72);
+  --fg-on-dark-dim: oklch(0.920 0.006 72 / 0.45);
 
   /* ── SEMANTIC: Backgrounds ── */
   --bg-app:         var(--color-bg);
@@ -85,50 +85,40 @@
   --bg-sidebar:     var(--color-sidebar);
 }
 
-/* ── DARK MODE ─────────────────────────────────────────────── */
+/* ── DARK MODE (deeper Bloomberg) ──────────────────────────── */
 .dark {
-  /* Surfaces */
-  --color-bg:            oklch(0.118 0.012 45);
-  --color-surface:       oklch(0.165 0.012 45);
-  --color-border:        oklch(0.248 0.012 45);
-  --color-border-strong: oklch(0.315 0.012 45);
+  --color-bg:             oklch(0.068 0.006 238);
+  --color-surface:        oklch(0.100 0.007 238);
+  --color-border:         oklch(0.175 0.007 238);
+  --color-border-strong:  oklch(0.228 0.007 238);
 
-  /* Sidebar: deepest level */
-  --color-sidebar:     oklch(0.220 0.065 248);
-  --color-sidebar-mid: oklch(0.270 0.060 248);
+  --color-sidebar:        oklch(0.050 0.008 238);
+  --color-sidebar-mid:    oklch(0.072 0.008 238);
 
-  /* Neutrals (dark) */
-  --color-gray-50:   oklch(0.165 0.012 45);
-  --color-gray-100:  oklch(0.210 0.012 45);
-  --color-gray-200:  oklch(0.272 0.012 45);
-  --color-gray-400:  oklch(0.440 0.012 50);
-  --color-gray-500:  oklch(0.555 0.012 52);
-  --color-gray-600:  oklch(0.660 0.012 55);
-  --color-gray-800:  oklch(0.835 0.010 60);
-  --color-gray-900:  oklch(0.958 0.006 72);
+  --color-gray-50:        oklch(0.100 0.007 238);
+  --color-gray-100:       oklch(0.130 0.007 238);
+  --color-gray-200:       oklch(0.175 0.007 238);
+  --color-gray-400:       oklch(0.310 0.007 238);
+  --color-gray-500:       oklch(0.410 0.007 238);
+  --color-gray-600:       oklch(0.520 0.007 238);
+  --color-gray-800:       oklch(0.720 0.006 72);
+  --color-gray-900:       oklch(0.910 0.006 72);
 
-  /* Semantic foreground (dark) */
-  --fg-base:    oklch(0.958 0.006 72);
-  --fg-muted:   oklch(0.660 0.012 55);
-  --fg-subtle:  oklch(0.478 0.012 50);
+  --fg-base:    oklch(0.910 0.006 72);
+  --fg-muted:   oklch(0.530 0.008 72);
+  --fg-subtle:  oklch(0.360 0.008 72);
 
-  /* Primary brighter in dark for contrast */
-  --color-primary:       oklch(0.765 0.138 70);
-  --color-primary-light: oklch(0.218 0.050 68);
+  --color-primary-light:  oklch(0.130 0.042 48);
+  --color-success-light:  oklch(0.130 0.045 152);
+  --color-warning-light:  oklch(0.130 0.038 72);
+  --color-danger-light:   oklch(0.130 0.045 27);
+  --color-secondary-light:oklch(0.130 0.032 198);
+  --color-accent-light:   oklch(0.130 0.035 230);
 
-  /* Status lights adjusted for dark surfaces */
-  --color-success-light:  oklch(0.215 0.055 150);
-  --color-warning-light:  oklch(0.215 0.055 75);
-  --color-danger-light:   oklch(0.215 0.055 25);
-  --color-secondary-light:oklch(0.215 0.045 195);
-  --color-accent-light:   oklch(0.215 0.045 216);
-
-  /* Backgrounds */
   --bg-app:   var(--color-bg);
   --bg-card:  var(--color-surface);
 
-  /* Shadows (dark) */
-  --shadow-ds-card:        0 1px 3px oklch(0 0 0 / 0.32), 0 4px 16px oklch(0 0 0 / 0.24);
-  --shadow-ds-card-strong: 0 2px 8px oklch(0 0 0 / 0.38), 0 8px 28px oklch(0 0 0 / 0.30);
-  --shadow-ds-modal:       0 8px 48px oklch(0 0 0 / 0.62);
+  --shadow-ds-card:        0 1px 0 oklch(0 0 0 / 0.60), 0 2px 12px oklch(0 0 0 / 0.50);
+  --shadow-ds-card-strong: 0 1px 0 oklch(0 0 0 / 0.70), 0 4px 24px oklch(0 0 0 / 0.60);
+  --shadow-ds-modal:       0 0 0 1px oklch(0.175 0.007 238), 0 8px 48px oklch(0 0 0 / 0.80);
 }

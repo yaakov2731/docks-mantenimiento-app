@@ -65,32 +65,41 @@ export default function DashboardLayout({ children, title }: { children: React.R
 
   const Sidebar = () => (
     <div className="flex flex-col h-full w-64 relative overflow-hidden"
-      style={{ background: 'var(--sidebar-bg)', color: 'var(--fg-on-dark)' }}>
+      style={{ background: 'var(--sidebar-bg)', borderRight: '1px solid oklch(0.672 0.210 48 / 0.15)' }}>
 
-      {/* Subtle ambient glow */}
-      <div className="pointer-events-none absolute top-0 right-0 w-48 h-48 rounded-full"
-        style={{ background: 'radial-gradient(circle, oklch(0.65 0.135 70 / 0.08) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
+      {/* Orange top accent line */}
+      <div className="absolute top-0 left-0 right-0 h-px"
+        style={{ background: 'linear-gradient(90deg, oklch(0.672 0.210 48), oklch(0.590 0.208 44))' }} />
 
       {/* Logo */}
-      <div className="px-5 pt-6 pb-5" style={{ borderBottom: '1px solid oklch(1 0 0 / 0.07)' }}>
+      <div className="px-5 pt-6 pb-4"
+        style={{ borderBottom: '1px solid oklch(0.195 0.007 238)' }}>
         <BrandLogo variant="dark" size="sm" showTagline />
       </div>
 
       {/* User card */}
       {user && (
-        <div className="mx-3 mt-3 mb-1 rounded-xl px-3 py-2.5"
-          style={{ background: 'oklch(1 0 0 / 0.05)', border: '1px solid oklch(1 0 0 / 0.08)' }}>
+        <div className="mx-3 mt-3 mb-1 px-3 py-2.5"
+          style={{
+            background: 'oklch(0.128 0.007 238)',
+            border: '1px solid oklch(0.195 0.007 238)',
+            borderLeft: '2px solid oklch(0.672 0.210 48)',
+            borderRadius: '3px',
+          }}>
           <p className="text-[9px] uppercase tracking-widest font-semibold"
-            style={{ color: 'oklch(1 0 0 / 0.28)' }}>Conectado como</p>
-          <p className="text-[13px] font-semibold mt-0.5 truncate" style={{ color: 'var(--fg-on-dark)', fontFamily: 'var(--font-heading)' }}>{user.name}</p>
-          <p className="text-[11px]" style={{ color: 'oklch(1 0 0 / 0.38)' }}>{roleLabel[userRole ?? 'employee']}</p>
+            style={{ color: 'oklch(0.672 0.210 48 / 0.70)', fontFamily: 'IBM Plex Mono, monospace' }}>Conectado como</p>
+          <p className="text-[13px] font-semibold mt-0.5 truncate"
+            style={{ color: 'oklch(0.920 0.006 72)', fontFamily: 'IBM Plex Mono, monospace' }}>{user.name}</p>
+          <p className="text-[11px]" style={{ color: 'oklch(0.555 0.008 72)', fontFamily: 'IBM Plex Sans, sans-serif' }}>
+            {roleLabel[userRole ?? 'employee']}
+          </p>
         </div>
       )}
 
       {/* Nav */}
-      <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         <p className="text-[9px] uppercase tracking-widest font-semibold px-3 mb-2"
-          style={{ color: 'oklch(1 0 0 / 0.22)' }}>Navegación</p>
+          style={{ color: 'oklch(0.672 0.210 48 / 0.50)', fontFamily: 'IBM Plex Mono, monospace' }}>Navegación</p>
         {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = location === href
           return (
@@ -98,19 +107,35 @@ export default function DashboardLayout({ children, title }: { children: React.R
               key={href}
               href={href}
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all"
+              className="flex items-center gap-2.5 px-3 py-2 text-[12px] transition-all"
               style={active ? {
-                background: 'oklch(0.65 0.135 70 / 0.18)',
-                color: 'oklch(0.88 0.10 72)',
+                background: 'oklch(0.672 0.210 48 / 0.12)',
+                color: 'oklch(0.672 0.210 48)',
                 fontWeight: '600',
-                boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.06)',
+                borderLeft: '2px solid oklch(0.672 0.210 48)',
+                borderRadius: '0 3px 3px 0',
+                fontFamily: 'IBM Plex Mono, monospace',
+                letterSpacing: '0.01em',
               } : {
-                color: 'oklch(1 0 0 / 0.44)',
+                color: 'oklch(0.555 0.008 72)',
+                borderLeft: '2px solid transparent',
+                borderRadius: '0 3px 3px 0',
+                fontFamily: 'IBM Plex Sans, sans-serif',
               }}
-              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(1 0 0 / 0.78)' }}
-              onMouseLeave={e => { if (!active) (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(1 0 0 / 0.44)' }}
+              onMouseEnter={e => {
+                if (!active) {
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(0.920 0.006 72)'
+                  ;(e.currentTarget as HTMLAnchorElement).style.background = 'oklch(0.195 0.007 238 / 0.40)'
+                }
+              }}
+              onMouseLeave={e => {
+                if (!active) {
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(0.555 0.008 72)'
+                  ;(e.currentTarget as HTMLAnchorElement).style.background = 'transparent'
+                }
+              }}
             >
-              <Icon size={15} style={{ opacity: active ? 1 : 0.7 }} />
+              <Icon size={14} style={{ opacity: active ? 1 : 0.6, flexShrink: 0 }} />
               {label}
             </Link>
           )
@@ -118,22 +143,27 @@ export default function DashboardLayout({ children, title }: { children: React.R
       </nav>
 
       {/* Logout */}
-      <div className="px-2.5 pb-4 pt-3" style={{ borderTop: '1px solid oklch(1 0 0 / 0.07)' }}>
+      <div className="px-2 pb-4 pt-2" style={{ borderTop: '1px solid oklch(0.195 0.007 238)' }}>
         <button
           type="button"
           onClick={() => logout.mutate()}
-          className="flex items-center gap-2.5 px-3 py-2 w-full rounded-lg text-[13px] transition-all"
-          style={{ color: 'oklch(1 0 0 / 0.32)', background: 'transparent' }}
+          className="flex items-center gap-2.5 px-3 py-2 w-full text-[12px] transition-all"
+          style={{
+            color: 'oklch(0.440 0.007 238)',
+            background: 'transparent',
+            borderRadius: '3px',
+            fontFamily: 'IBM Plex Sans, sans-serif',
+          }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'oklch(1 0 0 / 0.06)'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'oklch(1 0 0 / 0.65)'
+            (e.currentTarget as HTMLButtonElement).style.background = 'oklch(0.545 0.218 27 / 0.10)'
+            ;(e.currentTarget as HTMLButtonElement).style.color = 'oklch(0.545 0.218 27)'
           }}
           onMouseLeave={e => {
             (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'oklch(1 0 0 / 0.32)'
+            ;(e.currentTarget as HTMLButtonElement).style.color = 'oklch(0.440 0.007 238)'
           }}
         >
-          <LogOut size={15} />
+          <LogOut size={13} />
           Cerrar sesión
         </button>
       </div>
@@ -155,7 +185,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
             <Sidebar />
           </div>
           <div className="flex-1"
-            style={{ background: 'oklch(0 0 0 / 0.50)', backdropFilter: 'blur(2px)' }}
+            style={{ background: 'oklch(0 0 0 / 0.65)', backdropFilter: 'blur(2px)' }}
             onClick={() => setOpen(false)} />
         </div>
       )}
@@ -164,25 +194,32 @@ export default function DashboardLayout({ children, title }: { children: React.R
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Top bar */}
-        <header className="flex items-center gap-3 flex-shrink-0 px-4 md:px-5"
+        <header
+          className="flex items-center gap-3 flex-shrink-0 px-4 md:px-5 relative"
           style={{
-            height: '52px',
+            height: '48px',
             background: 'var(--surface)',
             borderBottom: '1px solid var(--border)',
           }}>
+
+          {/* Orange accent line top */}
+          <div className="absolute top-0 left-0 right-0 h-px"
+            style={{ background: 'var(--primary)', opacity: 0.4 }} />
+
           <button
             type="button"
-            className="md:hidden p-2 rounded-lg transition-colors"
-            style={{ color: 'var(--text-2)' }}
+            className="md:hidden p-1.5 transition-colors"
+            style={{ color: 'var(--text-2)', borderRadius: '3px' }}
             onClick={() => setOpen(!open)}
             aria-label="Abrir menú"
           >
-            {open ? <X size={20} /> : <Menu size={20} />}
+            {open ? <X size={18} /> : <Menu size={18} />}
           </button>
 
-          <div className="flex-1 min-w-0">
-            <h1 className="font-heading font-semibold truncate"
-              style={{ fontSize: '16px', color: 'var(--text-1)', fontFamily: 'var(--font-heading)', letterSpacing: '-0.01em' }}>
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <span style={{ color: 'var(--primary)', fontFamily: 'IBM Plex Mono, monospace', fontSize: '11px', opacity: 0.6 }}>{'>'}</span>
+            <h1 className="font-mono font-semibold truncate"
+              style={{ fontSize: '13px', color: 'var(--text-1)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
               {title ?? 'Dashboard'}
             </h1>
           </div>
@@ -192,8 +229,8 @@ export default function DashboardLayout({ children, title }: { children: React.R
             type="button"
             onClick={toggle}
             aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-            className="p-2 rounded-lg transition-all"
-            style={{ color: 'var(--text-2)', background: 'transparent' }}
+            className="p-1.5 transition-all"
+            style={{ color: 'var(--text-2)', background: 'transparent', borderRadius: '2px' }}
             onMouseEnter={e => {
               (e.currentTarget as HTMLButtonElement).style.background = 'var(--gray-100)'
               ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--primary)'
@@ -203,30 +240,36 @@ export default function DashboardLayout({ children, title }: { children: React.R
               ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--text-2)'
             }}
           >
-            {dark ? <Sun size={16} /> : <Moon size={16} />}
+            {dark ? <Sun size={14} /> : <Moon size={14} />}
           </button>
 
           <a
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 rounded-lg px-3 py-2 transition-all"
-            style={{ color: 'var(--text-2)', border: '1px solid var(--border)', fontSize: '12px' }}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 transition-all"
+            style={{
+              color: 'var(--text-2)',
+              border: '1px solid var(--border)',
+              fontSize: '11px',
+              borderRadius: '2px',
+              fontFamily: 'IBM Plex Mono, monospace',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}
             onMouseEnter={e => {
               const el = e.currentTarget as HTMLAnchorElement
               el.style.color = 'var(--primary)'
-              el.style.borderColor = 'var(--primary-light)'
-              el.style.background = 'var(--primary-light)'
+              el.style.borderColor = 'var(--primary)'
             }}
             onMouseLeave={e => {
               const el = e.currentTarget as HTMLAnchorElement
               el.style.color = 'var(--text-2)'
               el.style.borderColor = 'var(--border)'
-              el.style.background = 'transparent'
             }}
           >
-            <Home size={12} />
-            Ver formulario
+            <Home size={11} />
+            Formulario
           </a>
         </header>
 
