@@ -3,89 +3,89 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── CSS TOKENS (legacy aliases — synced to Predio Corporativo palette) ── */
+/* ── CSS TOKENS (legacy aliases — synced to Mando Marítimo palette) ── */
 :root {
-  --primary:            oklch(0.578 0.195 56);
-  --primary-dark:       oklch(0.512 0.192 52);
-  --primary-light:      oklch(0.952 0.038 65);
-  --sidebar-bg:         oklch(0.195 0.012 50);
-  --navy:               oklch(0.195 0.012 50);
-  --navy-mid:           oklch(0.238 0.010 50);
-  --navy-light:         oklch(0.290 0.010 50);
+  --primary:            oklch(0.748 0.162 70);
+  --primary-dark:       oklch(0.680 0.158 66);
+  --primary-light:      oklch(0.940 0.036 78);
+  --sidebar-bg:         oklch(0.108 0.022 258);
+  --navy:               oklch(0.108 0.022 258);
+  --navy-mid:           oklch(0.148 0.020 256);
+  --navy-light:         oklch(0.198 0.018 254);
 
-  --accent:             oklch(0.548 0.100 220);
-  --teal:               oklch(0.548 0.100 220);
-  --accent-light:       oklch(0.944 0.026 220);
-  --secondary:          oklch(0.540 0.085 165);
-  --success:            oklch(0.548 0.188 148);
-  --warning:            oklch(0.618 0.165 76);
-  --warn:               oklch(0.618 0.165 76);
-  --danger:             oklch(0.535 0.218 26);
+  --accent:             oklch(0.588 0.148 215);
+  --teal:               oklch(0.588 0.148 215);
+  --accent-light:       oklch(0.934 0.030 215);
+  --secondary:          oklch(0.545 0.088 165);
+  --success:            oklch(0.555 0.182 148);
+  --warning:            oklch(0.625 0.160 78);
+  --warn:               oklch(0.625 0.160 78);
+  --danger:             oklch(0.545 0.212 28);
 
-  --background:         oklch(0.952 0.006 62);
-  --bg:                 oklch(0.952 0.006 62);
-  --surface:            oklch(0.990 0.003 60);
-  --border:             oklch(0.878 0.008 60);
-  --border-dark:        oklch(0.818 0.010 56);
+  --background:         oklch(0.944 0.006 250);
+  --bg:                 oklch(0.944 0.006 250);
+  --surface:            oklch(0.985 0.002 252);
+  --border:             oklch(0.862 0.008 250);
+  --border-dark:        oklch(0.808 0.010 248);
 
-  --gray-50:            oklch(0.968 0.005 62);
-  --gray-100:           oklch(0.942 0.007 60);
-  --gray-200:           oklch(0.904 0.008 58);
-  --gray-400:           oklch(0.758 0.010 56);
-  --gray-500:           oklch(0.642 0.010 54);
-  --gray-600:           oklch(0.528 0.010 52);
-  --gray-800:           oklch(0.295 0.012 50);
-  --gray-900:           oklch(0.178 0.012 48);
+  --gray-50:            oklch(0.962 0.004 250);
+  --gray-100:           oklch(0.935 0.005 248);
+  --gray-200:           oklch(0.896 0.006 248);
+  --gray-400:           oklch(0.748 0.008 250);
+  --gray-500:           oklch(0.632 0.009 250);
+  --gray-600:           oklch(0.518 0.010 250);
+  --gray-800:           oklch(0.285 0.016 256);
+  --gray-900:           oklch(0.142 0.022 258);
 
-  --text-1:             oklch(0.178 0.012 48);
-  --text-2:             oklch(0.495 0.010 52);
-  --text-3:             oklch(0.668 0.008 54);
+  --text-1:             oklch(0.142 0.022 258);
+  --text-2:             oklch(0.478 0.012 252);
+  --text-3:             oklch(0.642 0.009 250);
 
-  --shadow-card:        0 1px 2px oklch(0.818 0.010 56 / 0.80), 0 2px 8px oklch(0 0 0 / 0.06);
-  --shadow-card-strong: 0 1px 2px oklch(0.818 0.010 56 / 0.80), 0 4px 16px oklch(0 0 0 / 0.10);
-  --shadow-modal:       0 0 0 1px oklch(0.878 0.008 60), 0 8px 40px oklch(0 0 0 / 0.18);
-  --shadow-btn:         0 2px 8px oklch(0.578 0.195 56 / 0.38);
-  --shadow-btn-primary: 0 2px 8px oklch(0.578 0.195 56 / 0.38);
+  --shadow-card:        0 1px 2px oklch(0.808 0.010 248 / 0.75), 0 2px 8px oklch(0 0 0 / 0.05);
+  --shadow-card-strong: 0 1px 2px oklch(0.808 0.010 248 / 0.75), 0 4px 18px oklch(0 0 0 / 0.09);
+  --shadow-modal:       0 0 0 1px oklch(0.862 0.008 250), 0 10px 48px oklch(0 0 0 / 0.18);
+  --shadow-btn:         0 2px 10px oklch(0.748 0.162 70 / 0.40);
+  --shadow-btn-primary: 0 2px 10px oklch(0.748 0.162 70 / 0.40);
 }
 
 .dark {
-  --primary:      oklch(0.748 0.185 62);
-  --primary-dark: oklch(0.678 0.182 58);
-  --primary-light:oklch(0.215 0.038 62);
+  --primary:      oklch(0.788 0.158 72);
+  --primary-dark: oklch(0.718 0.154 68);
+  --primary-light:oklch(0.188 0.042 72);
 
-  --background: oklch(0.158 0.010 52);
-  --bg:         oklch(0.158 0.010 52);
-  --surface:    oklch(0.192 0.010 52);
-  --border:     oklch(0.255 0.009 52);
-  --border-dark:oklch(0.312 0.009 52);
-  --sidebar-bg: oklch(0.108 0.012 48);
-  --navy:       oklch(0.108 0.012 48);
+  --background: oklch(0.115 0.022 258);
+  --bg:         oklch(0.115 0.022 258);
+  --surface:    oklch(0.148 0.020 256);
+  --border:     oklch(0.208 0.018 256);
+  --border-dark:oklch(0.268 0.016 254);
+  --sidebar-bg: oklch(0.072 0.020 262);
+  --navy:       oklch(0.072 0.020 262);
 
-  --gray-50:    oklch(0.192 0.010 52);
-  --gray-100:   oklch(0.222 0.010 52);
-  --gray-200:   oklch(0.255 0.009 52);
-  --gray-400:   oklch(0.382 0.009 52);
-  --gray-500:   oklch(0.480 0.009 52);
-  --gray-600:   oklch(0.575 0.009 52);
-  --gray-800:   oklch(0.748 0.011 65);
-  --gray-900:   oklch(0.922 0.012 65);
+  --gray-50:    oklch(0.148 0.018 256);
+  --gray-100:   oklch(0.178 0.016 256);
+  --gray-200:   oklch(0.208 0.014 254);
+  --gray-400:   oklch(0.328 0.010 252);
+  --gray-500:   oklch(0.428 0.009 252);
+  --gray-600:   oklch(0.528 0.008 250);
+  --gray-800:   oklch(0.738 0.010 75);
+  --gray-900:   oklch(0.918 0.010 75);
 
-  --text-1:     oklch(0.922 0.012 65);
-  --text-2:     oklch(0.548 0.010 60);
-  --text-3:     oklch(0.378 0.009 56);
+  --text-1:     oklch(0.925 0.008 75);
+  --text-2:     oklch(0.538 0.012 258);
+  --text-3:     oklch(0.365 0.010 256);
 
-  --shadow-card:        0 1px 0 oklch(0 0 0 / 0.40), 0 2px 10px oklch(0 0 0 / 0.30);
-  --shadow-card-strong: 0 1px 0 oklch(0 0 0 / 0.50), 0 4px 18px oklch(0 0 0 / 0.40);
-  --shadow-modal:       0 0 0 1px oklch(0.255 0.009 52), 0 8px 48px oklch(0 0 0 / 0.65);
-  --shadow-btn:         0 2px 10px oklch(0.748 0.185 62 / 0.40);
-  --shadow-btn-primary: 0 2px 10px oklch(0.748 0.185 62 / 0.40);
+  --shadow-card:        0 1px 0 oklch(0 0 0 / 0.45), 0 2px 12px oklch(0 0 0 / 0.35);
+  --shadow-card-strong: 0 1px 0 oklch(0 0 0 / 0.55), 0 4px 22px oklch(0 0 0 / 0.45);
+  --shadow-modal:       0 0 0 1px oklch(0.208 0.018 256), 0 10px 60px oklch(0 0 0 / 0.70);
+  --shadow-btn:         0 2px 12px oklch(0.788 0.158 72 / 0.45);
+  --shadow-btn-primary: 0 2px 12px oklch(0.788 0.158 72 / 0.45);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 html { font-size: 14px; }
 
 html, body {
-  font-family: 'IBM Plex Sans', var(--font-body), sans-serif;
+  font-family: 'Instrument Sans', var(--font-body), sans-serif;
   background-color: var(--background);
   color: var(--text-1);
   min-height: 100vh;
@@ -94,8 +94,9 @@ html, body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'IBM Plex Mono', var(--font-heading), monospace;
-  letter-spacing: -0.02em;
+  font-family: 'Bricolage Grotesque', var(--font-heading), sans-serif;
+  letter-spacing: -0.03em;
+  font-weight: 700;
 }
 
 .tabular-nums, [data-stat], .text-2xl, .text-3xl, .text-xl {
@@ -111,7 +112,7 @@ h1, h2, h3, h4, h5, h6 {
 ::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
 
-/* ── AMBER ACCENT LINE on top of header ── */
+/* ── GOLD ACCENT LINE on top of header ── */
 .terminal-topline::before {
   content: '';
   position: absolute;
@@ -156,8 +157,8 @@ h1, h2, h3, h4, h5, h6 {
   .hero-card {
     background: var(--sidebar-bg);
     border-radius: 4px;
-    border: 1px solid oklch(0.878 0.008 60 / 0.15);
-    border-top: 1px solid oklch(0.578 0.195 56 / 0.50);
+    border: 1px solid oklch(0.862 0.008 250 / 0.12);
+    border-top: 1px solid oklch(0.748 0.162 70 / 0.55);
     padding: 20px 24px;
     position: relative;
     overflow: hidden;
@@ -173,7 +174,7 @@ h1, h2, h3, h4, h5, h6 {
     position: absolute;
     top: -60px; right: -40px;
     width: 280px; height: 280px;
-    background: radial-gradient(circle, oklch(0.578 0.195 56 / 0.08) 0%, transparent 65%);
+    background: radial-gradient(circle, oklch(0.748 0.162 70 / 0.07) 0%, transparent 65%);
     pointer-events: none;
   }
 
@@ -181,16 +182,16 @@ h1, h2, h3, h4, h5, h6 {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    background: oklch(0.578 0.195 56 / 0.16);
-    border: 1px solid oklch(0.578 0.195 56 / 0.35);
-    color: oklch(0.748 0.185 62);
+    background: oklch(0.748 0.162 70 / 0.16);
+    border: 1px solid oklch(0.748 0.162 70 / 0.35);
+    color: oklch(0.788 0.158 72);
     font-size: 10px;
     font-weight: 600;
     padding: 2px 8px;
     border-radius: 2px;
     text-transform: uppercase;
     letter-spacing: 0.10em;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   /* ── KPI CARDS ── */
@@ -253,11 +254,11 @@ h1, h2, h3, h4, h5, h6 {
   /* ── BUTTONS ── */
   .btn-primary {
     background-color: var(--primary);
-    color: oklch(0.992 0.002 60);
+    color: oklch(0.092 0.018 258);
     border-radius: 2px;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 12px;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     transition: all 0.12s ease;
@@ -277,7 +278,7 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: 2px;
     font-weight: 500;
     font-size: 12px;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     transition: all 0.12s ease;
@@ -297,7 +298,7 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: 2px;
     font-size: 10px;
     font-weight: 600;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
@@ -305,7 +306,7 @@ h1, h2, h3, h4, h5, h6 {
   /* ── INPUTS ── */
   .filter-input, .filter-select,
   .input, .login-input, .pub-input, .config-input {
-    font-family: 'IBM Plex Sans', sans-serif;
+    font-family: 'Instrument Sans', sans-serif;
     border: 1px solid var(--border);
     border-radius: 2px;
     background: var(--surface);
@@ -316,7 +317,7 @@ h1, h2, h3, h4, h5, h6 {
 
   .input, .login-input, .pub-input, .config-input {
     border-width: 1px;
-    background: oklch(0.990 0.003 60);
+    background: oklch(0.985 0.002 252);
   }
 
   .filter-input:focus, .filter-select:focus,
@@ -324,7 +325,7 @@ h1, h2, h3, h4, h5, h6 {
   .pub-input:focus, .config-input:focus {
     border-color: var(--primary) !important;
     background: var(--surface) !important;
-    box-shadow: 0 0 0 2px oklch(0.578 0.195 56 / 0.15) !important;
+    box-shadow: 0 0 0 2px oklch(0.748 0.162 70 / 0.15) !important;
   }
 
   /* ── DATA TABLE ── */
@@ -335,7 +336,7 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--text-2);
     text-transform: uppercase;
     letter-spacing: 0.10em;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     background: var(--gray-50);
     border-bottom: 1px solid var(--border);
   }
@@ -346,7 +347,7 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 12.5px;
     vertical-align: middle;
     color: var(--text-1);
-    font-family: 'IBM Plex Sans', sans-serif;
+    font-family: 'Instrument Sans', sans-serif;
   }
 
   .data-table tbody tr:hover td {
@@ -398,17 +399,17 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   top: -60px; right: -60px;
   width: 300px; height: 300px;
-  background: radial-gradient(circle, oklch(0.578 0.195 56 / 0.07) 0%, transparent 65%);
+  background: radial-gradient(circle, oklch(0.748 0.162 70 / 0.06) 0%, transparent 65%);
   pointer-events: none;
 }
 
 /* ── BUTTONS (outside @layer) ── */
 .btn-primary {
   background-color: var(--primary);
-  color: oklch(0.992 0.002 60);
+  color: oklch(0.092 0.018 258);
   border-radius: 2px;
-  font-weight: 600;
-  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   transition: all 0.14s ease;
@@ -427,7 +428,7 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border-dark);
   border-radius: 2px;
   font-weight: 500;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   transition: all 0.14s ease;
@@ -441,7 +442,7 @@ h1, h2, h3, h4, h5, h6 {
 /* ── FOCUS STATES (global) ── */
 input:focus, textarea:focus, select:focus {
   border-color: var(--primary) !important;
-  box-shadow: 0 0 0 2px oklch(0.578 0.195 56 / 0.15) !important;
+  box-shadow: 0 0 0 2px oklch(0.748 0.162 70 / 0.15) !important;
   outline: none;
   background: var(--surface) !important;
 }
@@ -465,6 +466,6 @@ main > * { animation: pageEnter 0.16s ease forwards; }
 
 /* ── SELECTION COLOR ── */
 ::selection {
-  background: oklch(0.578 0.195 56 / 0.18);
+  background: oklch(0.748 0.162 70 / 0.20);
   color: var(--text-1);
 }

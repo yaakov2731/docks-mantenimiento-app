@@ -65,15 +65,15 @@ export default function DashboardLayout({ children, title }: { children: React.R
 
   const Sidebar = () => (
     <div className="flex flex-col h-full w-64 relative overflow-hidden"
-      style={{ background: 'var(--sidebar-bg)', borderRight: '1px solid oklch(0.672 0.210 48 / 0.15)' }}>
+      style={{ background: 'var(--sidebar-bg)', borderRight: '1px solid oklch(0.768 0.165 70 / 0.12)' }}>
 
-      {/* Orange top accent line */}
+      {/* Gold top accent line */}
       <div className="absolute top-0 left-0 right-0 h-px"
-        style={{ background: 'linear-gradient(90deg, oklch(0.672 0.210 48), oklch(0.590 0.208 44))' }} />
+        style={{ background: 'linear-gradient(90deg, oklch(0.768 0.165 70), oklch(0.698 0.160 66))' }} />
 
       {/* Logo */}
       <div className="px-5 pt-6 pb-4"
-        style={{ borderBottom: '1px solid oklch(0.195 0.007 238)' }}>
+        style={{ borderBottom: '1px solid oklch(0.148 0.022 258)' }}>
         <BrandLogo variant="dark" size="sm" showTagline />
       </div>
 
@@ -81,16 +81,16 @@ export default function DashboardLayout({ children, title }: { children: React.R
       {user && (
         <div className="mx-3 mt-3 mb-1 px-3 py-2.5"
           style={{
-            background: 'oklch(0.128 0.007 238)',
-            border: '1px solid oklch(0.195 0.007 238)',
-            borderLeft: '2px solid oklch(0.672 0.210 48)',
+            background: 'oklch(0.062 0.020 262)',
+            border: '1px solid oklch(0.148 0.022 258)',
+            borderLeft: '2px solid oklch(0.768 0.165 70)',
             borderRadius: '3px',
           }}>
           <p className="text-[9px] uppercase tracking-widest font-semibold"
-            style={{ color: 'oklch(0.672 0.210 48 / 0.70)', fontFamily: 'IBM Plex Mono, monospace' }}>Conectado como</p>
+            style={{ color: 'oklch(0.768 0.165 70 / 0.70)', fontFamily: 'JetBrains Mono, monospace' }}>Conectado como</p>
           <p className="text-[13px] font-semibold mt-0.5 truncate"
-            style={{ color: 'oklch(0.920 0.006 72)', fontFamily: 'IBM Plex Mono, monospace' }}>{user.name}</p>
-          <p className="text-[11px]" style={{ color: 'oklch(0.555 0.008 72)', fontFamily: 'IBM Plex Sans, sans-serif' }}>
+            style={{ color: 'oklch(0.928 0.008 75)', fontFamily: 'Bricolage Grotesque, sans-serif' }}>{user.name}</p>
+          <p className="text-[11px]" style={{ color: 'oklch(0.545 0.012 258)', fontFamily: 'Instrument Sans, sans-serif' }}>
             {roleLabel[userRole ?? 'employee']}
           </p>
         </div>
@@ -99,7 +99,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         <p className="text-[9px] uppercase tracking-widest font-semibold px-3 mb-2"
-          style={{ color: 'oklch(0.672 0.210 48 / 0.50)', fontFamily: 'IBM Plex Mono, monospace' }}>Navegación</p>
+          style={{ color: 'oklch(0.768 0.165 70 / 0.50)', fontFamily: 'JetBrains Mono, monospace' }}>Navegación</p>
         {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = location === href
           return (
@@ -109,28 +109,28 @@ export default function DashboardLayout({ children, title }: { children: React.R
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-3 py-2 text-[12px] transition-all"
               style={active ? {
-                background: 'oklch(0.672 0.210 48 / 0.12)',
-                color: 'oklch(0.672 0.210 48)',
+                background: 'oklch(0.768 0.165 70 / 0.12)',
+                color: 'oklch(0.768 0.165 70)',
                 fontWeight: '600',
-                borderLeft: '2px solid oklch(0.672 0.210 48)',
+                borderLeft: '2px solid oklch(0.768 0.165 70)',
                 borderRadius: '0 3px 3px 0',
-                fontFamily: 'IBM Plex Mono, monospace',
+                fontFamily: 'Bricolage Grotesque, sans-serif',
                 letterSpacing: '0.01em',
               } : {
-                color: 'oklch(0.555 0.008 72)',
+                color: 'oklch(0.545 0.012 258)',
                 borderLeft: '2px solid transparent',
                 borderRadius: '0 3px 3px 0',
-                fontFamily: 'IBM Plex Sans, sans-serif',
+                fontFamily: 'Instrument Sans, sans-serif',
               }}
               onMouseEnter={e => {
                 if (!active) {
-                  (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(0.920 0.006 72)'
-                  ;(e.currentTarget as HTMLAnchorElement).style.background = 'oklch(0.195 0.007 238 / 0.40)'
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(0.928 0.008 75)'
+                  ;(e.currentTarget as HTMLAnchorElement).style.background = 'oklch(0.148 0.022 258 / 0.50)'
                 }
               }}
               onMouseLeave={e => {
                 if (!active) {
-                  (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(0.555 0.008 72)'
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(0.545 0.012 258)'
                   ;(e.currentTarget as HTMLAnchorElement).style.background = 'transparent'
                 }
               }}
@@ -143,16 +143,16 @@ export default function DashboardLayout({ children, title }: { children: React.R
       </nav>
 
       {/* Logout */}
-      <div className="px-2 pb-4 pt-2" style={{ borderTop: '1px solid oklch(0.195 0.007 238)' }}>
+      <div className="px-2 pb-4 pt-2" style={{ borderTop: '1px solid oklch(0.148 0.022 258)' }}>
         <button
           type="button"
           onClick={() => logout.mutate()}
           className="flex items-center gap-2.5 px-3 py-2 w-full text-[12px] transition-all"
           style={{
-            color: 'oklch(0.440 0.007 238)',
+            color: 'oklch(0.418 0.010 258)',
             background: 'transparent',
             borderRadius: '3px',
-            fontFamily: 'IBM Plex Sans, sans-serif',
+            fontFamily: 'Instrument Sans, sans-serif',
           }}
           onMouseEnter={e => {
             (e.currentTarget as HTMLButtonElement).style.background = 'oklch(0.545 0.218 27 / 0.10)'
@@ -160,7 +160,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
           }}
           onMouseLeave={e => {
             (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'oklch(0.440 0.007 238)'
+            ;(e.currentTarget as HTMLButtonElement).style.color = 'oklch(0.418 0.010 258)'
           }}
         >
           <LogOut size={13} />
@@ -217,9 +217,9 @@ export default function DashboardLayout({ children, title }: { children: React.R
           </button>
 
           <div className="flex-1 min-w-0 flex items-center gap-2">
-            <span style={{ color: 'var(--primary)', fontFamily: 'IBM Plex Mono, monospace', fontSize: '11px', opacity: 0.6 }}>{'>'}</span>
-            <h1 className="font-mono font-semibold truncate"
-              style={{ fontSize: '13px', color: 'var(--text-1)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+            <span style={{ color: 'var(--primary)', fontFamily: 'JetBrains Mono, monospace', fontSize: '11px', opacity: 0.6 }}>{'>'}</span>
+            <h1 className="font-heading font-bold truncate"
+              style={{ fontSize: '13px', color: 'var(--text-1)', letterSpacing: '0.01em', textTransform: 'uppercase' }}>
               {title ?? 'Dashboard'}
             </h1>
           </div>
@@ -253,7 +253,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
               border: '1px solid var(--border)',
               fontSize: '11px',
               borderRadius: '2px',
-              fontFamily: 'IBM Plex Mono, monospace',
+              fontFamily: 'JetBrains Mono, monospace',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
             }}
