@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import { trpc } from '../lib/trpc'
 import { Button } from '../components/ui/button'
-import { Phone, Mail, MessageCircle, Calendar, X, Trash2, Clock, Bot } from 'lucide-react'
+import { Phone, Mail, MessageCircle, Calendar, X, Trash2, Clock, Bot, CheckSquare, Square, Users } from 'lucide-react'
 
 const ESTADOS_LEAD = [
   { value: 'nuevo', label: 'Nuevo', color: '#2563EB' },
@@ -58,31 +58,52 @@ function formatElapsed(fromValue: unknown, toValue: unknown = new Date()) {
   return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`
 }
 
+type BotState = 'idle' | 'bot_active' | 'lead_replied'
+
+function getBotState(lead: {
+  asignadoA?: string | null
+  needsAttentionAt?: Date | null
+  autoFollowupCount?: number | null
+}): BotState {
+  if (lead.needsAttentionAt) return 'lead_replied'
+  if (lead.asignadoA === 'Bot comercial') return 'bot_active'
+  return 'idle'
+}
+
+const BOT_STATE_BORDER: Record<BotState, string> = {
+  idle: 'border border-gray-100',
+  bot_active: 'border border-blue-200 border-l-4 border-l-blue-400',
+  lead_replied: 'border border-amber-200 border-l-4 border-l-amber-400',
+}
+
 export default function Leads() {
   const [filterEstado, setFilterEstado] = useState('')
   const [selected, setSelected] = useState<number | null>(null)
   const [turnoForm, setTurnoForm] = useState({ fecha: '', hora: '', notas: '' })
   const [asignadoId, setAsignadoId] = useState('')
   const [feedback, setFeedback] = useState('')
-  const [botLeadId, setBotLeadId] = useState<number | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [selectionMode, setSelectionMode] = useState(false)
 
   const utils = trpc.useContext()
   const processFollowups = trpc.leads.processFollowupBatch.useMutation({
     onSuccess: (data) => {
-      alert(`✓ ${data.sent} follow-up${data.sent !== 1 ? 's' : ''} enviado${data.sent !== 1 ? 's' : ''}. (${data.checked} leads revisados)`)
+      alert(`${data.sent} follow-up${data.sent !== 1 ? 's' : ''} enviado${data.sent !== 1 ? 's' : ''}. (${data.checked} leads revisados)`)
     },
   })
   const sendFollowup = trpc.leads.sendFollowup.useMutation({
     onSuccess: () => utils.leads.eventos.invalidate({ id: selected! }),
   })
-  const { data: leads = [], refetch } = trpc.leads.listar.useQuery({ estado: filterEstado || undefined })
+  const { data: leads = [], refetch } = trpc.leads.listar.useQuery(
+    { estado: filterEstado || undefined },
+    { refetchInterval: 15_000 }
+  )
   const { data: lead } = trpc.leads.obtener.useQuery({ id: selected! }, { enabled: !!selected })
   const { data: eventos = [] } = trpc.leads.eventos.useQuery(
     { id: selected! },
     { enabled: !!selected }
   )
   const { data: comerciales = [] } = trpc.usuarios.listarComerciales.useQuery()
-  const botLead = botLeadId ? leads.find(l => l.id === botLeadId) : null
   const eliminar = trpc.leads.eliminar.useMutation({
     onSuccess: () => { setSelected(null); refetch() },
   })
@@ -92,7 +113,7 @@ export default function Leads() {
       if (result.notificationWarning) {
         setFeedback(result.notificationWarning)
       } else if (result.notificationSent) {
-        setFeedback('Lead asignado y notificación enviada por WhatsApp.')
+        setFeedback('Lead asignado y notificacion enviada por WhatsApp.')
       } else {
         setFeedback('')
       }
@@ -103,8 +124,7 @@ export default function Leads() {
   })
   const asignarBot = trpc.leads.asignarBot.useMutation({
     onSuccess: async () => {
-      setFeedback('Lead asignado al bot comercial y respuesta automática encolada por WhatsApp.')
-      setBotLeadId(null)
+      setFeedback('Lead asignado al bot comercial y respuesta automatica encolada por WhatsApp.')
       await refetch()
       if (selected) await utils.leads.obtener.invalidate({ id: selected })
     },
@@ -112,6 +132,50 @@ export default function Leads() {
       setFeedback(error.message || 'No se pudo asignar el lead al bot.')
     },
   })
+  const asignarBotBatch = trpc.leads.asignarBotBatch.useMutation({
+    onSuccess: async (data) => {
+      const errors = data.results.filter((r: any) => !r.ok)
+      if (errors.length > 0) {
+        setFeedback(`${data.sent}/${data.total} leads asignados al bot. ${errors.length} con error.`)
+      } else {
+        setFeedback(`${data.sent} lead${data.sent !== 1 ? 's' : ''} asignado${data.sent !== 1 ? 's' : ''} al bot comercial.`)
+      }
+      setSelectedIds(new Set())
+      setSelectionMode(false)
+      await refetch()
+    },
+    onError: (error) => {
+      setFeedback(error.message || 'Error al asignar leads al bot.')
+    },
+  })
+
+  const stats = useMemo(() => {
+    const total = leads.length
+    const botContacto = leads.filter(l => (l as any).asignadoA === 'Bot comercial' || (l.autoFollowupCount ?? 0) > 0).length
+    const respondieron = leads.filter(l => (l as any).needsAttentionAt).length
+    return { total, botContacto, respondieron }
+  }, [leads])
+
+  const eligibleForBot = useMemo(() => {
+    return leads.filter(l => (l.waId || l.telefono) && (l as any).asignadoA !== 'Bot comercial')
+  }, [leads])
+
+  function toggleSelect(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(eligibleForBot.map(l => l.id)))
+  }
+
+  function deselectAll() {
+    setSelectedIds(new Set())
+  }
 
   async function exportLeads() {
     try {
@@ -135,13 +199,43 @@ export default function Leads() {
 
   return (
     <DashboardLayout title="Leads de Alquiler">
+      {/* Stats counters */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+          <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+          <div className="text-xs text-gray-500 mt-1">Total leads</div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-amber-100 p-4 text-center">
+          <div className="text-2xl font-bold text-amber-600">{stats.botContacto}</div>
+          <div className="text-xs text-amber-600 mt-1">Bot contacto</div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-emerald-100 p-4 text-center">
+          <div className="text-2xl font-bold text-emerald-600">{stats.respondieron}</div>
+          <div className="text-xs text-emerald-600 mt-1">Respondieron</div>
+        </div>
+      </div>
+
       <div className="flex flex-wrap gap-3 items-center justify-between mb-6">
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
           <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)}
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
             <option value="">Todos los estados</option>
             {ESTADOS_LEAD.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
           </select>
+          <button
+            onClick={() => {
+              setSelectionMode(!selectionMode)
+              if (selectionMode) setSelectedIds(new Set())
+            }}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+              selectionMode
+                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <Bot size={14} />
+            {selectionMode ? 'Cancelar seleccion' : 'Seleccionar para bot'}
+          </button>
         </div>
         <div className="flex gap-2">
           <button
@@ -149,41 +243,43 @@ export default function Leads() {
             disabled={processFollowups.isPending}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 disabled:opacity-50"
           >
-            {processFollowups.isPending ? 'Procesando...' : '↺ Follow-ups'}
+            {processFollowups.isPending ? 'Procesando...' : 'Follow-ups'}
           </button>
           <Button variant="secondary" onClick={exportLeads}>Exportar Excel</Button>
         </div>
       </div>
 
-      <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-col md:flex-row md:items-center gap-3 justify-between">
-        <div>
-          <div className="text-sm font-semibold text-amber-950">Mensaje automático del bot</div>
-          <div className="text-xs text-amber-800">
-            Seleccioná un lead de la lista y el bot le envía el primer mensaje para generar interés.
-          </div>
-          {botLead && (
-            <div className="mt-1 text-xs text-amber-900">
-              Seleccionado: <strong>{botLead.nombre}</strong>
+      {/* Selection toolbar */}
+      {selectionMode && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-col md:flex-row md:items-center gap-3 justify-between">
+          <div className="flex items-center gap-3">
+            <div className="text-sm font-semibold text-amber-950">
+              {selectedIds.size} lead{selectedIds.size !== 1 ? 's' : ''} seleccionado{selectedIds.size !== 1 ? 's' : ''}
             </div>
-          )}
+            <div className="flex gap-2">
+              <button onClick={selectAll} className="text-xs text-amber-700 hover:text-amber-900 underline">
+                Seleccionar todos ({eligibleForBot.length})
+              </button>
+              <button onClick={deselectAll} className="text-xs text-amber-700 hover:text-amber-900 underline">
+                Deseleccionar todos
+              </button>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            disabled={selectedIds.size === 0 || asignarBotBatch.isPending}
+            loading={asignarBotBatch.isPending}
+            onClick={() => {
+              if (!window.confirm(`Asignar ${selectedIds.size} lead${selectedIds.size !== 1 ? 's' : ''} al bot comercial?`)) return
+              setFeedback('')
+              asignarBotBatch.mutate({ ids: Array.from(selectedIds) })
+            }}
+          >
+            <Bot size={14} />
+            Enviar bot a {selectedIds.size} lead{selectedIds.size !== 1 ? 's' : ''}
+          </Button>
         </div>
-        <Button
-          size="sm"
-          disabled={!botLead || asignarBot.isLoading || (!botLead.waId && !botLead.telefono)}
-          loading={asignarBot.isLoading}
-          onClick={() => {
-            if (!botLead) return
-            setFeedback('')
-            asignarBot.mutate({ id: botLead.id })
-          }}
-        >
-          <Bot size={14} />
-          Enviar mensaje del bot
-        </Button>
-        {botLead && !botLead.waId && !botLead.telefono && (
-          <div className="text-xs text-amber-700">Ese lead no tiene WhatsApp o teléfono cargado.</div>
-        )}
-      </div>
+      )}
 
       {feedback && !selected && (
         <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
@@ -196,67 +292,98 @@ export default function Leads() {
           <div className="col-span-3 bg-white rounded-xl p-12 text-center shadow-sm text-gray-400">
             No hay leads registrados
           </div>
-        ) : leads.map(l => (
-          <div key={l.id} className={`bg-white rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow border ${botLeadId === l.id ? 'border-amber-400 ring-2 ring-amber-100' : 'border-gray-100'}`}
-            onClick={() => setSelected(l.id)}>
-            <div className="flex items-start justify-between mb-2">
-              <div className="min-w-0 flex-1">
-                <h3 className="font-medium text-sm flex items-center gap-1">
-                  {l.nombre}
-                  {(l as any).needsAttentionAt && (
-                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-xs font-bold" title="Respondió al follow-up">!</span>
+        ) : leads.map(l => {
+          const isSelected = selectedIds.has(l.id)
+          const canSelectForBot = (l.waId || l.telefono) && (l as any).asignadoA !== 'Bot comercial'
+          const botState = getBotState({
+            asignadoA: (l as any).asignadoA,
+            needsAttentionAt: (l as any).needsAttentionAt,
+            autoFollowupCount: l.autoFollowupCount,
+          })
+          return (
+            <div key={l.id}
+              className={`bg-white rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow ${
+                isSelected
+                  ? 'border border-amber-400 ring-2 ring-amber-100'
+                  : BOT_STATE_BORDER[botState]
+              }`}
+              onClick={() => {
+                if (selectionMode && canSelectForBot) {
+                  toggleSelect(l.id)
+                } else {
+                  setSelected(l.id)
+                }
+              }}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div className="min-w-0 flex-1 flex items-start gap-2">
+                  {selectionMode && (
+                    <button
+                      onClick={e => { e.stopPropagation(); if (canSelectForBot) toggleSelect(l.id) }}
+                      className={`mt-0.5 flex-shrink-0 ${canSelectForBot ? 'text-amber-500' : 'text-gray-300 cursor-not-allowed'}`}
+                      disabled={!canSelectForBot}
+                    >
+                      {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                    </button>
                   )}
-                </h3>
-                {l.rubro && <p className="text-xs text-gray-500">{l.rubro}</p>}
+                  <div className="min-w-0">
+                    <h3 className="font-medium text-sm">{l.nombre}</h3>
+                    {l.rubro && <p className="text-xs text-gray-500">{l.rubro}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 ml-2">
+                  <Badge value={l.estado} />
+                  <button
+                    className="p-1 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                    title="Eliminar lead"
+                    onClick={e => {
+                      e.stopPropagation()
+                      if (!window.confirm(`Eliminar el lead de "${l.nombre}"? Esta accion no se puede deshacer.`)) return
+                      eliminar.mutate({ id: l.id })
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 ml-2">
-                <Badge value={l.estado} />
-                <button
-                  className="p-1 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
-                  title="Eliminar lead"
-                  onClick={e => {
-                    e.stopPropagation()
-                    if (!window.confirm(`¿Eliminar el lead de "${l.nombre}"? Esta acción no se puede deshacer.`)) return
-                    eliminar.mutate({ id: l.id })
-                  }}
-                >
-                  <Trash2 size={13} />
-                </button>
+              <div className="space-y-1 text-xs text-gray-500">
+                {l.telefono && <div className="flex items-center gap-1.5"><Phone size={11}/>{l.telefono}</div>}
+                {l.email && <div className="flex items-center gap-1.5"><Mail size={11}/>{l.email}</div>}
+                {l.waId && <div className="flex items-center gap-1.5"><MessageCircle size={11}/>WA: {l.waId}</div>}
+                {l.turnoFecha && <div className="flex items-center gap-1.5 text-primary font-medium"><Calendar size={11}/>Turno: {l.turnoFecha} {l.turnoHora}</div>}
+                {(l as any).asignadoA && <div className="text-[11px] text-emerald-600 font-medium">Asignado a {(l as any).asignadoA}</div>}
               </div>
-            </div>
-            <div className="space-y-1 text-xs text-gray-500">
-              {l.telefono && <div className="flex items-center gap-1.5"><Phone size={11}/>{l.telefono}</div>}
-              {l.email && <div className="flex items-center gap-1.5"><Mail size={11}/>{l.email}</div>}
-              {l.waId && <div className="flex items-center gap-1.5"><MessageCircle size={11}/>WA: {l.waId}</div>}
-              {l.turnoFecha && <div className="flex items-center gap-1.5 text-primary font-medium"><Calendar size={11}/>Turno: {l.turnoFecha} {l.turnoHora}</div>}
-              {(l as any).asignadoA && <div className="text-[11px] text-emerald-600 font-medium">Asignado a {(l as any).asignadoA}</div>}
-            </div>
-            <div className="mt-3 space-y-1 text-xs text-gray-400">
-              <div>{l.fuente === 'whatsapp' ? '📱 WhatsApp' : '🌐 Web'} · Recibido {formatDateTime(l.createdAt)}</div>
-              <div className={`flex items-center gap-1.5 ${(l as any).firstContactedAt ? 'text-emerald-600' : 'text-amber-600'}`}>
-                <Clock size={11}/>
-                {(l as any).firstContactedAt
-                  ? `Respondido en ${formatElapsed(l.createdAt, (l as any).firstContactedAt)}`
-                  : `Sin respuesta hace ${formatElapsed(l.createdAt)}`}
+              <div className="mt-3 space-y-1 text-xs text-gray-400">
+                <div>{l.fuente === 'whatsapp' ? 'WhatsApp' : 'Web'} · Recibido {formatDateTime(l.createdAt)}</div>
+                <div className={`flex items-center gap-1.5 ${(l as any).firstContactedAt ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  <Clock size={11}/>
+                  {(l as any).firstContactedAt
+                    ? `Respondido en ${formatElapsed(l.createdAt, (l as any).firstContactedAt)}`
+                    : `Sin respuesta hace ${formatElapsed(l.createdAt)}`}
+                </div>
               </div>
+              {botState !== 'idle' && (
+                <div className={`mt-3 pt-2 border-t flex items-center gap-1.5 text-xs font-medium ${
+                  botState === 'lead_replied'
+                    ? 'border-amber-100 text-amber-700'
+                    : 'border-blue-100 text-blue-600'
+                }`}>
+                  {botState === 'lead_replied' ? (
+                    <>
+                      <span>⚡</span>
+                      <span>Respondió — hace {formatElapsed((l as any).needsAttentionAt)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🤖</span>
+                      <span>Bot activo{(l.autoFollowupCount ?? 0) > 0 ? ` · ${l.autoFollowupCount} FU enviado${l.autoFollowupCount !== 1 ? 's' : ''}` : ''}</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="mt-3 flex justify-end">
-              <Button
-                size="sm"
-                variant={botLeadId === l.id ? 'default' : 'outline'}
-                disabled={!l.waId && !l.telefono}
-                onClick={e => {
-                  e.stopPropagation()
-                  setBotLeadId(botLeadId === l.id ? null : l.id)
-                  setFeedback('')
-                }}
-              >
-                <Bot size={13} />
-                {botLeadId === l.id ? 'Seleccionado' : 'Seleccionar bot'}
-              </Button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Detail Dialog */}
@@ -268,7 +395,7 @@ export default function Leads() {
                 <h2 className="font-heading font-bold text-lg">{lead.nombre}</h2>
                 <div className="flex gap-2 mt-1 flex-wrap">
                   <Badge value={lead.estado} />
-                  {lead.fuente === 'whatsapp' && <span className="text-xs text-gray-400">📱 WhatsApp</span>}
+                  {lead.fuente === 'whatsapp' && <span className="text-xs text-gray-400">WhatsApp</span>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -276,7 +403,7 @@ export default function Leads() {
                   className="p-1.5 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
                   title="Eliminar lead"
                   onClick={() => {
-                    if (!window.confirm(`¿Eliminar el lead de "${lead.nombre}"? Esta acción no se puede deshacer.`)) return
+                    if (!window.confirm(`Eliminar el lead de "${lead.nombre}"? Esta accion no se puede deshacer.`)) return
                     eliminar.mutate({ id: lead.id })
                   }}
                 >
@@ -290,7 +417,7 @@ export default function Leads() {
               {(lead as any).needsAttentionAt && (
                 <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                   <span className="text-red-600 dark:text-red-400 text-sm font-medium flex-1">
-                    Respondió al follow-up — requiere atención
+                    Respondio al follow-up — requiere atencion
                   </span>
                   <button
                     onClick={() => clearFlag.mutate({ id: selected! })}
@@ -307,7 +434,7 @@ export default function Leads() {
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3 text-sm">
-                {lead.telefono && <div><span className="text-gray-400">Teléfono:</span> {lead.telefono}</div>}
+                {lead.telefono && <div><span className="text-gray-400">Telefono:</span> {lead.telefono}</div>}
                 {lead.email && <div><span className="text-gray-400">Email:</span> {lead.email}</div>}
                 {lead.rubro && <div><span className="text-gray-400">Rubro:</span> {lead.rubro}</div>}
                 {lead.tipoLocal && <div><span className="text-gray-400">Tipo local:</span> {lead.tipoLocal}</div>}
@@ -330,7 +457,7 @@ export default function Leads() {
                   Bot comercial
                 </div>
                 <p className="text-xs text-amber-800">
-                  Envía ahora el primer mensaje automático al WhatsApp del lead y deja activo el seguimiento del bot.
+                  Envia ahora el primer mensaje automatico al WhatsApp del lead y deja activo el seguimiento del bot.
                 </p>
                 <Button
                   size="sm"
@@ -346,7 +473,7 @@ export default function Leads() {
                   Asignar al bot
                 </Button>
                 {!lead.waId && !lead.telefono && (
-                  <div className="text-xs text-amber-700">Este lead necesita WhatsApp o teléfono para que el bot responda.</div>
+                  <div className="text-xs text-amber-700">Este lead necesita WhatsApp o telefono para que el bot responda.</div>
                 )}
               </div>
 
@@ -442,7 +569,7 @@ export default function Leads() {
               {eventos.length > 0 && (
                 <div className="mt-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-2">
-                    Historial de seguimiento automático
+                    Historial de seguimiento automatico
                   </p>
                   <ul className="space-y-2">
                     {eventos.map(ev => (
