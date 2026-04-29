@@ -158,6 +158,11 @@ exports.listUnassignedLeads = listUnassignedLeads;
 exports.actualizarLead = actualizarLead;
 exports.getLeadsForFollowup = getLeadsForFollowup;
 exports.updateLeadFollowup = updateLeadFollowup;
+exports.getLeadByWaId = getLeadByWaId;
+exports.flagLeadNeedsAttention = flagLeadNeedsAttention;
+exports.clearLeadAttentionFlag = clearLeadAttentionFlag;
+exports.createLeadEvento = createLeadEvento;
+exports.getLeadEventos = getLeadEventos;
 exports.crearTareaOperativaManual = crearTareaOperativaManual;
 exports.limpiarDatosDemo = limpiarDatosDemo;
 exports.reiniciarMetricasOperacion = reiniciarMetricasOperacion;
@@ -472,6 +477,14 @@ async function initDb() {
       metadata_json TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+        `CREATE TABLE IF NOT EXISTS leads_evento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER NOT NULL,
+      tipo TEXT NOT NULL,
+      descripcion TEXT NOT NULL,
+      metadata_json TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
         `CREATE TABLE IF NOT EXISTS locatarios_cobranza (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre TEXT NOT NULL,
@@ -570,6 +583,7 @@ async function initDb() {
         `ALTER TABLE empleados ADD COLUMN pago_semanal INTEGER NOT NULL DEFAULT 0`,
         `ALTER TABLE empleados ADD COLUMN pago_quincenal INTEGER NOT NULL DEFAULT 0`,
         `ALTER TABLE empleados ADD COLUMN pago_mensual INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE empleados ADD COLUMN puede_vender INTEGER NOT NULL DEFAULT 0`,
         `ALTER TABLE rondas_ocurrencia ADD COLUMN inicio_real_at INTEGER`,
         `ALTER TABLE rondas_ocurrencia ADD COLUMN pausado_at INTEGER`,
         `ALTER TABLE rondas_ocurrencia ADD COLUMN fin_real_at INTEGER`,
@@ -589,6 +603,7 @@ async function initDb() {
         `ALTER TABLE leads ADD COLUMN temperature TEXT`,
         `ALTER TABLE leads ADD COLUMN auto_followup_count INTEGER`,
         `ALTER TABLE leads ADD COLUMN last_bot_msg_at INTEGER`,
+        `ALTER TABLE leads ADD COLUMN needs_attention_at INTEGER`,
     ];
     for (const sql of alterStmts) {
         try {
@@ -985,8 +1000,21 @@ async function getUsers() {
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 async function getSalesUsers() {
-    const rows = await getUsers();
-    return rows.filter(user => user.role === 'sales' || user.role === 'admin');
+    const panelUsers = await getUsers();
+    const salesPanelUsers = panelUsers.filter(u => u.role === 'sales' || u.role === 'admin');
+    const allEmpleados = await exports.db.select().from(schema.empleados).where((0, drizzle_orm_1.eq)(schema.empleados.activo, true));
+    const vendedorEmpleados = allEmpleados
+        .filter(e => e.puedeVender && e.waId)
+        .map(e => ({
+        id: e.id,
+        name: e.nombre,
+        role: 'sales',
+        waId: e.waId,
+        activo: true,
+    }));
+    const panelUserIds = new Set(salesPanelUsers.map(u => u.id));
+    const uniqueVendedorEmpleados = vendedorEmpleados.filter(e => !panelUserIds.has(e.id));
+    return [...salesPanelUsers, ...uniqueVendedorEmpleados];
 }
 async function getUserById(id) {
     const rows = await exports.db.select().from(schema.users).where((0, drizzle_orm_1.eq)(schema.users.id, id));
@@ -2320,6 +2348,34 @@ async function updateLeadFollowup(id, newCount) {
         .where((0, drizzle_orm_1.eq)(schema.leads.id, id))
         .run();
 }
+async function getLeadByWaId(waId) {
+    const rows = await exports.db.select().from(schema.leads).where((0, drizzle_orm_1.eq)(schema.leads.waId, waId)).limit(1);
+    return rows[0] ?? null;
+}
+async function flagLeadNeedsAttention(leadId, intent) {
+    await exports.db.update(schema.leads).set({
+        needsAttentionAt: new Date(),
+        notas: (0, drizzle_orm_1.sql) `CASE WHEN notas IS NULL OR notas = '' THEN ${intent} ELSE notas || char(10) || ${intent} END`,
+    }).where((0, drizzle_orm_1.eq)(schema.leads.id, leadId)).run();
+}
+async function clearLeadAttentionFlag(leadId) {
+    await exports.db.update(schema.leads).set({ needsAttentionAt: null }).where((0, drizzle_orm_1.eq)(schema.leads.id, leadId)).run();
+}
+async function createLeadEvento(data) {
+    await exports.db.insert(schema.leadsEvento).values({
+        leadId: data.leadId,
+        tipo: data.tipo,
+        descripcion: data.descripcion,
+        metadataJson: data.metadataJson ?? null,
+    }).run();
+}
+async function getLeadEventos(leadId) {
+    return exports.db
+        .select()
+        .from(schema.leadsEvento)
+        .where((0, drizzle_orm_1.eq)(schema.leadsEvento.leadId, leadId))
+        .orderBy(schema.leadsEvento.createdAt);
+}
 async function crearTareaOperativaManual(data) {
     const rows = await exports.db.insert(schema.tareasOperativas).values({
         origen: 'manual',
@@ -2382,10 +2438,11 @@ async function limpiarDatosDemo() {
     };
 }
 async function reiniciarMetricasOperacion() {
-    const [actualizaciones, reportes, leads, botQueue, tareas, tareasEventos, asistencia, asistenciaAuditoria, liquidaciones, marcaciones, rondasOcurrencias, rondasEventos,] = await Promise.all([
+    const [actualizaciones, reportes, leads, leadsEventos, botQueue, tareas, tareasEventos, asistencia, asistenciaAuditoria, liquidaciones, marcaciones, rondasOcurrencias, rondasEventos,] = await Promise.all([
         exports.db.select().from(schema.actualizaciones),
         exports.db.select().from(schema.reportes),
         exports.db.select().from(schema.leads),
+        exports.db.select().from(schema.leadsEvento),
         exports.db.select().from(schema.botQueue),
         exports.db.select().from(schema.tareasOperativas),
         exports.db.select().from(schema.tareasOperativasEvento),
@@ -2398,6 +2455,7 @@ async function reiniciarMetricasOperacion() {
     ]);
     await exports.db.delete(schema.actualizaciones).run();
     await exports.db.delete(schema.reportes).run();
+    await exports.db.delete(schema.leadsEvento).run();
     await exports.db.delete(schema.leads).run();
     await exports.db.delete(schema.botQueue).run();
     await exports.db.delete(schema.tareasOperativasEvento).run();
@@ -2421,7 +2479,8 @@ async function reiniciarMetricasOperacion() {
       'empleado_liquidacion_cierre',
       'marcaciones_empleados',
       'rondas_evento',
-      'rondas_ocurrencia'
+      'rondas_ocurrencia',
+      'leads_evento'
     )`);
     }
     catch {
@@ -2431,6 +2490,7 @@ async function reiniciarMetricasOperacion() {
         actualizaciones: actualizaciones.length,
         reportes: reportes.length,
         leads: leads.length,
+        leadsEventos: leadsEventos.length,
         colaBot: botQueue.length,
         tareas: tareas.length,
         tareasEventos: tareasEventos.length,
@@ -2443,6 +2503,7 @@ async function reiniciarMetricasOperacion() {
         total: actualizaciones.length +
             reportes.length +
             leads.length +
+            leadsEventos.length +
             botQueue.length +
             tareas.length +
             tareasEventos.length +

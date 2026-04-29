@@ -70,3 +70,47 @@ const adminContext = {
         (0, vitest_1.expect)(await (0, db_1.listUnassignedLeads)()).toHaveLength(0);
     });
 });
+(0, vitest_1.describe)('leads eventos', () => {
+    (0, vitest_1.beforeEach)(async () => {
+        const { resetTestDb } = await Promise.resolve().then(() => __importStar(require('./test/db-factory')));
+        await resetTestDb();
+    });
+    (0, vitest_1.it)('creates and retrieves lead eventos', async () => {
+        const leadId = await (0, db_1.crearLead)({
+            nombre: 'Test Evento',
+            telefono: '11 1234-5678',
+            fuente: 'web',
+        });
+        await (0, db_1.createLeadEvento)({
+            leadId,
+            tipo: 'followup1_sent',
+            descripcion: 'Follow-up 1 enviado automáticamente',
+            metadataJson: JSON.stringify({ message: 'Hola Test' }),
+        });
+        const eventos = await (0, db_1.getLeadEventos)(leadId);
+        (0, vitest_1.expect)(eventos).toHaveLength(1);
+        (0, vitest_1.expect)(eventos[0]).toMatchObject({
+            leadId,
+            tipo: 'followup1_sent',
+            descripcion: 'Follow-up 1 enviado automáticamente',
+        });
+        (0, vitest_1.expect)(eventos[0].createdAt).toBeTruthy();
+        (0, vitest_1.expect)(eventos[0].metadataJson).toBe(JSON.stringify({ message: 'Hola Test' }));
+    });
+    (0, vitest_1.it)('leads.eventos tRPC query returns eventos for a lead', async () => {
+        const caller = routers_1.appRouter.createCaller(adminContext);
+        const { id: leadId } = await caller.leads.crear({
+            nombre: 'Trpc Evento Test',
+            telefono: '11 7777-0000',
+            fuente: 'web',
+        });
+        await (0, db_1.createLeadEvento)({
+            leadId,
+            tipo: 'followup1_sent',
+            descripcion: 'Follow-up 1 enviado automáticamente a Trpc Evento Test',
+        });
+        const eventos = await caller.leads.eventos({ id: leadId });
+        (0, vitest_1.expect)(eventos).toHaveLength(1);
+        (0, vitest_1.expect)(eventos[0]).toMatchObject({ tipo: 'followup1_sent', leadId });
+    });
+});

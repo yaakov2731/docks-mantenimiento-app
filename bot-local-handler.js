@@ -98,14 +98,29 @@ function startHeartbeat() {
   }, 60_000)
 }
 
+function isInboundImageMessage(msg) {
+  return msg.type === 'image' || msg.type === 'sticker'
+}
+
+function buildUnsupportedImageReply(msg) {
+  const label = msg.type === 'sticker' ? 'sticker' : 'captura/imagen'
+  return `Recibí tu ${label}. Para comenzar con el bot de Docks, escribime tu consulta en texto.`
+}
+
 // ── Handler principal de mensajes entrantes ────────────────────────────────────
 
 module.exports = function setupMessageHandler(client) {
   client.on('message', async (msg) => {
     // Ignorar mensajes grupales
     if (msg.from.includes('@g.us') || msg.from.includes('@broadcast')) return
-    // Solo texto
-    if (msg.type !== 'chat') return
+    // Las capturas sin caption no se mandan al servidor para no avanzar el wizard.
+    // Si hay caption, se procesa como texto normal.
+    if (isInboundImageMessage(msg) && !(msg.body || '').trim()) {
+      await msg.reply(buildUnsupportedImageReply(msg))
+      console.log(`[bot] 🖼️ Imagen sin texto recibida de ${msg.from}; se pidió respuesta textual`)
+      return
+    }
+    if (msg.type !== 'chat' && !isInboundImageMessage(msg)) return
 
     const waNumber = msg.from.replace('@c.us', '')
     const message  = (msg.body || '').trim()

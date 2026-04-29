@@ -134,10 +134,10 @@ async function navigateBack(session) {
     await updateSession(session.waNumber, {
         currentMenu: previousMenu,
         menuHistory: history,
-        contextData: {},
+        contextData: session.contextData,
     });
     return {
-        session: { ...session, currentMenu: previousMenu, menuHistory: history, contextData: {} },
+        session: { ...session, currentMenu: previousMenu, menuHistory: history, contextData: session.contextData },
         previousMenu,
     };
 }

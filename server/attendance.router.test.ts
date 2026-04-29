@@ -337,6 +337,39 @@ describe('attendance router', () => {
     expect(summary.empleados[0].liquidacion?.segundosTrabajados).toBe(18000)
   })
 
+  it('does not add overnight carryover hours to today when the employee clocks in again on the same day', async () => {
+    const empleadoId = await createEmpleadoId()
+    const caller = appRouter.createCaller(adminContext as any)
+
+    await caller.asistencia.crearManual({
+      empleadoId,
+      tipo: 'entrada',
+      fechaHora: new Date('2026-04-09T12:00:00.000Z'),
+    })
+    await caller.asistencia.crearManual({
+      empleadoId,
+      tipo: 'salida',
+      fechaHora: new Date('2026-04-10T12:00:00.000Z'),
+    })
+    vi.setSystemTime(new Date('2026-04-10T15:00:00.000Z'))
+    await caller.asistencia.crearManual({
+      empleadoId,
+      tipo: 'entrada',
+      fechaHora: new Date('2026-04-10T12:05:00.000Z'),
+    })
+
+    const summary = await caller.asistencia.resumen({ periodo: 'dia' })
+    const today = summary.empleados[0].liquidacion?.dias.find((day: any) => day.fecha === '2026-04-10')
+
+    expect(today).toMatchObject({
+      fecha: '2026-04-10',
+      workedSeconds: 10500,
+      entradas: 1,
+      salidas: 1,
+      turnoAbierto: true,
+    })
+  })
+
   it('lets an admin create and correct manual attendance with audit trail', async () => {
     const empleadoId = await createEmpleadoId()
     const caller = appRouter.createCaller(adminContext as any)

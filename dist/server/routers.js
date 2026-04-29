@@ -47,6 +47,7 @@ const notification_1 = require("./_core/notification");
 const env_1 = require("./_core/env");
 const database = __importStar(require("./db"));
 const schema = __importStar(require("../drizzle/schema"));
+const http_1 = require("./leads/http");
 const service_1 = require("./rounds/service");
 const schedule_1 = require("./rounds/schedule");
 const reporte_assignment_1 = require("./reporte-assignment");
@@ -714,6 +715,45 @@ exports.appRouter = (0, trpc_1.router)({
             });
             return { success: true, queued: true, botQueueId };
         }),
+        asignarBotBatch: trpc_1.protectedProcedure
+            .input(zod_1.z.object({ ids: zod_1.z.array(zod_1.z.number()).min(1).max(50) }))
+            .mutation(async ({ input }) => {
+            const results = [];
+            for (const id of input.ids) {
+                try {
+                    const lead = await (0, db_1.getLeadById)(id);
+                    if (!lead) {
+                        results.push({ id, ok: false, error: 'No encontrado' });
+                        continue;
+                    }
+                    const waNumber = lead.waId || lead.telefono;
+                    if (!waNumber) {
+                        results.push({ id, ok: false, error: 'Sin WhatsApp/teléfono' });
+                        continue;
+                    }
+                    const message = await buildBotLeadReply(lead);
+                    const botQueueId = await (0, db_1.enqueueBotMessage)(waNumber, message);
+                    if (!botQueueId) {
+                        results.push({ id, ok: false, error: 'No se pudo normalizar WhatsApp' });
+                        continue;
+                    }
+                    const now = new Date();
+                    await (0, db_1.actualizarLead)(id, {
+                        asignadoA: 'Bot comercial',
+                        asignadoId: null,
+                        firstContactedAt: lead.firstContactedAt ?? now,
+                        lastBotMsgAt: now,
+                        autoFollowupCount: Math.max(1, Number(lead.autoFollowupCount ?? 0)),
+                    });
+                    results.push({ id, ok: true });
+                }
+                catch (e) {
+                    results.push({ id, ok: false, error: e.message ?? 'Error desconocido' });
+                }
+            }
+            const sent = results.filter(r => r.ok).length;
+            return { success: true, sent, total: input.ids.length, results };
+        }),
         eliminar: trpc_1.protectedProcedure
             .input(zod_1.z.object({ id: zod_1.z.number() }))
             .mutation(async ({ input, ctx }) => {
@@ -721,6 +761,73 @@ exports.appRouter = (0, trpc_1.router)({
             await (0, db_1.deleteLeadById)(input.id);
             return { success: true };
         }),
+        eventos: trpc_1.protectedProcedure
+            .input(zod_1.z.object({ id: zod_1.z.number() }))
+            .query(({ input }) => (0, db_1.getLeadEventos)(input.id)),
+        sendFollowup: trpc_1.protectedProcedure
+            .input(zod_1.z.object({
+            leadId: zod_1.z.number(),
+            tipo: zod_1.z.enum(['followup1_sent', 'followup2_sent']),
+        }))
+            .mutation(async ({ input }) => {
+            const lead = await (0, db_1.getLeadById)(input.leadId);
+            if (!lead)
+                throw new server_1.TRPCError({ code: 'NOT_FOUND', message: 'Lead no encontrado' });
+            if (!lead.waId)
+                throw new server_1.TRPCError({ code: 'BAD_REQUEST', message: 'Lead sin WhatsApp' });
+            const newCount = input.tipo === 'followup1_sent' ? 1 : 2;
+            const buildMsg = input.tipo === 'followup1_sent' ? http_1.buildFollowup1 : http_1.buildFollowup2;
+            const msg = await buildMsg(lead.nombre);
+            await (0, db_1.enqueueBotMessage)(lead.waId, msg);
+            await (0, db_1.createLeadEvento)({
+                leadId: lead.id,
+                tipo: input.tipo,
+                descripcion: `${input.tipo === 'followup1_sent' ? 'Follow-up 1' : 'Follow-up 2'} enviado manualmente a ${lead.nombre}`,
+                metadataJson: JSON.stringify({ message: msg, manual: true }),
+            });
+            await (0, db_1.updateLeadFollowup)(lead.id, newCount);
+            return { ok: true };
+        }),
+        processFollowupBatch: trpc_1.protectedProcedure
+            .mutation(async () => {
+            const leads = await (0, db_1.getLeadsForFollowup)();
+            const now = Date.now();
+            const delay1Min = Number((await (0, db_1.getAppConfig)('followup1_delay_min')) ?? 30);
+            const delay2Hs = Number((await (0, db_1.getAppConfig)('followup2_delay_horas')) ?? 4);
+            const DELAY1_MS = delay1Min * 60 * 1000;
+            const DELAY2_MS = delay2Hs * 60 * 60 * 1000;
+            let sent = 0;
+            for (const lead of leads) {
+                if (!lead.waId)
+                    continue;
+                const lastMs = lead.lastBotMsgAt ? new Date(lead.lastBotMsgAt).getTime() : 0;
+                const elapsed = now - lastMs;
+                const count = lead.autoFollowupCount ?? 0;
+                try {
+                    if (count === 0 && elapsed >= DELAY1_MS) {
+                        const msg = await (0, http_1.buildFollowup1)(lead.nombre);
+                        await (0, db_1.enqueueBotMessage)(lead.waId, msg);
+                        await (0, db_1.createLeadEvento)({ leadId: lead.id, tipo: 'followup1_sent', descripcion: `Follow-up 1 enviado automáticamente a ${lead.nombre}`, metadataJson: JSON.stringify({ message: msg }) });
+                        await (0, db_1.updateLeadFollowup)(lead.id, 1);
+                        sent++;
+                    }
+                    else if (count === 1 && elapsed >= DELAY2_MS) {
+                        const msg = await (0, http_1.buildFollowup2)(lead.nombre);
+                        await (0, db_1.enqueueBotMessage)(lead.waId, msg);
+                        await (0, db_1.createLeadEvento)({ leadId: lead.id, tipo: 'followup2_sent', descripcion: `Follow-up 2 enviado automáticamente a ${lead.nombre}`, metadataJson: JSON.stringify({ message: msg }) });
+                        await (0, db_1.updateLeadFollowup)(lead.id, 2);
+                        sent++;
+                    }
+                }
+                catch (e) {
+                    console.error(`[processFollowupBatch] lead ${lead.id}:`, e);
+                }
+            }
+            return { sent, checked: leads.length };
+        }),
+        clearAttentionFlag: trpc_1.protectedProcedure
+            .input(zod_1.z.object({ id: zod_1.z.number() }))
+            .mutation(({ input }) => (0, db_1.clearLeadAttentionFlag)(input.id)),
     }),
     rondas: (0, trpc_1.router)({
         crearPlantilla: trpc_1.protectedProcedure
@@ -1199,6 +1306,7 @@ exports.appRouter = (0, trpc_1.router)({
             pagoSemanal: payrollAmountSchema,
             pagoQuincenal: payrollAmountSchema,
             pagoMensual: payrollAmountSchema,
+            puedeVender: zod_1.z.boolean().optional(),
         }))
             .mutation(async ({ input }) => {
             await (0, db_1.crearEmpleado)(input);
@@ -1216,6 +1324,7 @@ exports.appRouter = (0, trpc_1.router)({
             pagoSemanal: payrollAmountSchema,
             pagoQuincenal: payrollAmountSchema,
             pagoMensual: payrollAmountSchema,
+            puedeVender: zod_1.z.boolean().optional(),
         }))
             .mutation(async ({ input }) => {
             const { id, ...data } = input;

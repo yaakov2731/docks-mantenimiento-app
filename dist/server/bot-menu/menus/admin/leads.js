@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildAdminLeadsSinAsignar = buildAdminLeadsSinAsignar;
 exports.handleAdminLeadsSinAsignar = handleAdminLeadsSinAsignar;
+exports.buildAdminLeadDetalleDisplay = buildAdminLeadDetalleDisplay;
 exports.handleAdminLeadDetalle = handleAdminLeadDetalle;
 exports.handleAdminLeadElegirVendedor = handleAdminLeadElegirVendedor;
 exports.handleAdminLeadConfirmar = handleAdminLeadConfirmar;
@@ -114,6 +115,9 @@ async function handleAdminLeadsSinAsignar(session, input) {
     return buildAdminLeadDetalle(lead);
 }
 // ─── admin_lead_detalle ───────────────────────────────────────────────────────
+function buildAdminLeadDetalleDisplay(lead) {
+    return buildAdminLeadDetalle(lead);
+}
 function buildAdminLeadDetalle(lead) {
     return [
         `🎯 *Lead: ${lead.nombre ?? 'Sin nombre'}*`,
@@ -222,14 +226,20 @@ async function handleAdminLeadConfirmar(session, input) {
         asignadoA: vendedorNombre,
     });
     if (vendedor?.waId) {
+        const tempEmoji = { hot: '🔥', warm: '🌡️', cold: '❄️', not_fit: '⚫' };
+        const tempLabel = { hot: 'Caliente', warm: 'Tibio', cold: 'Frío', not_fit: 'No aplica' };
+        const temp = lead.temperature ?? 'warm';
         const mensaje = [
             `🎯 *Te asignaron un lead — Docks del Puerto*`,
             ``,
             `👤 *${lead.nombre ?? 'Sin nombre'}*`,
-            `🏪 Rubro: ${lead.rubro ?? '—'}`,
+            lead.telefono ? `📞 ${lead.telefono}` : null,
+            lead.rubro ? `🏪 Rubro: ${lead.rubro}` : null,
+            lead.tipoLocal ? `🏬 Tipo de espacio: ${lead.tipoLocal}` : null,
+            `${tempEmoji[temp] ?? '🌡️'} Temperatura: ${tempLabel[temp] ?? temp}`,
             lead.mensaje ? `💬 "${lead.mensaje}"` : null,
             ``,
-            `Podés ver el detalle y agregar notas desde el menú del bot (opción Mis leads).`,
+            `Respondé *"mis leads"* para ver el detalle y agregar notas.`,
             ``,
             `🔑 Lead #${leadId}`,
         ].filter(Boolean).join('\n');

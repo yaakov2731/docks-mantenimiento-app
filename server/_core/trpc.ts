@@ -10,7 +10,7 @@ export type SessionUser = {
   id: number
   username: string
   name: string
-  role: 'admin' | 'employee' | 'sales'
+  role: 'admin' | 'employee' | 'sales' | 'collections'
 }
 
 export function createContext({ req, res }: CreateExpressContextOptions) {

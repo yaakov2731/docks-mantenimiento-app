@@ -3,9 +3,10 @@ import { useLocation } from 'wouter'
 import { trpc } from '../lib/trpc'
 import BrandLogo from '../components/BrandLogo'
 
-type PanelRole = 'admin' | 'employee' | 'sales'
+type PanelRole = 'admin' | 'employee' | 'sales' | 'collections'
 
 function getDefaultRoute(role?: PanelRole) {
+  if (role === 'collections') return '/cobranzas'
   return role === 'sales' ? '/leads' : '/dashboard'
 }
 

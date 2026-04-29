@@ -3,6 +3,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.buildFollowup1 = buildFollowup1;
+exports.buildFollowup2 = buildFollowup2;
 const express_1 = require("express");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const exceljs_1 = __importDefault(require("exceljs"));
@@ -231,15 +233,34 @@ router.get('/leads-followup', async (req, res) => {
             const lastMs = lead.lastBotMsgAt ? new Date(lead.lastBotMsgAt).getTime() : 0;
             const elapsed = now - lastMs;
             const count = lead.autoFollowupCount ?? 0;
-            if (count === 0 && elapsed >= DELAY1_MS) {
-                await (0, db_1.enqueueBotMessage)(lead.waId, await buildFollowup1(lead.nombre));
-                await (0, db_1.updateLeadFollowup)(lead.id, 1);
-                sent++;
+            try {
+                if (count === 0 && elapsed >= DELAY1_MS) {
+                    const msg = await buildFollowup1(lead.nombre);
+                    await (0, db_1.enqueueBotMessage)(lead.waId, msg);
+                    await (0, db_1.createLeadEvento)({
+                        leadId: lead.id,
+                        tipo: 'followup1_sent',
+                        descripcion: `Follow-up 1 enviado automáticamente a ${lead.nombre}`,
+                        metadataJson: JSON.stringify({ message: msg }),
+                    });
+                    await (0, db_1.updateLeadFollowup)(lead.id, 1);
+                    sent++;
+                }
+                else if (count === 1 && elapsed >= DELAY2_MS) {
+                    const msg = await buildFollowup2(lead.nombre);
+                    await (0, db_1.enqueueBotMessage)(lead.waId, msg);
+                    await (0, db_1.createLeadEvento)({
+                        leadId: lead.id,
+                        tipo: 'followup2_sent',
+                        descripcion: `Follow-up 2 enviado automáticamente a ${lead.nombre}`,
+                        metadataJson: JSON.stringify({ message: msg }),
+                    });
+                    await (0, db_1.updateLeadFollowup)(lead.id, 2);
+                    sent++;
+                }
             }
-            else if (count === 1 && elapsed >= DELAY2_MS) {
-                await (0, db_1.enqueueBotMessage)(lead.waId, await buildFollowup2(lead.nombre));
-                await (0, db_1.updateLeadFollowup)(lead.id, 2);
-                sent++;
+            catch (leadErr) {
+                console.error(`[leads-followup] error procesando lead ${lead.id}:`, leadErr);
             }
         }
         res.json({ ok: true, sent, checked: leads.length });

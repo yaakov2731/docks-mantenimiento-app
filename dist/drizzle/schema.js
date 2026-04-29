@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appConfig = exports.tareasOperativasEvento = exports.tareasOperativas = exports.rondasEvento = exports.rondasOcurrencia = exports.rondasProgramacion = exports.rondasPlantilla = exports.botSession = exports.botHeartbeat = exports.cobranzasNotificaciones = exports.cobranzasSaldos = exports.cobranzasImportaciones = exports.locatariosCobranza = exports.botQueue = exports.leads = exports.notificaciones = exports.marcacionesEmpleados = exports.empleadoLiquidacionCierre = exports.empleadoAsistenciaAuditoria = exports.empleadoAsistencia = exports.empleados = exports.actualizaciones = exports.reportes = exports.users = void 0;
+exports.appConfig = exports.leadsEvento = exports.tareasOperativasEvento = exports.tareasOperativas = exports.rondasEvento = exports.rondasOcurrencia = exports.rondasProgramacion = exports.rondasPlantilla = exports.botSession = exports.botHeartbeat = exports.cobranzasNotificaciones = exports.cobranzasSaldos = exports.cobranzasImportaciones = exports.locatariosCobranza = exports.botQueue = exports.leads = exports.notificaciones = exports.marcacionesEmpleados = exports.empleadoLiquidacionCierre = exports.empleadoAsistenciaAuditoria = exports.empleadoAsistencia = exports.empleados = exports.actualizaciones = exports.reportes = exports.users = void 0;
 const sqlite_core_1 = require("drizzle-orm/sqlite-core");
 const drizzle_orm_1 = require("drizzle-orm");
 exports.users = (0, sqlite_core_1.sqliteTable)('users', {
@@ -66,6 +66,7 @@ exports.empleados = (0, sqlite_core_1.sqliteTable)('empleados', {
     pagoQuincenal: (0, sqlite_core_1.integer)('pago_quincenal').default(0).notNull(),
     pagoMensual: (0, sqlite_core_1.integer)('pago_mensual').default(0).notNull(),
     activo: (0, sqlite_core_1.integer)('activo', { mode: 'boolean' }).default(true).notNull(),
+    puedeVender: (0, sqlite_core_1.integer)('puede_vender', { mode: 'boolean' }).default(false).notNull(),
     createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
     updatedAt: (0, sqlite_core_1.integer)('updated_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
 });
@@ -167,6 +168,7 @@ exports.leads = (0, sqlite_core_1.sqliteTable)('leads', {
     // Follow-up automático
     autoFollowupCount: (0, sqlite_core_1.integer)('auto_followup_count').default(0),
     lastBotMsgAt: (0, sqlite_core_1.integer)('last_bot_msg_at', { mode: 'timestamp' }),
+    needsAttentionAt: (0, sqlite_core_1.integer)('needs_attention_at', { mode: 'timestamp' }),
     createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
     updatedAt: (0, sqlite_core_1.integer)('updated_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
 });
@@ -378,6 +380,16 @@ exports.tareasOperativasEvento = (0, sqlite_core_1.sqliteTable)('tareas_operativ
     actorTipo: (0, sqlite_core_1.text)('actor_tipo', { enum: ['system', 'employee', 'admin'] }).default('system').notNull(),
     actorId: (0, sqlite_core_1.integer)('actor_id'),
     actorNombre: (0, sqlite_core_1.text)('actor_nombre'),
+    descripcion: (0, sqlite_core_1.text)('descripcion').notNull(),
+    metadataJson: (0, sqlite_core_1.text)('metadata_json'),
+    createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),
+});
+exports.leadsEvento = (0, sqlite_core_1.sqliteTable)('leads_evento', {
+    id: (0, sqlite_core_1.integer)('id').primaryKey({ autoIncrement: true }),
+    leadId: (0, sqlite_core_1.integer)('lead_id').notNull(),
+    tipo: (0, sqlite_core_1.text)('tipo', {
+        enum: ['followup1_sent', 'followup2_sent'],
+    }).notNull(),
     descripcion: (0, sqlite_core_1.text)('descripcion').notNull(),
     metadataJson: (0, sqlite_core_1.text)('metadata_json'),
     createdAt: (0, sqlite_core_1.integer)('created_at', { mode: 'timestamp' }).default((0, drizzle_orm_1.sql) `(unixepoch())`).notNull(),

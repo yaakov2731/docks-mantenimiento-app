@@ -42,6 +42,7 @@ async function resetTestDb() {
     for (const table of [
         schema.actualizaciones,
         schema.reportes,
+        schema.leadsEvento,
         schema.leads,
         schema.cobranzasNotificaciones,
         schema.cobranzasSaldos,

@@ -62,6 +62,8 @@ const leads_1 = require("./menus/admin/leads");
 const tasks_1 = require("./menus/admin/tasks");
 // Sales
 const leads_2 = require("./menus/sales/leads");
+// Público — lead response
+const lead_response_1 = require("./menus/public/lead-response");
 // Público (no registrados)
 const comercial_1 = require("./menus/public/comercial");
 // ── DB helpers para identificación ───────────────────────────────────────────
@@ -86,12 +88,17 @@ async function identifyUser(waNumber) {
         return normalizeWa(u.waId) === normalized;
     });
     if (panelUser) {
+        if (panelUser.role !== 'admin' && panelUser.role !== 'sales')
+            return null;
         const userType = panelUser.role === 'admin' ? 'admin' : 'sales';
         return { userType, userId: panelUser.id, userName: panelUser.name };
     }
     // 2. ¿Es empleado?
     const empleado = await (0, db_1.getEmpleadoByWaId)(waNumber);
     if (empleado) {
+        if (empleado.puedeVender) {
+            return { userType: 'sales', userId: empleado.id, userName: empleado.nombre };
+        }
         return { userType: 'employee', userId: empleado.id, userName: empleado.nombre };
     }
     return null;
@@ -113,6 +120,18 @@ async function handleIncomingMessage(waNumber, rawMessage) {
                 userId: 0,
                 userName: 'Visitante',
             });
+            // Check if this public user is an existing lead who received follow-ups
+            const existingLead = await (0, db_1.getLeadByWaId)(normalized);
+            if (existingLead && (existingLead.autoFollowupCount ?? 0) > 0) {
+                await (0, session_1.updateSession)(normalized, {
+                    currentMenu: 'lead_respondio',
+                    contextData: { leadId: existingLead.id },
+                    menuHistory: [],
+                });
+                // Refresh session object
+                session = (await (0, session_1.getSession)(normalized));
+                return (0, lead_response_1.buildLeadRespondioMenu)(existingLead.nombre ?? 'ahi');
+            }
             return (0, comercial_1.buildPublicMainMenu)();
         }
         session = await (0, session_1.createSession)({
@@ -126,6 +145,19 @@ async function handleIncomingMessage(waNumber, rawMessage) {
     // Timeout → resetear y mostrar menú
     if ((0, session_1.isSessionExpired)(session)) {
         session = await (0, session_1.resetToMain)(session);
+        // For public users, re-check if they are a lead with follow-ups
+        if (session.userType === 'public') {
+            const existingLead = await (0, db_1.getLeadByWaId)(normalized);
+            if (existingLead && (existingLead.autoFollowupCount ?? 0) > 0) {
+                await (0, session_1.updateSession)(normalized, {
+                    currentMenu: 'lead_respondio',
+                    contextData: { leadId: existingLead.id },
+                    menuHistory: [],
+                });
+                session = (await (0, session_1.getSession)(normalized));
+                return MSG_SESSION_EXPIRADA + (0, lead_response_1.buildLeadRespondioMenu)(existingLead.nombre ?? 'ahi');
+            }
+        }
         return MSG_SESSION_EXPIRADA + await buildMainMenu(session);
     }
     // Actualizar actividad
@@ -373,6 +405,12 @@ async function routeMessage(session, input) {
     }
     // ── PÚBLICO (no registrado) ───────────────────────────────────────────────────
     if (userType === 'public') {
+        if (currentMenu === 'lead_respondio')
+            return (0, lead_response_1.handleLeadRespondio)(session, input);
+        if (currentMenu === 'lead_visita')
+            return (0, lead_response_1.handleLeadVisita)(session, input);
+        if (currentMenu === 'lead_consulta')
+            return (0, lead_response_1.handleLeadConsulta)(session, input);
         if (currentMenu === 'main')
             return (0, comercial_1.handlePublicMain)(session, input);
         if (currentMenu === 'public_alquiler_p1')
@@ -471,6 +509,17 @@ async function buildMenuDisplay(session, menuName) {
             return (0, rondas_2.buildAdminRondasUnassigned)(session);
         if (menuName === 'admin_leads_sin_asignar')
             return (0, leads_1.buildAdminLeadsSinAsignar)(session);
+        if (menuName === 'admin_lead_detalle') {
+            const { leadId } = session.contextData;
+            if (leadId) {
+                const { getLeadById } = await Promise.resolve().then(() => __importStar(require('../db')));
+                const lead = await getLeadById(Number(leadId));
+                if (lead) {
+                    const { buildAdminLeadDetalleDisplay } = await Promise.resolve().then(() => __importStar(require('./menus/admin/leads')));
+                    return buildAdminLeadDetalleDisplay(lead);
+                }
+            }
+        }
         if (menuName === 'admin_bot_autorespuesta')
             return (0, leads_1.buildAdminBotAutorespuesta)();
         if (menuName === 'admin_nueva_tarea_p1')
@@ -502,6 +551,10 @@ async function buildMenuDisplay(session, menuName) {
             return (0, leads_2.buildEstadoLeads)(session);
     }
     if (userType === 'public') {
+        if (menuName === 'lead_respondio') {
+            const lead = await (0, db_1.getLeadByWaId)(session.waNumber);
+            return (0, lead_response_1.buildLeadRespondioMenu)(lead?.nombre ?? 'ahi');
+        }
         if (menuName === 'public_alquiler_p1')
             return (0, comercial_1.buildPublicAlquilerP1)();
         if (menuName === 'public_alquiler_p2')
