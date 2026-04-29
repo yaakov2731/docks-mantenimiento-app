@@ -45,6 +45,11 @@ describe('leads router', () => {
 })
 
 describe('leads eventos', () => {
+  beforeEach(async () => {
+    const { resetTestDb } = await import('./test/db-factory')
+    await resetTestDb()
+  })
+
   it('creates and retrieves lead eventos', async () => {
     const leadId = await crearLead({
       nombre: 'Test Evento',
@@ -67,5 +72,6 @@ describe('leads eventos', () => {
       descripcion: 'Follow-up 1 enviado automáticamente',
     })
     expect(eventos[0].createdAt).toBeTruthy()
+    expect(eventos[0].metadataJson).toBe(JSON.stringify({ message: 'Hola Test' }))
   })
 })

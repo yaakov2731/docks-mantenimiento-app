@@ -2571,7 +2571,7 @@ export async function createLeadEvento(data: {
     tipo: data.tipo,
     descripcion: data.descripcion,
     metadataJson: data.metadataJson ?? null,
-  } as any).run()
+  }).run()
 }
 
 export async function getLeadEventos(leadId: number) {
@@ -2687,6 +2687,7 @@ export async function reiniciarMetricasOperacion() {
 
   await db.delete(schema.actualizaciones).run()
   await db.delete(schema.reportes).run()
+  await db.delete(schema.leadsEvento).run()
   await db.delete(schema.leads).run()
   await db.delete(schema.botQueue).run()
   await db.delete(schema.tareasOperativasEvento).run()

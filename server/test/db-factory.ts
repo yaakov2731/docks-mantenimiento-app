@@ -7,7 +7,12 @@ export async function resetTestDb() {
   for (const table of [
     schema.actualizaciones,
     schema.reportes,
+    schema.leadsEvento,
     schema.leads,
+    schema.cobranzasNotificaciones,
+    schema.cobranzasSaldos,
+    schema.cobranzasImportaciones,
+    schema.locatariosCobranza,
     schema.botQueue,
     schema.notificaciones,
     schema.tareasOperativasEvento,
