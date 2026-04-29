@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import ExcelJS from 'exceljs'
-import { getLeads, getLeadsForFollowup, updateLeadFollowup, enqueueBotMessage, getAppConfig } from '../db'
+import { getLeads, getLeadsForFollowup, updateLeadFollowup, enqueueBotMessage, getAppConfig, createLeadEvento } from '../db'
 import { readEnv } from '../_core/env'
 import { JWT_COOKIE } from '../_core/trpc'
 
@@ -247,12 +247,26 @@ router.get('/leads-followup', async (req: Request, res: Response) => {
       const count   = lead.autoFollowupCount ?? 0
 
       if (count === 0 && elapsed >= DELAY1_MS) {
-        await enqueueBotMessage(lead.waId, await buildFollowup1(lead.nombre))
+        const msg = await buildFollowup1(lead.nombre)
+        await enqueueBotMessage(lead.waId, msg)
         await updateLeadFollowup(lead.id, 1)
+        await createLeadEvento({
+          leadId: lead.id,
+          tipo: 'followup1_sent',
+          descripcion: `Follow-up 1 enviado automáticamente a ${lead.nombre}`,
+          metadataJson: JSON.stringify({ message: msg }),
+        })
         sent++
       } else if (count === 1 && elapsed >= DELAY2_MS) {
-        await enqueueBotMessage(lead.waId, await buildFollowup2(lead.nombre))
+        const msg = await buildFollowup2(lead.nombre)
+        await enqueueBotMessage(lead.waId, msg)
         await updateLeadFollowup(lead.id, 2)
+        await createLeadEvento({
+          leadId: lead.id,
+          tipo: 'followup2_sent',
+          descripcion: `Follow-up 2 enviado automáticamente a ${lead.nombre}`,
+          metadataJson: JSON.stringify({ message: msg }),
+        })
         sent++
       }
     }

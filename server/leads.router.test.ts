@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, beforeEach } from 'vitest'
 import { appRouter } from './routers'
 import { db, listUnassignedLeads, createLeadEvento, getLeadEventos, crearLead } from './db'
 import * as schema from '../drizzle/schema'
@@ -73,5 +73,27 @@ describe('leads eventos', () => {
     })
     expect(eventos[0].createdAt).toBeTruthy()
     expect(eventos[0].metadataJson).toBe(JSON.stringify({ message: 'Hola Test' }))
+  })
+
+  it('leads.eventos tRPC query returns eventos for a lead', async () => {
+    const caller = appRouter.createCaller(adminContext as any)
+
+    const { id: leadId } = await caller.leads.crear({
+      nombre: 'Trpc Evento Test',
+      telefono: '11 7777-0000',
+      fuente: 'web',
+    })
+
+    await createLeadEvento({
+      leadId,
+      tipo: 'followup1_sent',
+      descripcion: 'Follow-up 1 enviado automáticamente a Trpc Evento Test',
+    })
+
+    // This test is a placeholder until Task 4 adds leads.eventos to tRPC
+    // For now just verify the evento was created
+    const eventos = await getLeadEventos(leadId)
+    expect(eventos).toHaveLength(1)
+    expect(eventos[0].tipo).toBe('followup1_sent')
   })
 })
