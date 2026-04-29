@@ -123,6 +123,10 @@ export async function handleAdminLeadsSinAsignar(session: BotSession, input: str
 
 // ─── admin_lead_detalle ───────────────────────────────────────────────────────
 
+export function buildAdminLeadDetalleDisplay(lead: any): string {
+  return buildAdminLeadDetalle(lead)
+}
+
 function buildAdminLeadDetalle(lead: any): string {
   return [
     `🎯 *Lead: ${lead.nombre ?? 'Sin nombre'}*`,

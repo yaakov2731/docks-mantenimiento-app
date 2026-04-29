@@ -153,6 +153,7 @@ async function identifyUser(waNumber: string): Promise<{ userType: UserType; use
     return normalizeWa(u.waId) === normalized
   })
   if (panelUser) {
+    if (panelUser.role !== 'admin' && panelUser.role !== 'sales') return null
     const userType: UserType = panelUser.role === 'admin' ? 'admin' : 'sales'
     return { userType, userId: panelUser.id, userName: panelUser.name }
   }
@@ -460,6 +461,17 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
     if (menuName === 'admin_rondas') return buildAdminRondasMenu(session)
     if (menuName === 'admin_rondas_unassigned') return buildAdminRondasUnassigned(session)
     if (menuName === 'admin_leads_sin_asignar') return buildAdminLeadsSinAsignar(session)
+    if (menuName === 'admin_lead_detalle') {
+      const { leadId } = session.contextData
+      if (leadId) {
+        const { getLeadById } = await import('../db')
+        const lead = await getLeadById(Number(leadId))
+        if (lead) {
+          const { buildAdminLeadDetalleDisplay } = await import('./menus/admin/leads')
+          return buildAdminLeadDetalleDisplay(lead)
+        }
+      }
+    }
     if (menuName === 'admin_bot_autorespuesta')  return buildAdminBotAutorespuesta()
     if (menuName === 'admin_nueva_tarea_p1')    return buildNuevaTareaP1(session)
     if (menuName === 'admin_nueva_tarea_p2')    return buildNuevaTareaP2(session.contextData.tareaEmpleadoNombre as string)

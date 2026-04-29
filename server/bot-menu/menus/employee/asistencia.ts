@@ -42,7 +42,13 @@ export async function buildAsistenciaMenu(session: BotSession): Promise<string> 
 
 export async function handleAsistencia(session: BotSession, input: string): Promise<string> {
   const opt = parseMenuOption(input, 5)
-  if (opt === null) return invalidOption(await buildAsistenciaMenu(session))
+  if (opt === null) {
+    const command = parseAttendanceCommand(input)
+    if (!command) return invalidOption(await buildAsistenciaMenu(session))
+    if (command === 'menu') return buildAsistenciaMenu(session)
+    if (command === 'resumen') return buildResumenDia(session)
+    return ejecutarAsistencia(session, command)
+  }
 
   if (opt === 0) return null as any // engine lo maneja como "volver"
 
@@ -87,6 +93,11 @@ async function ejecutarAsistencia(
       status: result.status,
     })}`)
     const mensajesError: Record<string, string> = {
+      already_on_shift:  'Ya tenés un turno activo. Primero registrá la salida del turno anterior.',
+      not_on_shift:      'Primero registrá la entrada.',
+      already_on_lunch:  'Ya tenés el almuerzo iniciado.',
+      not_on_lunch:      'No tenés almuerzo activo para finalizar.',
+      on_lunch:          'Finalizá el almuerzo antes de registrar la salida.',
       ALREADY_ON_SHIFT:   'Ya tenés un turno activo. Primero registrá la salida del turno anterior.',
       NO_OPEN_SHIFT:      'No tenés un turno activo. Primero registrá la entrada.',
       ALREADY_ON_LUNCH:   'Ya tenés el almuerzo iniciado.',
@@ -208,4 +219,43 @@ function fmtHora(value: Date | string | number | null | undefined): string {
   return d.toLocaleTimeString('es-AR', {
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires',
   })
+}
+
+function parseAttendanceCommand(input: string): 'entrada' | 'salida' | 'inicio_almuerzo' | 'fin_almuerzo' | 'resumen' | 'menu' | null {
+  const normalized = normalizeAttendanceText(input)
+  if (!normalized) return null
+
+  if (matchesAttendanceCommand(normalized, ['asistencia', 'marcacion', 'marcacion asistencia', 'registrar asistencia', 'turno'])) {
+    return 'menu'
+  }
+  if (matchesAttendanceCommand(normalized, ['resumen', 'ver resumen', 'resumen del dia'])) {
+    return 'resumen'
+  }
+  if (matchesAttendanceCommand(normalized, ['registrar entrada', 'marcar entrada', 'entrada', 'ingreso', 'entro', 'llegue'])) {
+    return 'entrada'
+  }
+  if (matchesAttendanceCommand(normalized, ['registrar salida', 'marcar salida', 'salida', 'salgo', 'me voy', 'cierro turno', 'termino turno'])) {
+    return 'salida'
+  }
+  if (matchesAttendanceCommand(normalized, ['inicio almuerzo', 'iniciar almuerzo', 'salgo a almorzar', 'me voy a almorzar'])) {
+    return 'inicio_almuerzo'
+  }
+  if (matchesAttendanceCommand(normalized, ['fin almuerzo', 'volver de almuerzo', 'volvi de almorzar', 'termine almuerzo'])) {
+    return 'fin_almuerzo'
+  }
+
+  return null
+}
+
+function normalizeAttendanceText(input: string): string {
+  return input
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function matchesAttendanceCommand(input: string, patterns: string[]): boolean {
+  return patterns.some(pattern => input === pattern || input.includes(pattern))
 }

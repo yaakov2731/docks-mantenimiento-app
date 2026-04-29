@@ -30,6 +30,33 @@ function estadoLeadEmoji(estado: string): string {
   }
 }
 
+function formatLeadDateTime(value: unknown): string {
+  if (!value) return '—'
+  const date = value instanceof Date ? value : new Date(value as string | number)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatLeadElapsed(fromValue: unknown, toValue: unknown = new Date()): string {
+  if (!fromValue) return '—'
+  const from = fromValue instanceof Date ? fromValue : new Date(fromValue as string | number)
+  const to = toValue instanceof Date ? toValue : new Date(toValue as string | number)
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return '—'
+  const minutes = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000))
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (hours < 24) return rest ? `${hours}h ${rest}m` : `${hours}h`
+  const days = Math.floor(hours / 24)
+  const remainingHours = hours % 24
+  return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`
+}
+
 async function getMisLeads(userId: number) {
   const todos = await db.select().from(schema.leads).where(eq(schema.leads.asignadoId, userId))
   return todos.sort((a, b) => {
@@ -67,6 +94,7 @@ export async function buildLeadsLista(session: BotSession): Promise<string> {
     lines.push(
       `${n}️⃣  ${estadoLeadEmoji(l.estado)} *${l.nombre}*`,
       `   📞 ${contacto} | ${l.rubro ?? 'Sin rubro'} | ${l.estado}`,
+      `   🕒 Recibido: ${formatLeadDateTime(l.createdAt)} | ${l.firstContactedAt ? `respondido en ${formatLeadElapsed(l.createdAt, l.firstContactedAt)}` : `sin respuesta ${formatLeadElapsed(l.createdAt)}`}`,
     )
   })
 
@@ -112,6 +140,10 @@ function buildLeadDetalle(lead: any): string {
     lead.rubro    ? `🏪 Rubro: ${lead.rubro}` : '',
     lead.tipoLocal ? `🏢 Tipo de local: ${lead.tipoLocal}` : '',
     lead.mensaje  ? `💬 Consulta: ${lead.mensaje}` : '',
+    `🕒 Recibido: ${formatLeadDateTime(lead.createdAt)}`,
+    lead.firstContactedAt
+      ? `✅ Primer contacto: ${formatLeadDateTime(lead.firstContactedAt)} (${formatLeadElapsed(lead.createdAt, lead.firstContactedAt)})`
+      : `⏳ Sin respuesta hace ${formatLeadElapsed(lead.createdAt)}`,
     SEP,
     `Estado: ${estadoLeadEmoji(lead.estado)} *${lead.estado}*`,
     lead.notas ? `📝 Notas: ${lead.notas}` : '',
@@ -143,10 +175,7 @@ export async function handleLeadDetalle(session: BotSession, input: string): Pro
 
   if (nuevoEstado) {
     try {
-      await db.update(schema.leads).set({
-        estado: nuevoEstado as any,
-        updatedAt: new Date(),
-      } as any).where(eq(schema.leads.id, leadId as number)).run()
+      await actualizarLead(leadId as number, { estado: nuevoEstado as any })
       await navigateBack(session)
       return `✅ Lead actualizado a *${nuevoEstado}*.\n\n0️⃣  Volver`
     } catch (err) {
@@ -502,6 +531,7 @@ function buildLeadLibreDetalle(lead: any): string {
     lead.rubro    ? `🏪 Rubro: ${lead.rubro}` : '',
     lead.mensaje  ? `💬 "${lead.mensaje}"` : '',
     lead.fuente === 'whatsapp' ? `📱 Vino por WhatsApp` : `🌐 Vino por web`,
+    `🕒 Recibido: ${formatLeadDateTime(lead.createdAt)} | ${lead.firstContactedAt ? `respondido en ${formatLeadElapsed(lead.createdAt, lead.firstContactedAt)}` : `sin respuesta ${formatLeadElapsed(lead.createdAt)}`}`,
     SEP,
     `1️⃣  ✋ Tomar este lead`,
     `0️⃣  Volver`,
