@@ -384,18 +384,20 @@ export default function Leads() {
               {eventos.length > 0 && (
                 <div className="mt-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-2">
-                    Seguimiento automático
+                    Historial de seguimiento automático
                   </p>
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-2">
                     {eventos.map(ev => (
                       <li key={ev.id} className="flex items-start gap-2 text-sm">
-                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {EVENTO_LABELS[ev.tipo] ?? ev.tipo}
-                        </span>
-                        <span className="ml-auto text-xs text-gray-400 whitespace-nowrap">
-                          {formatDateTime(ev.createdAt)}
-                        </span>
+                        <span className="mt-0.5 w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                        <div>
+                          <span className="font-medium text-gray-800 dark:text-gray-100">
+                            {EVENTO_LABELS[ev.tipo] ?? ev.tipo}
+                          </span>
+                          <span className="ml-2 text-xs text-gray-400">
+                            {formatDateTime(ev.createdAt)}
+                          </span>
+                        </div>
                       </li>
                     ))}
                   </ul>
