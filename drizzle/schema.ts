@@ -403,6 +403,17 @@ export const tareasOperativasEvento = sqliteTable('tareas_operativas_evento', {
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
 
+export const leadsEvento = sqliteTable('leads_evento', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  leadId: integer('lead_id').notNull(),
+  tipo: text('tipo', {
+    enum: ['followup1_sent', 'followup2_sent'],
+  }).notNull(),
+  descripcion: text('descripcion').notNull(),
+  metadataJson: text('metadata_json'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
 export type User = typeof users.$inferSelect
 export type Reporte = typeof reportes.$inferSelect
 export type Actualizacion = typeof actualizaciones.$inferSelect
@@ -424,6 +435,7 @@ export type RondaOcurrencia = typeof rondasOcurrencia.$inferSelect
 export type RondaEvento = typeof rondasEvento.$inferSelect
 export type TareaOperativa = typeof tareasOperativas.$inferSelect
 export type TareaOperativaEvento = typeof tareasOperativasEvento.$inferSelect
+export type LeadEvento = typeof leadsEvento.$inferSelect
 
 export const appConfig = sqliteTable('app_config', {
   clave: text('clave').primaryKey(),
