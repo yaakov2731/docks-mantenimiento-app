@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { appRouter } from './routers'
-import { db, listUnassignedLeads } from './db'
+import { db, listUnassignedLeads, createLeadEvento, getLeadEventos, crearLead } from './db'
 import * as schema from '../drizzle/schema'
 
 const adminContext = {
@@ -41,5 +41,31 @@ describe('leads router', () => {
     expect(updated.lastBotMsgAt).toBeTruthy()
     expect(updated.firstContactedAt).toBeTruthy()
     expect(await listUnassignedLeads()).toHaveLength(0)
+  })
+})
+
+describe('leads eventos', () => {
+  it('creates and retrieves lead eventos', async () => {
+    const leadId = await crearLead({
+      nombre: 'Test Evento',
+      telefono: '11 1234-5678',
+      fuente: 'web',
+    })
+
+    await createLeadEvento({
+      leadId,
+      tipo: 'followup1_sent',
+      descripcion: 'Follow-up 1 enviado automáticamente',
+      metadataJson: JSON.stringify({ message: 'Hola Test' }),
+    })
+
+    const eventos = await getLeadEventos(leadId)
+    expect(eventos).toHaveLength(1)
+    expect(eventos[0]).toMatchObject({
+      leadId,
+      tipo: 'followup1_sent',
+      descripcion: 'Follow-up 1 enviado automáticamente',
+    })
+    expect(eventos[0].createdAt).toBeTruthy()
   })
 })

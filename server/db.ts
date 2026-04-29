@@ -314,6 +314,14 @@ export async function initDb() {
       metadata_json TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    `CREATE TABLE IF NOT EXISTS leads_evento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER NOT NULL,
+      tipo TEXT NOT NULL,
+      descripcion TEXT NOT NULL,
+      metadata_json TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
     `CREATE TABLE IF NOT EXISTS locatarios_cobranza (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre TEXT NOT NULL,
@@ -2550,6 +2558,28 @@ export async function updateLeadFollowup(id: number, newCount: number) {
     .set({ autoFollowupCount: newCount, lastBotMsgAt: new Date(), updatedAt: new Date() } as any)
     .where(eq(schema.leads.id, id))
     .run()
+}
+
+export async function createLeadEvento(data: {
+  leadId: number
+  tipo: 'followup1_sent' | 'followup2_sent'
+  descripcion: string
+  metadataJson?: string
+}) {
+  await db.insert(schema.leadsEvento).values({
+    leadId: data.leadId,
+    tipo: data.tipo,
+    descripcion: data.descripcion,
+    metadataJson: data.metadataJson ?? null,
+  } as any).run()
+}
+
+export async function getLeadEventos(leadId: number) {
+  return db
+    .select()
+    .from(schema.leadsEvento)
+    .where(eq(schema.leadsEvento.leadId, leadId))
+    .orderBy(schema.leadsEvento.createdAt)
 }
 
 export async function crearTareaOperativaManual(data: {
