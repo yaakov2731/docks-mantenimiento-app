@@ -798,6 +798,36 @@ export const appRouter = router({
         return { success: true, queued: true, botQueueId }
       }),
 
+    asignarBotBatch: protectedProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1).max(50) }))
+      .mutation(async ({ input }) => {
+        const results: { id: number; ok: boolean; error?: string }[] = []
+        for (const id of input.ids) {
+          try {
+            const lead = await getLeadById(id)
+            if (!lead) { results.push({ id, ok: false, error: 'No encontrado' }); continue }
+            const waNumber = lead.waId || lead.telefono
+            if (!waNumber) { results.push({ id, ok: false, error: 'Sin WhatsApp/teléfono' }); continue }
+            const message = await buildBotLeadReply(lead)
+            const botQueueId = await enqueueBotMessage(waNumber, message)
+            if (!botQueueId) { results.push({ id, ok: false, error: 'No se pudo normalizar WhatsApp' }); continue }
+            const now = new Date()
+            await actualizarLead(id, {
+              asignadoA: 'Bot comercial',
+              asignadoId: null,
+              firstContactedAt: lead.firstContactedAt ?? now,
+              lastBotMsgAt: now,
+              autoFollowupCount: Math.max(1, Number(lead.autoFollowupCount ?? 0)),
+            } as any)
+            results.push({ id, ok: true })
+          } catch (e: any) {
+            results.push({ id, ok: false, error: e.message ?? 'Error desconocido' })
+          }
+        }
+        const sent = results.filter(r => r.ok).length
+        return { success: true, sent, total: input.ids.length, results }
+      }),
+
     eliminar: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
