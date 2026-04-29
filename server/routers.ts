@@ -1402,6 +1402,7 @@ export const appRouter = router({
         pagoSemanal: payrollAmountSchema,
         pagoQuincenal: payrollAmountSchema,
         pagoMensual: payrollAmountSchema,
+        puedeVender: z.boolean().optional(),
       }))
       .mutation(async ({ input }) => {
         await crearEmpleado(input as any)
@@ -1419,6 +1420,7 @@ export const appRouter = router({
         pagoSemanal: payrollAmountSchema,
         pagoQuincenal: payrollAmountSchema,
         pagoMensual: payrollAmountSchema,
+        puedeVender: z.boolean().optional(),
       }))
       .mutation(async ({ input }) => {
         const { id, ...data } = input

@@ -26,6 +26,7 @@ const empty = {
   pagoSemanal: '',
   pagoQuincenal: '',
   pagoMensual: '',
+  puedeVender: false,
 }
 type AttendanceAction = 'entrada' | 'inicio_almuerzo' | 'fin_almuerzo' | 'salida'
 
@@ -601,6 +602,7 @@ export default function Empleados() {
     pagoSemanal: parsePayrollInput(form.pagoSemanal),
     pagoQuincenal: parsePayrollInput(form.pagoQuincenal),
     pagoMensual: parsePayrollInput(form.pagoMensual),
+    puedeVender: form.puedeVender,
   }
 
   const openEditForm = (empleado: any) => {
@@ -615,6 +617,7 @@ export default function Empleados() {
       pagoSemanal: String(empleado.pagoSemanal ?? ''),
       pagoQuincenal: String(empleado.pagoQuincenal ?? ''),
       pagoMensual: String(empleado.pagoMensual ?? ''),
+      puedeVender: empleado.puedeVender ?? false,
     })
     setShowForm(true)
   }
@@ -707,6 +710,15 @@ export default function Empleados() {
                       />
                     </label>
                   ))}
+                  <label className="md:col-span-2 flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={form.puedeVender}
+                      onChange={e => setForm(current => ({ ...current, puedeVender: e.target.checked }))}
+                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/20"
+                    />
+                    <span className="text-sm font-medium text-slate-700">Puede vender (acceso al menú de ventas del bot)</span>
+                  </label>
                 </div>
               </div>
             </div>

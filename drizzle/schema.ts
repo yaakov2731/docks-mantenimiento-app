@@ -67,6 +67,7 @@ export const empleados = sqliteTable('empleados', {
   pagoQuincenal: integer('pago_quincenal').default(0).notNull(),
   pagoMensual: integer('pago_mensual').default(0).notNull(),
   activo: integer('activo', { mode: 'boolean' }).default(true).notNull(),
+  puedeVender: integer('puede_vender', { mode: 'boolean' }).default(false).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })

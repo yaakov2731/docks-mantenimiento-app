@@ -169,6 +169,9 @@ async function identifyUser(waNumber: string): Promise<{ userType: UserType; use
   // 2. ¿Es empleado?
   const empleado = await getEmpleadoByWaId(waNumber)
   if (empleado) {
+    if (empleado.puedeVender) {
+      return { userType: 'sales', userId: empleado.id, userName: empleado.nombre }
+    }
     return { userType: 'employee', userId: empleado.id, userName: empleado.nombre }
   }
 

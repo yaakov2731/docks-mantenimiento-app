@@ -419,6 +419,7 @@ export async function initDb() {
     `ALTER TABLE empleados ADD COLUMN pago_semanal INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE empleados ADD COLUMN pago_quincenal INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE empleados ADD COLUMN pago_mensual INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE empleados ADD COLUMN puede_vender INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE rondas_ocurrencia ADD COLUMN inicio_real_at INTEGER`,
     `ALTER TABLE rondas_ocurrencia ADD COLUMN pausado_at INTEGER`,
     `ALTER TABLE rondas_ocurrencia ADD COLUMN fin_real_at INTEGER`,
@@ -914,8 +915,24 @@ export async function getUsers() {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 export async function getSalesUsers() {
-  const rows = await getUsers()
-  return rows.filter(user => user.role === 'sales' || user.role === 'admin')
+  const panelUsers = await getUsers()
+  const salesPanelUsers = panelUsers.filter(u => u.role === 'sales' || u.role === 'admin')
+
+  const allEmpleados = await db.select().from(schema.empleados).where(eq(schema.empleados.activo, true))
+  const vendedorEmpleados = allEmpleados
+    .filter(e => e.puedeVender && e.waId)
+    .map(e => ({
+      id: e.id,
+      name: e.nombre,
+      role: 'sales' as const,
+      waId: e.waId,
+      activo: true,
+    }))
+
+  const panelUserIds = new Set(salesPanelUsers.map(u => u.id))
+  const uniqueVendedorEmpleados = vendedorEmpleados.filter(e => !panelUserIds.has(e.id))
+
+  return [...salesPanelUsers, ...uniqueVendedorEmpleados]
 }
 export async function getUserById(id: number) {
   const rows = await db.select().from(schema.users).where(eq(schema.users.id, id))

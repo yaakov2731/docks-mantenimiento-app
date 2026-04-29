@@ -246,14 +246,21 @@ export async function handleAdminLeadConfirmar(session: BotSession, input: strin
   })
 
   if (vendedor?.waId) {
+    const tempEmoji = { hot: '🔥', warm: '🌡️', cold: '❄️', not_fit: '⚫' }
+    const tempLabel = { hot: 'Caliente', warm: 'Tibio', cold: 'Frío', not_fit: 'No aplica' }
+    const temp = lead.temperature ?? 'warm'
+
     const mensaje = [
       `🎯 *Te asignaron un lead — Docks del Puerto*`,
       ``,
       `👤 *${lead.nombre ?? 'Sin nombre'}*`,
-      `🏪 Rubro: ${lead.rubro ?? '—'}`,
+      lead.telefono ? `📞 ${lead.telefono}` : null,
+      lead.rubro ? `🏪 Rubro: ${lead.rubro}` : null,
+      lead.tipoLocal ? `🏬 Tipo de espacio: ${lead.tipoLocal}` : null,
+      `${tempEmoji[temp as keyof typeof tempEmoji] ?? '🌡️'} Temperatura: ${tempLabel[temp as keyof typeof tempLabel] ?? temp}`,
       lead.mensaje ? `💬 "${lead.mensaje}"` : null,
       ``,
-      `Podés ver el detalle y agregar notas desde el menú del bot (opción Mis leads).`,
+      `Respondé *"mis leads"* para ver el detalle y agregar notas.`,
       ``,
       `🔑 Lead #${leadId}`,
     ].filter(Boolean).join('\n')
