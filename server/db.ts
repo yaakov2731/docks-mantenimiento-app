@@ -2661,6 +2661,7 @@ export async function reiniciarMetricasOperacion() {
     actualizaciones,
     reportes,
     leads,
+    leadsEventos,
     botQueue,
     tareas,
     tareasEventos,
@@ -2674,6 +2675,7 @@ export async function reiniciarMetricasOperacion() {
     db.select().from(schema.actualizaciones),
     db.select().from(schema.reportes),
     db.select().from(schema.leads),
+    db.select().from(schema.leadsEvento),
     db.select().from(schema.botQueue),
     db.select().from(schema.tareasOperativas),
     db.select().from(schema.tareasOperativasEvento),
@@ -2712,7 +2714,8 @@ export async function reiniciarMetricasOperacion() {
       'empleado_liquidacion_cierre',
       'marcaciones_empleados',
       'rondas_evento',
-      'rondas_ocurrencia'
+      'rondas_ocurrencia',
+      'leads_evento'
     )`)
   } catch {
     // sqlite_sequence is only present after AUTOINCREMENT tables have been used.
@@ -2722,6 +2725,7 @@ export async function reiniciarMetricasOperacion() {
     actualizaciones: actualizaciones.length,
     reportes: reportes.length,
     leads: leads.length,
+    leadsEventos: leadsEventos.length,
     colaBot: botQueue.length,
     tareas: tareas.length,
     tareasEventos: tareasEventos.length,
@@ -2735,6 +2739,7 @@ export async function reiniciarMetricasOperacion() {
       actualizaciones.length +
       reportes.length +
       leads.length +
+      leadsEventos.length +
       botQueue.length +
       tareas.length +
       tareasEventos.length +
