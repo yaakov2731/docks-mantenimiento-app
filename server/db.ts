@@ -438,6 +438,7 @@ export async function initDb() {
     `ALTER TABLE leads ADD COLUMN temperature TEXT`,
     `ALTER TABLE leads ADD COLUMN auto_followup_count INTEGER`,
     `ALTER TABLE leads ADD COLUMN last_bot_msg_at INTEGER`,
+    `ALTER TABLE leads ADD COLUMN needs_attention_at INTEGER`,
   ]
   for (const sql of alterStmts) {
     try {
@@ -2558,6 +2559,22 @@ export async function updateLeadFollowup(id: number, newCount: number) {
     .set({ autoFollowupCount: newCount, lastBotMsgAt: new Date(), updatedAt: new Date() } as any)
     .where(eq(schema.leads.id, id))
     .run()
+}
+
+export async function getLeadByWaId(waId: string) {
+  const rows = await db.select().from(schema.leads).where(eq(schema.leads.waId, waId)).limit(1)
+  return rows[0] ?? null
+}
+
+export async function flagLeadNeedsAttention(leadId: number, intent: string) {
+  await db.update(schema.leads).set({
+    needsAttentionAt: new Date(),
+    notas: sql`CASE WHEN notas IS NULL OR notas = '' THEN ${intent} ELSE notas || char(10) || ${intent} END`,
+  } as any).where(eq(schema.leads.id, leadId)).run()
+}
+
+export async function clearLeadAttentionFlag(leadId: number) {
+  await db.update(schema.leads).set({ needsAttentionAt: null } as any).where(eq(schema.leads.id, leadId)).run()
 }
 
 export async function createLeadEvento(data: {

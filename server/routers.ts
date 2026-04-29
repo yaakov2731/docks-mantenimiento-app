@@ -23,7 +23,7 @@ import {
   createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado,
   getNotificaciones, crearNotificacion, actualizarNotificacion, eliminarNotificacion,
   crearLead, getLeads, getLeadById, actualizarLead, deleteLeadById, getLeadEventos,
-  getLeadsForFollowup, updateLeadFollowup, createLeadEvento,
+  getLeadsForFollowup, updateLeadFollowup, createLeadEvento, clearLeadAttentionFlag,
   listLocatariosCobranza, upsertLocatarioCobranza, saveCobranzaImportacion, listCobranzaImportaciones,
   listCobranzaSaldos, getCobranzaSaldoById, updateCobranzaSaldoEstado, updateCobranzaSaldoContacto,
   getCobranzaNotificationsBySaldoIds, createCobranzaNotification, listCobranzaNotificaciones, clearCobranzaLista,
@@ -870,6 +870,10 @@ export const appRouter = router({
         }
         return { sent, checked: leads.length }
       }),
+
+    clearAttentionFlag: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => clearLeadAttentionFlag(input.id)),
   }),
 
   rondas: router({

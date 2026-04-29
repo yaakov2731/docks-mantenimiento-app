@@ -174,6 +174,7 @@ export const leads = sqliteTable('leads', {
   // Follow-up automático
   autoFollowupCount: integer('auto_followup_count').default(0),
   lastBotMsgAt: integer('last_bot_msg_at', { mode: 'timestamp' }),
+  needsAttentionAt: integer('needs_attention_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })

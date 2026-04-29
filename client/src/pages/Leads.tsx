@@ -98,6 +98,9 @@ export default function Leads() {
       }
     },
   })
+  const clearFlag = trpc.leads.clearAttentionFlag.useMutation({
+    onSuccess: () => utils.leads.listar.invalidate(),
+  })
   const asignarBot = trpc.leads.asignarBot.useMutation({
     onSuccess: async () => {
       setFeedback('Lead asignado al bot comercial y respuesta automática encolada por WhatsApp.')
@@ -198,7 +201,12 @@ export default function Leads() {
             onClick={() => setSelected(l.id)}>
             <div className="flex items-start justify-between mb-2">
               <div className="min-w-0 flex-1">
-                <h3 className="font-medium text-sm">{l.nombre}</h3>
+                <h3 className="font-medium text-sm flex items-center gap-1">
+                  {l.nombre}
+                  {(l as any).needsAttentionAt && (
+                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-xs font-bold" title="Respondió al follow-up">!</span>
+                  )}
+                </h3>
                 {l.rubro && <p className="text-xs text-gray-500">{l.rubro}</p>}
               </div>
               <div className="flex items-center gap-1.5 ml-2">
@@ -279,6 +287,20 @@ export default function Leads() {
             </div>
 
             <div className="p-5 space-y-4">
+              {(lead as any).needsAttentionAt && (
+                <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                  <span className="text-red-600 dark:text-red-400 text-sm font-medium flex-1">
+                    Respondió al follow-up — requiere atención
+                  </span>
+                  <button
+                    onClick={() => clearFlag.mutate({ id: selected! })}
+                    disabled={clearFlag.isPending}
+                    className="text-xs text-red-500 hover:text-red-700 underline"
+                  >
+                    Marcar atendido
+                  </button>
+                </div>
+              )}
               {feedback && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   {feedback}

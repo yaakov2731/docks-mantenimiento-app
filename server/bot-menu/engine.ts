@@ -103,6 +103,14 @@ import {
   buildBandeja, handleBandeja,
 } from './menus/sales/leads'
 
+// Público — lead response
+import {
+  buildLeadRespondioMenu,
+  handleLeadRespondio,
+  handleLeadVisita,
+  handleLeadConsulta,
+} from './menus/public/lead-response'
+
 // Público (no registrados)
 import {
   buildPublicMainMenu, handlePublicMain,
@@ -127,7 +135,7 @@ import {
 } from './menus/public/comercial'
 
 // ── DB helpers para identificación ───────────────────────────────────────────
-import { getEmpleadoByWaId, getUsers } from '../db'
+import { getEmpleadoByWaId, getUsers, getLeadByWaId } from '../db'
 
 const MSG_NO_REGISTRADO = [
   `❌ *Tu número no está registrado en Docks del Puerto.*`,
@@ -188,6 +196,20 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
         userId: 0,
         userName: 'Visitante',
       })
+
+      // Check if this public user is an existing lead who received follow-ups
+      const existingLead = await getLeadByWaId(normalized)
+      if (existingLead && (existingLead.autoFollowupCount ?? 0) > 0) {
+        await updateSession(normalized, {
+          currentMenu: 'lead_respondio',
+          contextData: { leadId: existingLead.id },
+          menuHistory: [],
+        })
+        // Refresh session object
+        session = (await getSession(normalized))!
+        return buildLeadRespondioMenu(existingLead.nombre ?? 'ahi')
+      }
+
       return buildPublicMainMenu()
     }
 
@@ -203,6 +225,19 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
   // Timeout → resetear y mostrar menú
   if (isSessionExpired(session)) {
     session = await resetToMain(session)
+    // For public users, re-check if they are a lead with follow-ups
+    if (session.userType === 'public') {
+      const existingLead = await getLeadByWaId(normalized)
+      if (existingLead && (existingLead.autoFollowupCount ?? 0) > 0) {
+        await updateSession(normalized, {
+          currentMenu: 'lead_respondio',
+          contextData: { leadId: existingLead.id },
+          menuHistory: [],
+        })
+        session = (await getSession(normalized))!
+        return MSG_SESSION_EXPIRADA + buildLeadRespondioMenu(existingLead.nombre ?? 'ahi')
+      }
+    }
     return MSG_SESSION_EXPIRADA + await buildMainMenu(session)
   }
 
@@ -394,6 +429,9 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
 
   // ── PÚBLICO (no registrado) ───────────────────────────────────────────────────
   if (userType === 'public') {
+    if (currentMenu === 'lead_respondio') return handleLeadRespondio(session, input)
+    if (currentMenu === 'lead_visita') return handleLeadVisita(session, input)
+    if (currentMenu === 'lead_consulta') return handleLeadConsulta(session, input)
     if (currentMenu === 'main') return handlePublicMain(session, input)
     if (currentMenu === 'public_alquiler_p1') return handlePublicAlquilerP1(session, input)
     if (currentMenu === 'public_alquiler_p2') return handlePublicAlquilerP2(session, input)
@@ -495,6 +533,10 @@ async function buildMenuDisplay(session: BotSession, menuName: string): Promise<
   }
 
   if (userType === 'public') {
+    if (menuName === 'lead_respondio') {
+      const lead = await getLeadByWaId(session.waNumber)
+      return buildLeadRespondioMenu(lead?.nombre ?? 'ahi')
+    }
     if (menuName === 'public_alquiler_p1') return buildPublicAlquilerP1()
     if (menuName === 'public_alquiler_p2') return buildPublicAlquilerP2()
     if (menuName === 'public_alquiler_p3') return buildPublicAlquilerP3()
