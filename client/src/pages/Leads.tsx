@@ -71,9 +71,9 @@ function getBotState(lead: {
 }
 
 const BOT_STATE_BORDER: Record<BotState, string> = {
-  idle: 'border border-gray-100',
-  bot_active: 'border border-blue-200 border-l-4 border-l-blue-400',
-  lead_replied: 'border border-amber-200 border-l-4 border-l-amber-400',
+  idle: 'border border-[var(--border)]',
+  bot_active: 'border border-blue-300/50 ring-1 ring-blue-200/30',
+  lead_replied: 'border border-amber-400/60 ring-1 ring-amber-300/30',
 }
 
 export default function Leads() {
@@ -200,18 +200,18 @@ export default function Leads() {
   return (
     <DashboardLayout title="Leads de Alquiler">
       {/* Stats counters */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-          <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-          <div className="text-xs text-gray-500 mt-1">Total leads</div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="card p-4 text-center">
+          <div className="text-2xl font-bold" style={{ color: 'var(--fg-base)' }}>{stats.total}</div>
+          <div className="text-xs mt-1" style={{ color: 'var(--fg-muted)' }}>Total leads</div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-amber-100 p-4 text-center">
-          <div className="text-2xl font-bold text-amber-600">{stats.botContacto}</div>
-          <div className="text-xs text-amber-600 mt-1">Bot contacto</div>
+        <div className="card p-4 text-center" style={{ borderColor: 'oklch(0.748 0.162 70 / 0.30)' }}>
+          <div className="text-2xl font-bold" style={{ color: 'var(--color-primary)' }}>{stats.botContacto}</div>
+          <div className="text-xs mt-1" style={{ color: 'var(--color-primary)' }}>Bot contacto</div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-emerald-100 p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-600">{stats.respondieron}</div>
-          <div className="text-xs text-emerald-600 mt-1">Respondieron</div>
+        <div className="card p-4 text-center" style={{ borderColor: 'oklch(0.555 0.182 148 / 0.35)' }}>
+          <div className="text-2xl font-bold" style={{ color: 'var(--color-success)' }}>{stats.respondieron}</div>
+          <div className="text-xs mt-1" style={{ color: 'var(--color-success)' }}>Respondieron</div>
         </div>
       </div>
 
@@ -287,9 +287,9 @@ export default function Leads() {
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="lead-rental-grid grid md:grid-cols-2 lg:grid-cols-3 gap-3">
         {leads.length === 0 ? (
-          <div className="col-span-3 bg-white rounded-xl p-12 text-center shadow-sm text-gray-400">
+          <div className="col-span-full card p-12 text-center" style={{ color: 'var(--fg-subtle)' }}>
             No hay leads registrados
           </div>
         ) : leads.map(l => {
@@ -302,9 +302,9 @@ export default function Leads() {
           })
           return (
             <div key={l.id}
-              className={`bg-white rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow ${
+              className={`lead-rental-card p-3 cursor-pointer ${
                 isSelected
-                  ? 'border border-amber-400 ring-2 ring-amber-100'
+                  ? 'border-2 border-amber-400 ring-2 ring-amber-400/20'
                   : BOT_STATE_BORDER[botState]
               }`}
               onClick={() => {
@@ -327,8 +327,8 @@ export default function Leads() {
                     </button>
                   )}
                   <div className="min-w-0">
-                    <h3 className="font-medium text-sm">{l.nombre}</h3>
-                    {l.rubro && <p className="text-xs text-gray-500">{l.rubro}</p>}
+                    <h3 className="lead-rental-name font-heading font-semibold text-base leading-tight" style={{ color: 'var(--fg-base)' }}>{l.nombre}</h3>
+                    {l.rubro && <p className="mt-0.5 text-[13px] font-medium" style={{ color: 'var(--fg-muted)' }}>{l.rubro}</p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 ml-2">
@@ -346,14 +346,14 @@ export default function Leads() {
                   </button>
                 </div>
               </div>
-              <div className="space-y-1 text-xs text-gray-500">
+              <div className="lead-rental-meta space-y-1 text-[13px] font-medium" style={{ color: 'var(--fg-muted)' }}>
                 {l.telefono && <div className="flex items-center gap-1.5"><Phone size={11}/>{l.telefono}</div>}
                 {l.email && <div className="flex items-center gap-1.5"><Mail size={11}/>{l.email}</div>}
                 {l.waId && <div className="flex items-center gap-1.5"><MessageCircle size={11}/>WA: {l.waId}</div>}
                 {l.turnoFecha && <div className="flex items-center gap-1.5 text-primary font-medium"><Calendar size={11}/>Turno: {l.turnoFecha} {l.turnoHora}</div>}
                 {(l as any).asignadoA && <div className="text-[11px] text-emerald-600 font-medium">Asignado a {(l as any).asignadoA}</div>}
               </div>
-              <div className="mt-3 space-y-1 text-xs text-gray-400">
+              <div className="mt-2.5 space-y-1 text-[12px] font-medium" style={{ color: 'var(--fg-subtle)' }}>
                 <div>{l.fuente === 'whatsapp' ? 'WhatsApp' : 'Web'} · Recibido {formatDateTime(l.createdAt)}</div>
                 <div className={`flex items-center gap-1.5 ${(l as any).firstContactedAt ? 'text-emerald-600' : 'text-amber-600'}`}>
                   <Clock size={11}/>
@@ -389,7 +389,7 @@ export default function Leads() {
       {/* Detail Dialog */}
       {selected && lead && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-0 md:p-4" onClick={() => setSelected(null)}>
-          <div className="bg-white w-full md:max-w-lg md:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="w-full md:max-w-lg md:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b flex items-start gap-3">
               <div className="flex-1">
                 <h2 className="font-heading font-bold text-lg">{lead.nombre}</h2>

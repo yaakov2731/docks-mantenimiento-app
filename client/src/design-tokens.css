@@ -1,32 +1,32 @@
 /* ============================================================
    DOCKS DEL PUERTO — Design System Tokens
-   Palette: Mando Marítimo — cold navy + champagne gold
+   Palette: Predio Operacional — warm charcoal + champagne amber
    Fonts: Bricolage Grotesque (headings), Instrument Sans (body), JetBrains Mono (data)
    ============================================================ */
 
-/* ── BASE LIGHT (cold professional — blue-tinted day mode) ────── */
+/* ── BASE LIGHT (warm professional — amber-tinted paper mode) ── */
 :root {
-  /* ── PRIMARY: Champagne Gold (refined over raw amber) ── */
+  /* ── PRIMARY: Champagne Amber ── */
   --color-primary:        oklch(0.748 0.162 70);
   --color-primary-dark:   oklch(0.680 0.158 66);
-  --color-primary-light:  oklch(0.940 0.036 78);
+  --color-primary-light:  oklch(0.948 0.032 78);
 
-  /* ── SIDEBAR / BRAND DARK (deep navy — maritime anchor) ── */
-  --color-sidebar:        oklch(0.108 0.022 258);
-  --color-sidebar-mid:    oklch(0.148 0.020 256);
+  /* ── SIDEBAR / BRAND DARK (warm charcoal — grounded authority) ── */
+  --color-sidebar:        oklch(0.108 0.016 68);
+  --color-sidebar-mid:    oklch(0.148 0.014 70);
 
   /* ── SIDEBAR INTERACTION TOKENS ── */
   --color-sidebar-accent:     oklch(0.768 0.165 70);
   --color-sidebar-accent-2:   oklch(0.698 0.160 66);
-  --color-sidebar-card-bg:    oklch(0.062 0.020 262);
-  --color-sidebar-border-int: oklch(0.148 0.022 258);
+  --color-sidebar-card-bg:    oklch(0.068 0.010 65);
+  --color-sidebar-border-int: oklch(0.158 0.014 68);
   --color-sidebar-text:       oklch(0.928 0.008 75);
-  --color-sidebar-text-dim:   oklch(0.545 0.012 258);
-  --color-sidebar-text-faint: oklch(0.418 0.010 258);
+  --color-sidebar-text-dim:   oklch(0.548 0.009 72);
+  --color-sidebar-text-faint: oklch(0.418 0.007 70);
 
-  /* ── ACCENT: Electric Steel Blue ── */
-  --color-accent:         oklch(0.588 0.148 215);
-  --color-accent-light:   oklch(0.934 0.030 215);
+  /* ── ACCENT: Deep Copper ── */
+  --color-accent:         oklch(0.578 0.108 48);
+  --color-accent-light:   oklch(0.948 0.026 52);
 
   /* ── SECONDARY: Muted Sage ── */
   --color-secondary:      oklch(0.545 0.088 165);
@@ -40,21 +40,21 @@
   --color-danger:         oklch(0.545 0.212 28);
   --color-danger-light:   oklch(0.955 0.040 28);
 
-  /* ── SURFACES (cold blue-white) ── */
-  --color-bg:             oklch(0.944 0.006 250);
-  --color-surface:        oklch(0.985 0.002 252);
-  --color-border:         oklch(0.862 0.008 250);
-  --color-border-strong:  oklch(0.808 0.010 248);
+  /* ── SURFACES (warm cream paper) ── */
+  --color-bg:             oklch(0.952 0.008 78);
+  --color-surface:        oklch(0.992 0.003 80);
+  --color-border:         oklch(0.862 0.010 76);
+  --color-border-strong:  oklch(0.808 0.012 74);
 
-  /* ── NEUTRALS (cold gray scale) ── */
-  --color-gray-50:        oklch(0.962 0.004 250);
-  --color-gray-100:       oklch(0.935 0.005 248);
-  --color-gray-200:       oklch(0.896 0.006 248);
-  --color-gray-400:       oklch(0.748 0.008 250);
-  --color-gray-500:       oklch(0.632 0.009 250);
-  --color-gray-600:       oklch(0.518 0.010 250);
-  --color-gray-800:       oklch(0.285 0.016 256);
-  --color-gray-900:       oklch(0.142 0.022 258);
+  /* ── NEUTRALS (warm gray scale) ── */
+  --color-gray-50:        oklch(0.968 0.005 78);
+  --color-gray-100:       oklch(0.938 0.006 76);
+  --color-gray-200:       oklch(0.898 0.007 76);
+  --color-gray-400:       oklch(0.748 0.008 74);
+  --color-gray-500:       oklch(0.632 0.008 74);
+  --color-gray-600:       oklch(0.518 0.009 72);
+  --color-gray-800:       oklch(0.285 0.014 70);
+  --color-gray-900:       oklch(0.142 0.018 68);
 
   /* ── LOGO ARCH COLORS (unchanged) ── */
   --color-logo-red:       #D94F3B;
@@ -62,11 +62,11 @@
   --color-logo-yellow:    #E8B830;
   --color-logo-blue:      #1E72B8;
 
-  /* ── SHADOWS (crisp, professional) ── */
-  --shadow-ds-card:         0 1px 2px oklch(0.808 0.010 248 / 0.75), 0 2px 8px oklch(0 0 0 / 0.05);
-  --shadow-ds-card-strong:  0 1px 2px oklch(0.808 0.010 248 / 0.75), 0 4px 18px oklch(0 0 0 / 0.09);
-  --shadow-ds-modal:        0 0 0 1px oklch(0.862 0.008 250), 0 10px 48px oklch(0 0 0 / 0.18);
-  --shadow-ds-btn-primary:  0 2px 10px oklch(0.748 0.162 70 / 0.40);
+  /* ── SHADOWS (warm, grounded) ── */
+  --shadow-ds-card:         0 1px 2px oklch(0.808 0.012 74 / 0.70), 0 2px 10px oklch(0 0 0 / 0.05);
+  --shadow-ds-card-strong:  0 1px 2px oklch(0.808 0.012 74 / 0.70), 0 5px 20px oklch(0 0 0 / 0.10);
+  --shadow-ds-modal:        0 0 0 1px oklch(0.862 0.010 76), 0 12px 52px oklch(0 0 0 / 0.18);
+  --shadow-ds-btn-primary:  0 2px 12px oklch(0.748 0.162 70 / 0.40);
 
   /* ── BORDER RADIUS: sharp professional ── */
   --radius-sm:    2px;
@@ -82,9 +82,9 @@
   --font-mono:    'JetBrains Mono', monospace;
 
   /* ── SEMANTIC: Foreground ── */
-  --fg-base:        oklch(0.142 0.022 258);
-  --fg-muted:       oklch(0.478 0.012 252);
-  --fg-subtle:      oklch(0.642 0.009 250);
+  --fg-base:        oklch(0.142 0.018 72);
+  --fg-muted:       oklch(0.478 0.010 74);
+  --fg-subtle:      oklch(0.642 0.008 76);
   --fg-on-dark:     oklch(0.928 0.008 75);
   --fg-on-dark-dim: oklch(0.928 0.008 75 / 0.48);
 
@@ -94,27 +94,27 @@
   --bg-sidebar:     var(--color-sidebar);
 }
 
-/* ── DARK MODE (deep navy command center) ──────────────────── */
+/* ── DARK MODE (OLED warm charcoal — predio operacional) ──── */
 .dark {
-  --color-bg:             oklch(0.115 0.022 258);
-  --color-surface:        oklch(0.148 0.020 256);
-  --color-border:         oklch(0.208 0.018 256);
-  --color-border-strong:  oklch(0.268 0.016 254);
+  --color-bg:             oklch(0.062 0.006 68);
+  --color-surface:        oklch(0.098 0.009 70);
+  --color-border:         oklch(0.172 0.012 70);
+  --color-border-strong:  oklch(0.242 0.014 72);
 
-  --color-sidebar:        oklch(0.072 0.020 262);
-  --color-sidebar-mid:    oklch(0.108 0.018 260);
+  --color-sidebar:        oklch(0.042 0.004 65);
+  --color-sidebar-mid:    oklch(0.072 0.006 66);
 
-  --color-sidebar-card-bg:    oklch(0.052 0.018 264);
-  --color-sidebar-border-int: oklch(0.125 0.020 260);
+  --color-sidebar-card-bg:    oklch(0.028 0.002 62);
+  --color-sidebar-border-int: oklch(0.118 0.009 68);
 
-  --color-gray-50:        oklch(0.148 0.018 256);
-  --color-gray-100:       oklch(0.178 0.016 256);
-  --color-gray-200:       oklch(0.208 0.014 254);
-  --color-gray-400:       oklch(0.328 0.010 252);
-  --color-gray-500:       oklch(0.428 0.009 252);
-  --color-gray-600:       oklch(0.528 0.008 250);
-  --color-gray-800:       oklch(0.738 0.010 75);
-  --color-gray-900:       oklch(0.918 0.010 75);
+  --color-gray-50:        oklch(0.122 0.010 70);
+  --color-gray-100:       oklch(0.155 0.010 70);
+  --color-gray-200:       oklch(0.188 0.011 70);
+  --color-gray-400:       oklch(0.312 0.009 70);
+  --color-gray-500:       oklch(0.418 0.008 72);
+  --color-gray-600:       oklch(0.525 0.008 72);
+  --color-gray-800:       oklch(0.738 0.008 75);
+  --color-gray-900:       oklch(0.918 0.008 75);
 
   --color-primary:        oklch(0.788 0.158 72);
   --color-primary-dark:   oklch(0.718 0.154 68);
@@ -124,19 +124,18 @@
   --color-warning-light:  oklch(0.192 0.038 78);
   --color-danger-light:   oklch(0.188 0.044 28);
   --color-secondary-light:oklch(0.195 0.028 165);
-  --color-accent-light:   oklch(0.192 0.030 215);
+  --color-accent-light:   oklch(0.188 0.025 48);
+  --color-accent:         oklch(0.618 0.108 48);
 
-  --color-accent:         oklch(0.618 0.148 215);
-
-  --fg-base:    oklch(0.925 0.008 75);
-  --fg-muted:   oklch(0.538 0.012 258);
-  --fg-subtle:  oklch(0.365 0.010 256);
+  --fg-base:    oklch(0.932 0.006 78);
+  --fg-muted:   oklch(0.552 0.009 72);
+  --fg-subtle:  oklch(0.348 0.007 70);
 
   --bg-app:   var(--color-bg);
   --bg-card:  var(--color-surface);
 
-  --shadow-ds-card:        0 1px 0 oklch(0 0 0 / 0.45), 0 2px 12px oklch(0 0 0 / 0.35);
-  --shadow-ds-card-strong: 0 1px 0 oklch(0 0 0 / 0.55), 0 4px 22px oklch(0 0 0 / 0.45);
-  --shadow-ds-modal:       0 0 0 1px oklch(0.208 0.018 256), 0 10px 60px oklch(0 0 0 / 0.70);
-  --shadow-ds-btn-primary: 0 2px 12px oklch(0.788 0.158 72 / 0.45);
+  --shadow-ds-card:        0 1px 0 oklch(0 0 0 / 0.55), 0 2px 14px oklch(0 0 0 / 0.42);
+  --shadow-ds-card-strong: 0 1px 0 oklch(0 0 0 / 0.65), 0 4px 24px oklch(0 0 0 / 0.52);
+  --shadow-ds-modal:       0 0 0 1px oklch(0.172 0.012 70), 0 12px 64px oklch(0 0 0 / 0.75);
+  --shadow-ds-btn-primary: 0 2px 14px oklch(0.788 0.158 72 / 0.45);
 }
