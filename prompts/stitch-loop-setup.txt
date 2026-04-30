@@ -1,0 +1,1 @@
+"Create my project setup files for stitch-loop. I want to build a [your website]. Generate SITE.md with my pages, create a Stitch home screen with this vibe: [your style], then run design-md to generate DESIGN.md. Save both files. Do not start the loop yet."
