@@ -366,13 +366,16 @@ export async function handleCancelarReclamo(session: BotSession, input: string):
 // ─── Estado general del día ───────────────────────────────────────────────────
 
 export async function buildEstadoGeneral(session: BotSession): Promise<string> {
-  const [reportes, vencidos, botStatus, pendingMsgs, tareasOverview] = await Promise.all([
+  const [reportes, botStatus, pendingMsgs, tareasOverview] = await Promise.all([
     getReportes(),
-    getReportesVencidos(),
     getBotConnectionStatus(),
     getPendingBotMessages(),
     getOperationalTasksOverview(),
   ])
+  const vencidos = reportes.filter(r => {
+    if (['completado', 'cancelado'].includes(r.estado)) return false
+    return calcularSLA(r.prioridad, r.createdAt).vencida
+  })
 
   const abiertos = reportes.filter(r => !['completado', 'cancelado'].includes(r.estado))
   const completadosHoy = reportes.filter(r => {

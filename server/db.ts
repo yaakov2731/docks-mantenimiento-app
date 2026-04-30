@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client'
 import { drizzle } from 'drizzle-orm/libsql'
-import { eq, and, or, like, inArray, sql, desc, not, isNull, isNotNull, lt } from 'drizzle-orm'
+import { eq, and, or, like, inArray, sql, desc, not, isNull, isNotNull, lt, gte } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import * as schema from '../drizzle/schema'
 import { readEnv } from './_core/env'
@@ -1480,11 +1480,17 @@ export async function persistOperationalTaskChange(
 }
 
 export async function getOperationalTasksOverview() {
+  const { start, end } = getBuenosAiresDayRange()
   const [rows, events] = await Promise.all([
     listOperationalTasks(),
-    db.select().from(schema.tareasOperativasEvento),
+    db.select().from(schema.tareasOperativasEvento).where(
+      and(
+        eq(schema.tareasOperativasEvento.tipo, 'rechazo'),
+        gte(schema.tareasOperativasEvento.createdAt, new Date(start)),
+        lt(schema.tareasOperativasEvento.createdAt, new Date(end)),
+      )
+    ),
   ])
-  const { start, end } = getBuenosAiresDayRange()
   const employeeMap = new Map<number, {
     empleadoId: number
     empleadoNombre: string
@@ -1521,7 +1527,7 @@ export async function getOperationalTasksOverview() {
     pendientesAsignacion: rows.filter(task => task.estado === 'pendiente_asignacion').length,
     pendientesConfirmacion: rows.filter(task => task.estado === 'pendiente_confirmacion').length,
     terminadasHoy: rows.filter(task => isWithinDay(task.terminadoAt, start, end)).length,
-    rechazadasHoy: events.filter(event => event.tipo === 'rechazo' && isWithinDay(event.createdAt, start, end)).length,
+    rechazadasHoy: events.length,
     derivadasDesdeReportes: rows.filter(task => task.origen === 'reclamo').length,
     empleadosConColaAlta: [...employeeMap.values()].filter(item => item.pendientes >= 3).length,
     porEmpleado: [...employeeMap.values()].sort((a, b) =>
