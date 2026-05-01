@@ -1,36 +1,36 @@
 /* ============================================================
    DOCKS DEL PUERTO — Design System Tokens
-   Palette: Predio Operacional — warm charcoal + champagne amber
-   Fonts: Bricolage Grotesque (headings), Instrument Sans (body), JetBrains Mono (data)
+   Palette: Slate Profesional — cool slate + corporate blue
+   Fonts: IBM Plex Sans Condensed (headings), IBM Plex Sans (body), JetBrains Mono (data)
    ============================================================ */
 
-/* ── BASE LIGHT (warm professional — amber-tinted paper mode) ── */
+/* ── BASE LIGHT ── */
 :root {
-  /* ── PRIMARY: Champagne Amber ── */
-  --color-primary:        oklch(0.748 0.162 70);
-  --color-primary-dark:   oklch(0.680 0.158 66);
-  --color-primary-light:  oklch(0.948 0.032 78);
+  /* ── PRIMARY: Corporate Slate Blue ── */
+  --color-primary:        oklch(0.528 0.168 245);
+  --color-primary-dark:   oklch(0.462 0.178 245);
+  --color-primary-light:  oklch(0.938 0.018 245);
 
-  /* ── SIDEBAR / BRAND DARK (warm charcoal — grounded authority) ── */
-  --color-sidebar:        oklch(0.108 0.016 68);
-  --color-sidebar-mid:    oklch(0.148 0.014 70);
+  /* ── SIDEBAR / BRAND DARK ── */
+  --color-sidebar:        oklch(0.108 0.016 250);
+  --color-sidebar-mid:    oklch(0.148 0.016 252);
 
   /* ── SIDEBAR INTERACTION TOKENS ── */
-  --color-sidebar-accent:     oklch(0.768 0.165 70);
-  --color-sidebar-accent-2:   oklch(0.698 0.160 66);
-  --color-sidebar-card-bg:    oklch(0.068 0.010 65);
-  --color-sidebar-border-int: oklch(0.158 0.014 68);
-  --color-sidebar-text:       oklch(0.928 0.008 75);
-  --color-sidebar-text-dim:   oklch(0.548 0.009 72);
-  --color-sidebar-text-faint: oklch(0.418 0.007 70);
+  --color-sidebar-accent:     oklch(0.658 0.148 245);
+  --color-sidebar-accent-2:   oklch(0.592 0.158 245);
+  --color-sidebar-card-bg:    oklch(0.068 0.010 255);
+  --color-sidebar-border-int: oklch(0.165 0.014 250);
+  --color-sidebar-text:       oklch(0.932 0.006 255);
+  --color-sidebar-text-dim:   oklch(0.548 0.008 252);
+  --color-sidebar-text-faint: oklch(0.418 0.006 250);
 
-  /* ── ACCENT: Deep Copper ── */
-  --color-accent:         oklch(0.578 0.108 48);
-  --color-accent-light:   oklch(0.948 0.026 52);
+  /* ── ACCENT: Cool Teal ── */
+  --color-accent:         oklch(0.548 0.112 195);
+  --color-accent-light:   oklch(0.940 0.022 195);
 
-  /* ── SECONDARY: Muted Sage ── */
-  --color-secondary:      oklch(0.545 0.088 165);
-  --color-secondary-light:oklch(0.942 0.024 165);
+  /* ── SECONDARY: Slate ── */
+  --color-secondary:      oklch(0.548 0.088 245);
+  --color-secondary-light:oklch(0.940 0.018 245);
 
   /* ── STATUS ── */
   --color-success:        oklch(0.555 0.182 148);
@@ -40,21 +40,21 @@
   --color-danger:         oklch(0.545 0.212 28);
   --color-danger-light:   oklch(0.955 0.040 28);
 
-  /* ── SURFACES (warm cream paper) ── */
-  --color-bg:             oklch(0.952 0.008 78);
-  --color-surface:        oklch(0.992 0.003 80);
-  --color-border:         oklch(0.862 0.010 76);
-  --color-border-strong:  oklch(0.808 0.012 74);
+  /* ── SURFACES (cool neutral white) ── */
+  --color-bg:             oklch(0.975 0.003 250);
+  --color-surface:        oklch(1 0 0);
+  --color-border:         oklch(0.882 0.006 250);
+  --color-border-strong:  oklch(0.828 0.008 248);
 
-  /* ── NEUTRALS (warm gray scale) ── */
-  --color-gray-50:        oklch(0.968 0.005 78);
-  --color-gray-100:       oklch(0.938 0.006 76);
-  --color-gray-200:       oklch(0.898 0.007 76);
-  --color-gray-400:       oklch(0.748 0.008 74);
-  --color-gray-500:       oklch(0.632 0.008 74);
-  --color-gray-600:       oklch(0.518 0.009 72);
-  --color-gray-800:       oklch(0.285 0.014 70);
-  --color-gray-900:       oklch(0.142 0.018 68);
+  /* ── NEUTRALS (cool gray scale) ── */
+  --color-gray-50:        oklch(0.968 0.003 250);
+  --color-gray-100:       oklch(0.942 0.004 250);
+  --color-gray-200:       oklch(0.900 0.005 248);
+  --color-gray-400:       oklch(0.748 0.006 250);
+  --color-gray-500:       oklch(0.632 0.006 250);
+  --color-gray-600:       oklch(0.515 0.007 250);
+  --color-gray-800:       oklch(0.282 0.010 255);
+  --color-gray-900:       oklch(0.142 0.012 258);
 
   /* ── LOGO ARCH COLORS (unchanged) ── */
   --color-logo-red:       #D94F3B;
@@ -62,31 +62,31 @@
   --color-logo-yellow:    #E8B830;
   --color-logo-blue:      #1E72B8;
 
-  /* ── SHADOWS (warm, grounded) ── */
-  --shadow-ds-card:         0 1px 2px oklch(0.808 0.012 74 / 0.70), 0 2px 10px oklch(0 0 0 / 0.05);
-  --shadow-ds-card-strong:  0 1px 2px oklch(0.808 0.012 74 / 0.70), 0 5px 20px oklch(0 0 0 / 0.10);
-  --shadow-ds-modal:        0 0 0 1px oklch(0.862 0.010 76), 0 12px 52px oklch(0 0 0 / 0.18);
-  --shadow-ds-btn-primary:  0 2px 12px oklch(0.748 0.162 70 / 0.40);
+  /* ── SHADOWS (clean, cool) ── */
+  --shadow-ds-card:         0 1px 3px oklch(0.828 0.008 248 / 0.60), 0 2px 10px oklch(0 0 0 / 0.05);
+  --shadow-ds-card-strong:  0 1px 3px oklch(0.828 0.008 248 / 0.60), 0 5px 20px oklch(0 0 0 / 0.09);
+  --shadow-ds-modal:        0 0 0 1px oklch(0.882 0.006 250), 0 12px 52px oklch(0 0 0 / 0.18);
+  --shadow-ds-btn-primary:  0 2px 12px oklch(0.528 0.168 245 / 0.35);
 
-  /* ── BORDER RADIUS: sharp professional ── */
-  --radius-sm:    2px;
-  --radius-md:    3px;
-  --radius-lg:    4px;
-  --radius-xl:    6px;
-  --radius-2xl:   8px;
-  --radius-modal: 6px;
+  /* ── BORDER RADIUS: modern professional ── */
+  --radius-sm:    3px;
+  --radius-md:    4px;
+  --radius-lg:    6px;
+  --radius-xl:    8px;
+  --radius-2xl:   10px;
+  --radius-modal: 8px;
 
   /* ── TYPOGRAPHY ── */
-  --font-heading: 'Bricolage Grotesque', sans-serif;
-  --font-body:    'Instrument Sans', sans-serif;
+  --font-heading: 'IBM Plex Sans Condensed', sans-serif;
+  --font-body:    'IBM Plex Sans', sans-serif;
   --font-mono:    'JetBrains Mono', monospace;
 
   /* ── SEMANTIC: Foreground ── */
-  --fg-base:        oklch(0.142 0.018 72);
-  --fg-muted:       oklch(0.478 0.010 74);
-  --fg-subtle:      oklch(0.642 0.008 76);
-  --fg-on-dark:     oklch(0.928 0.008 75);
-  --fg-on-dark-dim: oklch(0.928 0.008 75 / 0.48);
+  --fg-base:        oklch(0.142 0.012 258);
+  --fg-muted:       oklch(0.478 0.008 252);
+  --fg-subtle:      oklch(0.632 0.006 250);
+  --fg-on-dark:     oklch(0.932 0.006 255);
+  --fg-on-dark-dim: oklch(0.932 0.006 255 / 0.48);
 
   /* ── SEMANTIC: Backgrounds ── */
   --bg-app:         var(--color-bg);
@@ -94,48 +94,48 @@
   --bg-sidebar:     var(--color-sidebar);
 }
 
-/* ── DARK MODE (OLED warm charcoal — predio operacional) ──── */
+/* ── DARK MODE ── */
 .dark {
-  --color-bg:             oklch(0.062 0.006 68);
-  --color-surface:        oklch(0.098 0.009 70);
-  --color-border:         oklch(0.172 0.012 70);
-  --color-border-strong:  oklch(0.242 0.014 72);
+  --color-bg:             oklch(0.065 0.008 258);
+  --color-surface:        oklch(0.100 0.010 255);
+  --color-border:         oklch(0.175 0.012 255);
+  --color-border-strong:  oklch(0.245 0.014 252);
 
-  --color-sidebar:        oklch(0.042 0.004 65);
-  --color-sidebar-mid:    oklch(0.072 0.006 66);
+  --color-sidebar:        oklch(0.045 0.005 260);
+  --color-sidebar-mid:    oklch(0.075 0.007 258);
 
-  --color-sidebar-card-bg:    oklch(0.028 0.002 62);
-  --color-sidebar-border-int: oklch(0.118 0.009 68);
+  --color-sidebar-card-bg:    oklch(0.030 0.003 262);
+  --color-sidebar-border-int: oklch(0.122 0.010 255);
 
-  --color-gray-50:        oklch(0.122 0.010 70);
-  --color-gray-100:       oklch(0.155 0.010 70);
-  --color-gray-200:       oklch(0.188 0.011 70);
-  --color-gray-400:       oklch(0.312 0.009 70);
-  --color-gray-500:       oklch(0.418 0.008 72);
-  --color-gray-600:       oklch(0.525 0.008 72);
-  --color-gray-800:       oklch(0.738 0.008 75);
-  --color-gray-900:       oklch(0.918 0.008 75);
+  --color-gray-50:        oklch(0.125 0.010 255);
+  --color-gray-100:       oklch(0.158 0.010 255);
+  --color-gray-200:       oklch(0.192 0.011 252);
+  --color-gray-400:       oklch(0.315 0.009 252);
+  --color-gray-500:       oklch(0.420 0.008 250);
+  --color-gray-600:       oklch(0.528 0.008 250);
+  --color-gray-800:       oklch(0.742 0.008 252);
+  --color-gray-900:       oklch(0.922 0.006 255);
 
-  --color-primary:        oklch(0.788 0.158 72);
-  --color-primary-dark:   oklch(0.718 0.154 68);
-  --color-primary-light:  oklch(0.188 0.042 72);
+  --color-primary:        oklch(0.658 0.148 245);
+  --color-primary-dark:   oklch(0.592 0.158 245);
+  --color-primary-light:  oklch(0.185 0.042 248);
 
   --color-success-light:  oklch(0.185 0.042 148);
   --color-warning-light:  oklch(0.192 0.038 78);
   --color-danger-light:   oklch(0.188 0.044 28);
-  --color-secondary-light:oklch(0.195 0.028 165);
-  --color-accent-light:   oklch(0.188 0.025 48);
-  --color-accent:         oklch(0.618 0.108 48);
+  --color-secondary-light:oklch(0.195 0.028 245);
+  --color-accent-light:   oklch(0.188 0.025 195);
+  --color-accent:         oklch(0.618 0.112 195);
 
-  --fg-base:    oklch(0.932 0.006 78);
-  --fg-muted:   oklch(0.552 0.009 72);
-  --fg-subtle:  oklch(0.348 0.007 70);
+  --fg-base:    oklch(0.932 0.006 255);
+  --fg-muted:   oklch(0.552 0.008 252);
+  --fg-subtle:  oklch(0.348 0.007 250);
 
   --bg-app:   var(--color-bg);
   --bg-card:  var(--color-surface);
 
   --shadow-ds-card:        0 1px 0 oklch(0 0 0 / 0.55), 0 2px 14px oklch(0 0 0 / 0.42);
   --shadow-ds-card-strong: 0 1px 0 oklch(0 0 0 / 0.65), 0 4px 24px oklch(0 0 0 / 0.52);
-  --shadow-ds-modal:       0 0 0 1px oklch(0.172 0.012 70), 0 12px 64px oklch(0 0 0 / 0.75);
-  --shadow-ds-btn-primary: 0 2px 14px oklch(0.788 0.158 72 / 0.45);
+  --shadow-ds-modal:       0 0 0 1px oklch(0.175 0.012 255), 0 12px 64px oklch(0 0 0 / 0.75);
+  --shadow-ds-btn-primary: 0 2px 14px oklch(0.658 0.148 245 / 0.45);
 }

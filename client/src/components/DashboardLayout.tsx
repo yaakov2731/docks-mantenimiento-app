@@ -66,13 +66,13 @@ export default function DashboardLayout({ children, title }: { children: React.R
   const Sidebar = () => (
     <div className="flex flex-col h-full w-64 relative overflow-hidden"
       style={{
-        background: 'radial-gradient(circle at 28% 0%, oklch(0.748 0.162 70 / 0.10), transparent 18rem), linear-gradient(180deg, oklch(0.082 0.009 68), oklch(0.058 0.006 65) 42%, oklch(0.042 0.004 62))',
-        borderRight: `1px solid oklch(0.158 0.014 68 / 0.80)`,
+        background: 'radial-gradient(circle at 28% 0%, oklch(0.528 0.168 245 / 0.12), transparent 18rem), linear-gradient(180deg, oklch(0.108 0.016 250), oklch(0.078 0.012 252) 42%, oklch(0.055 0.008 255))',
+        borderRight: `1px solid oklch(0.165 0.014 250 / 0.80)`,
       }}>
 
-      {/* Gold top accent line */}
-      <div className="absolute top-0 left-0 right-0 h-px"
-        style={{ background: 'linear-gradient(90deg, oklch(0.768 0.165 70), oklch(0.698 0.160 66))' }} />
+      {/* Copper accent bar */}
+      <div className="absolute top-0 left-0 right-0 h-[3px]"
+        style={{ background: 'linear-gradient(90deg, oklch(0.658 0.148 245), oklch(0.592 0.158 245) 60%, oklch(0.528 0.168 245))' }} />
 
       {/* Logo */}
       <div className="px-5 pt-6 pb-4"
@@ -84,16 +84,16 @@ export default function DashboardLayout({ children, title }: { children: React.R
       {user && (
         <div className="mx-3 mt-3 mb-1 px-3 py-2.5"
           style={{
-            background: 'oklch(0.505 0.026 78 / 0.58)',
-            border: '1px solid oklch(0.720 0.030 78 / 0.34)',
+            background: 'oklch(0.505 0.016 252 / 0.55)',
+            border: '1px solid oklch(0.620 0.020 250 / 0.34)',
             borderRadius: '3px',
-            boxShadow: 'inset 0 1px 0 oklch(0.900 0.050 78 / 0.18), 0 10px 24px oklch(0 0 0 / 0.12)',
+            boxShadow: 'inset 0 1px 0 oklch(0.900 0.010 255 / 0.16), 0 10px 24px oklch(0 0 0 / 0.12)',
           }}>
           <p className="text-[9px] uppercase tracking-widest font-semibold"
-            style={{ color: 'oklch(0.768 0.165 70 / 0.70)', fontFamily: 'JetBrains Mono, monospace' }}>Conectado como</p>
+            style={{ color: 'oklch(0.658 0.148 245 / 0.80)', fontFamily: 'JetBrains Mono, monospace' }}>Conectado como</p>
           <p className="text-[13px] font-semibold mt-0.5 truncate"
-            style={{ color: 'oklch(0.928 0.008 75)', fontFamily: 'Bricolage Grotesque, sans-serif' }}>{user.name}</p>
-          <p className="text-[11px]" style={{ color: 'oklch(0.548 0.009 72)', fontFamily: 'Instrument Sans, sans-serif' }}>
+            style={{ color: 'oklch(0.928 0.008 75)', fontFamily: 'IBM Plex Sans Condensed, sans-serif' }}>{user.name}</p>
+          <p className="text-[11px]" style={{ color: 'oklch(0.548 0.009 72)', fontFamily: 'IBM Plex Sans, sans-serif' }}>
             {roleLabel[userRole ?? 'employee']}
           </p>
         </div>
@@ -102,7 +102,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         <p className="text-[9px] uppercase tracking-widest font-semibold px-3 mb-2"
-          style={{ color: 'oklch(0.840 0.110 76 / 0.68)', fontFamily: 'JetBrains Mono, monospace' }}>Navegación</p>
+          style={{ color: 'oklch(0.628 0.120 245 / 0.80)', fontFamily: 'JetBrains Mono, monospace' }}>Navegación</p>
         {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = location === href
           return (
@@ -112,23 +112,23 @@ export default function DashboardLayout({ children, title }: { children: React.R
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-3 py-2 text-[12px] transition-all"
               style={active ? {
-                background: 'oklch(0.842 0.078 76 / 0.22)',
-                color: 'oklch(0.968 0.016 78)',
+                background: 'oklch(0.528 0.168 245 / 0.22)',
+                color: 'oklch(0.982 0.006 255)',
                 fontWeight: '600',
-                border: '1px solid oklch(0.842 0.078 76 / 0.34)',
+                border: '1px solid oklch(0.528 0.168 245 / 0.38)',
                 borderRadius: '3px',
-                fontFamily: 'Bricolage Grotesque, sans-serif',
+                fontFamily: 'IBM Plex Sans Condensed, sans-serif',
                 letterSpacing: '0.01em',
               } : {
                 color: 'oklch(0.902 0.014 78 / 0.78)',
                 border: '1px solid transparent',
                 borderRadius: '3px',
-                fontFamily: 'Instrument Sans, sans-serif',
+                fontFamily: 'IBM Plex Sans, sans-serif',
               }}
               onMouseEnter={e => {
                 if (!active) {
-                  (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(0.985 0.010 78)'
-                  ;(e.currentTarget as HTMLAnchorElement).style.background = 'oklch(0.560 0.028 78 / 0.34)'
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'oklch(0.990 0.004 255)'
+                  ;(e.currentTarget as HTMLAnchorElement).style.background = 'oklch(0.560 0.016 252 / 0.28)'
                 }
               }}
               onMouseLeave={e => {
@@ -155,7 +155,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
             color: 'oklch(0.418 0.007 70)',
             background: 'transparent',
             borderRadius: '3px',
-            fontFamily: 'Instrument Sans, sans-serif',
+            fontFamily: 'IBM Plex Sans, sans-serif',
           }}
           onMouseEnter={e => {
             (e.currentTarget as HTMLButtonElement).style.background = 'oklch(0.545 0.218 27 / 0.10)'
@@ -212,9 +212,9 @@ export default function DashboardLayout({ children, title }: { children: React.R
               : '0 8px 22px oklch(0.188 0.026 74 / 0.06)',
           }}>
 
-          {/* Orange accent line top */}
-          <div className="absolute top-0 left-0 right-0 h-px"
-            style={{ background: 'var(--primary)', opacity: 0.4 }} />
+          {/* Copper accent line top */}
+          <div className="absolute top-0 left-0 right-0 h-[2px]"
+            style={{ background: 'var(--primary)', opacity: 0.55 }} />
 
           <button
             type="button"

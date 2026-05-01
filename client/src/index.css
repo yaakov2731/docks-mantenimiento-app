@@ -3,89 +3,89 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── CSS TOKENS (legacy aliases — synced to Mando Marítimo palette) ── */
+/* ── CSS TOKENS (legacy aliases — Slate Profesional) ── */
 :root {
-  --primary:            oklch(0.642 0.108 72);
-  --primary-dark:       oklch(0.548 0.096 68);
-  --primary-light:      oklch(0.918 0.038 76);
-  --sidebar-bg:         oklch(0.365 0.026 78);
-  --navy:               oklch(0.365 0.026 78);
-  --navy-mid:           oklch(0.438 0.024 80);
-  --navy-light:         oklch(0.520 0.022 82);
+  --primary:            oklch(0.528 0.168 245);
+  --primary-dark:       oklch(0.462 0.178 245);
+  --primary-light:      oklch(0.938 0.018 245);
+  --sidebar-bg:         oklch(0.108 0.016 250);
+  --navy:               oklch(0.108 0.016 250);
+  --navy-mid:           oklch(0.148 0.016 252);
+  --navy-light:         oklch(0.188 0.016 252);
 
-  --accent:             oklch(0.520 0.082 165);
-  --teal:               oklch(0.520 0.082 165);
-  --accent-light:       oklch(0.915 0.030 165);
-  --secondary:          oklch(0.560 0.064 132);
-  --success:            oklch(0.520 0.126 148);
-  --warning:            oklch(0.654 0.118 76);
-  --warn:               oklch(0.654 0.118 76);
-  --danger:             oklch(0.552 0.154 28);
+  --accent:             oklch(0.548 0.112 195);
+  --teal:               oklch(0.548 0.112 195);
+  --accent-light:       oklch(0.940 0.022 195);
+  --secondary:          oklch(0.548 0.088 245);
+  --success:            oklch(0.555 0.182 148);
+  --warning:            oklch(0.625 0.160 78);
+  --warn:               oklch(0.625 0.160 78);
+  --danger:             oklch(0.545 0.212 28);
 
-  --background:         oklch(0.955 0.014 80);
-  --bg:                 oklch(0.955 0.014 80);
-  --surface:            oklch(0.990 0.006 82);
-  --border:             oklch(0.842 0.018 78);
-  --border-dark:        oklch(0.736 0.024 74);
+  --background:         oklch(0.975 0.003 250);
+  --bg:                 oklch(0.975 0.003 250);
+  --surface:            oklch(1 0 0);
+  --border:             oklch(0.882 0.006 250);
+  --border-dark:        oklch(0.828 0.008 248);
 
-  --gray-50:            oklch(0.968 0.012 80);
-  --gray-100:           oklch(0.932 0.014 80);
-  --gray-200:           oklch(0.882 0.016 78);
-  --gray-400:           oklch(0.708 0.018 76);
-  --gray-500:           oklch(0.574 0.020 74);
-  --gray-600:           oklch(0.448 0.022 74);
-  --gray-800:           oklch(0.272 0.026 74);
-  --gray-900:           oklch(0.188 0.026 74);
+  --gray-50:            oklch(0.968 0.003 250);
+  --gray-100:           oklch(0.942 0.004 250);
+  --gray-200:           oklch(0.900 0.005 248);
+  --gray-400:           oklch(0.748 0.006 250);
+  --gray-500:           oklch(0.632 0.006 250);
+  --gray-600:           oklch(0.515 0.007 250);
+  --gray-800:           oklch(0.282 0.010 255);
+  --gray-900:           oklch(0.142 0.012 258);
 
-  --text-1:             oklch(0.188 0.026 74);
-  --text-2:             oklch(0.402 0.022 74);
-  --text-3:             oklch(0.588 0.018 76);
+  --text-1:             oklch(0.142 0.012 258);
+  --text-2:             oklch(0.400 0.010 252);
+  --text-3:             oklch(0.588 0.007 250);
 
-  --shadow-card:        0 1px 0 oklch(1 0 0 / 0.82), 0 9px 22px oklch(0.188 0.026 74 / 0.07), 0 22px 48px oklch(0.188 0.026 74 / 0.035);
-  --shadow-card-strong: 0 1px 0 oklch(1 0 0 / 0.88), 0 16px 36px oklch(0.188 0.026 74 / 0.11), 0 34px 74px oklch(0.188 0.026 74 / 0.06);
-  --shadow-modal:       0 0 0 1px oklch(0.842 0.018 78), 0 18px 58px oklch(0.188 0.026 74 / 0.20);
-  --shadow-btn:         0 8px 18px oklch(0.642 0.108 72 / 0.24);
-  --shadow-btn-primary: 0 8px 18px oklch(0.642 0.108 72 / 0.24);
+  --shadow-card:        0 1px 0 oklch(1 0 0 / 0.80), 0 9px 22px oklch(0.142 0.012 258 / 0.06), 0 22px 48px oklch(0.142 0.012 258 / 0.03);
+  --shadow-card-strong: 0 1px 0 oklch(1 0 0 / 0.86), 0 16px 36px oklch(0.142 0.012 258 / 0.09), 0 34px 74px oklch(0.142 0.012 258 / 0.05);
+  --shadow-modal:       0 0 0 1px oklch(0.882 0.006 250), 0 18px 58px oklch(0.142 0.012 258 / 0.18);
+  --shadow-btn:         0 8px 18px oklch(0.528 0.168 245 / 0.22);
+  --shadow-btn-primary: 0 8px 18px oklch(0.528 0.168 245 / 0.22);
 }
 
 .dark {
-  --primary:      oklch(0.788 0.158 72);
-  --primary-dark: oklch(0.718 0.154 68);
-  --primary-light:oklch(0.188 0.042 72);
+  --primary:      oklch(0.658 0.148 245);
+  --primary-dark: oklch(0.592 0.158 245);
+  --primary-light:oklch(0.185 0.042 248);
 
-  --background: oklch(0.062 0.006 68);
-  --bg:         oklch(0.062 0.006 68);
-  --surface:    oklch(0.098 0.009 70);
-  --border:     oklch(0.172 0.012 70);
-  --border-dark:oklch(0.242 0.014 72);
-  --sidebar-bg: oklch(0.042 0.004 65);
-  --navy:       oklch(0.042 0.004 65);
+  --background: oklch(0.065 0.008 258);
+  --bg:         oklch(0.065 0.008 258);
+  --surface:    oklch(0.100 0.010 255);
+  --border:     oklch(0.175 0.012 255);
+  --border-dark:oklch(0.245 0.014 252);
+  --sidebar-bg: oklch(0.045 0.005 260);
+  --navy:       oklch(0.045 0.005 260);
 
-  --gray-50:    oklch(0.122 0.010 70);
-  --gray-100:   oklch(0.155 0.010 70);
-  --gray-200:   oklch(0.188 0.011 70);
-  --gray-400:   oklch(0.312 0.009 70);
-  --gray-500:   oklch(0.418 0.008 72);
-  --gray-600:   oklch(0.525 0.008 72);
-  --gray-800:   oklch(0.738 0.008 75);
-  --gray-900:   oklch(0.918 0.008 75);
+  --gray-50:    oklch(0.125 0.010 255);
+  --gray-100:   oklch(0.158 0.010 255);
+  --gray-200:   oklch(0.192 0.011 252);
+  --gray-400:   oklch(0.315 0.009 252);
+  --gray-500:   oklch(0.420 0.008 250);
+  --gray-600:   oklch(0.528 0.008 250);
+  --gray-800:   oklch(0.742 0.008 252);
+  --gray-900:   oklch(0.922 0.006 255);
 
-  --text-1:     oklch(0.932 0.006 78);
-  --text-2:     oklch(0.552 0.009 72);
-  --text-3:     oklch(0.348 0.007 70);
+  --text-1:     oklch(0.932 0.006 255);
+  --text-2:     oklch(0.552 0.008 252);
+  --text-3:     oklch(0.348 0.007 250);
 
   --shadow-card:        0 1px 0 oklch(0 0 0 / 0.55), 0 2px 14px oklch(0 0 0 / 0.42);
   --shadow-card-strong: 0 1px 0 oklch(0 0 0 / 0.65), 0 4px 24px oklch(0 0 0 / 0.52);
-  --shadow-modal:       0 0 0 1px oklch(0.172 0.012 70), 0 12px 64px oklch(0 0 0 / 0.75);
-  --shadow-btn:         0 2px 14px oklch(0.788 0.158 72 / 0.45);
-  --shadow-btn-primary: 0 2px 14px oklch(0.788 0.158 72 / 0.45);
+  --shadow-modal:       0 0 0 1px oklch(0.175 0.012 255), 0 12px 64px oklch(0 0 0 / 0.75);
+  --shadow-btn:         0 2px 14px oklch(0.658 0.148 245 / 0.45);
+  --shadow-btn-primary: 0 2px 14px oklch(0.658 0.148 245 / 0.45);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { font-size: 14px; }
+html { font-size: 15px; }
 
 html, body {
-  font-family: 'Instrument Sans', var(--font-body), sans-serif;
+  font-family: 'IBM Plex Sans', var(--font-body), sans-serif;
   background-color: var(--background);
   color: var(--text-1);
   min-height: 100vh;
@@ -94,8 +94,8 @@ html, body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Bricolage Grotesque', var(--font-heading), sans-serif;
-  letter-spacing: -0.03em;
+  font-family: 'IBM Plex Sans Condensed', var(--font-heading), sans-serif;
+  letter-spacing: -0.01em;
   font-weight: 700;
 }
 
@@ -112,7 +112,7 @@ h1, h2, h3, h4, h5, h6 {
 ::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
 
-/* ── GOLD ACCENT LINE on top of header ── */
+/* ── ACCENT LINE on top of header ── */
 .terminal-topline::before {
   content: '';
   position: absolute;
@@ -126,14 +126,14 @@ h1, h2, h3, h4, h5, h6 {
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 6px;
     box-shadow: var(--shadow-card);
   }
 
   .card-strong, .card-xl {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 6px;
     box-shadow: var(--shadow-card-strong);
   }
 
@@ -156,9 +156,9 @@ h1, h2, h3, h4, h5, h6 {
   /* ── HERO CARD ── */
   .hero-card {
     background: var(--sidebar-bg);
-    border-radius: 4px;
+    border-radius: 6px;
     border: 1px solid oklch(0.862 0.008 250 / 0.12);
-    border-top: 1px solid oklch(0.748 0.162 70 / 0.55);
+    border-top: 1px solid oklch(0.528 0.168 245 / 0.55);
     padding: 20px 24px;
     position: relative;
     overflow: hidden;
@@ -174,7 +174,7 @@ h1, h2, h3, h4, h5, h6 {
     position: absolute;
     top: -60px; right: -40px;
     width: 280px; height: 280px;
-    background: radial-gradient(circle, oklch(0.748 0.162 70 / 0.07) 0%, transparent 65%);
+    background: radial-gradient(circle, oklch(0.528 0.168 245 / 0.08) 0%, transparent 65%);
     pointer-events: none;
   }
 
@@ -182,13 +182,13 @@ h1, h2, h3, h4, h5, h6 {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    background: oklch(0.748 0.162 70 / 0.16);
-    border: 1px solid oklch(0.748 0.162 70 / 0.35);
-    color: oklch(0.788 0.158 72);
+    background: oklch(0.528 0.168 245 / 0.14);
+    border: 1px solid oklch(0.528 0.168 245 / 0.30);
+    color: oklch(0.658 0.148 245);
     font-size: 10px;
     font-weight: 600;
     padding: 2px 8px;
-    border-radius: 2px;
+    border-radius: 3px;
     text-transform: uppercase;
     letter-spacing: 0.10em;
     font-family: 'JetBrains Mono', monospace;
@@ -198,7 +198,7 @@ h1, h2, h3, h4, h5, h6 {
   .kpi {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 6px;
     padding: 16px;
     box-shadow: var(--shadow-card);
     transition: border-color 0.15s, box-shadow 0.15s;
@@ -224,7 +224,7 @@ h1, h2, h3, h4, h5, h6 {
 
   .kpi-icon {
     width: 32px; height: 32px;
-    border-radius: 2px;
+    border-radius: 4px;
     display: flex; align-items: center; justify-content: center;
     margin-bottom: 10px;
   }
@@ -237,7 +237,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .lead-card {
-    border-radius: 4px;
+    border-radius: 6px;
     padding: 16px;
     cursor: pointer;
     transition: border-color 0.15s, box-shadow 0.15s;
@@ -249,13 +249,13 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: var(--shadow-card-strong);
   }
 
-  .config-section { border-radius: 4px; padding: 20px; }
+  .config-section { border-radius: 6px; padding: 20px; }
 
   /* ── BUTTONS ── */
   .btn-primary {
     background-color: var(--primary);
-    color: oklch(0.092 0.018 258);
-    border-radius: 2px;
+    color: oklch(0.998 0 0);
+    border-radius: 3px;
     font-weight: 700;
     font-size: 12px;
     font-family: 'JetBrains Mono', monospace;
@@ -275,7 +275,7 @@ h1, h2, h3, h4, h5, h6 {
     background-color: transparent;
     color: var(--text-1);
     border: 1px solid var(--border-dark);
-    border-radius: 2px;
+    border-radius: 3px;
     font-weight: 500;
     font-size: 12px;
     font-family: 'JetBrains Mono', monospace;
@@ -295,7 +295,7 @@ h1, h2, h3, h4, h5, h6 {
     align-items: center;
     gap: 4px;
     padding: 2px 7px;
-    border-radius: 2px;
+    border-radius: 3px;
     font-size: 10px;
     font-weight: 600;
     font-family: 'JetBrains Mono', monospace;
@@ -306,9 +306,9 @@ h1, h2, h3, h4, h5, h6 {
   /* ── INPUTS ── */
   .filter-input, .filter-select,
   .input, .login-input, .pub-input, .config-input {
-    font-family: 'Instrument Sans', sans-serif;
+    font-family: 'IBM Plex Sans', sans-serif;
     border: 1px solid var(--border);
-    border-radius: 2px;
+    border-radius: 4px;
     background: var(--surface);
     color: var(--text-1);
     outline: none;
@@ -317,7 +317,7 @@ h1, h2, h3, h4, h5, h6 {
 
   .input, .login-input, .pub-input, .config-input {
     border-width: 1px;
-    background: oklch(0.985 0.002 252);
+    background: oklch(0.998 0.001 252);
   }
 
   .filter-input:focus, .filter-select:focus,
@@ -325,7 +325,7 @@ h1, h2, h3, h4, h5, h6 {
   .pub-input:focus, .config-input:focus {
     border-color: var(--primary) !important;
     background: var(--surface) !important;
-    box-shadow: 0 0 0 2px oklch(0.748 0.162 70 / 0.15) !important;
+    box-shadow: 0 0 0 2px oklch(0.528 0.168 245 / 0.15) !important;
   }
 
   /* ── DATA TABLE ── */
@@ -347,7 +347,7 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 12.5px;
     vertical-align: middle;
     color: var(--text-1);
-    font-family: 'Instrument Sans', sans-serif;
+    font-family: 'IBM Plex Sans', sans-serif;
   }
 
   .data-table tbody tr:hover td {
@@ -399,15 +399,15 @@ h1, h2, h3, h4, h5, h6 {
   position: absolute;
   top: -60px; right: -60px;
   width: 300px; height: 300px;
-  background: radial-gradient(circle, oklch(0.748 0.162 70 / 0.06) 0%, transparent 65%);
+  background: radial-gradient(circle, oklch(0.528 0.168 245 / 0.07) 0%, transparent 65%);
   pointer-events: none;
 }
 
 /* ── BUTTONS (outside @layer) ── */
 .btn-primary {
   background-color: var(--primary);
-  color: oklch(0.092 0.018 258);
-  border-radius: 2px;
+  color: oklch(0.998 0 0);
+  border-radius: 3px;
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
   text-transform: uppercase;
@@ -426,7 +426,7 @@ h1, h2, h3, h4, h5, h6 {
   background-color: transparent;
   color: var(--text-1);
   border: 1px solid var(--border-dark);
-  border-radius: 2px;
+  border-radius: 3px;
   font-weight: 500;
   font-family: 'JetBrains Mono', monospace;
   text-transform: uppercase;
@@ -442,7 +442,7 @@ h1, h2, h3, h4, h5, h6 {
 /* ── FOCUS STATES (global) ── */
 input:focus, textarea:focus, select:focus {
   border-color: var(--primary) !important;
-  box-shadow: 0 0 0 2px oklch(0.748 0.162 70 / 0.15) !important;
+  box-shadow: 0 0 0 2px oklch(0.528 0.168 245 / 0.15) !important;
   outline: none;
   background: var(--surface) !important;
 }
@@ -466,86 +466,86 @@ main > * { animation: pageEnter 0.16s ease forwards; }
 
 /* ── SELECTION COLOR ── */
 ::selection {
-  background: oklch(0.748 0.162 70 / 0.20);
+  background: oklch(0.528 0.168 245 / 0.18);
   color: var(--text-1);
 }
 
-/* ── ADMIN PREMIUM THEME: marfil operativo + bronce sobrio ── */
+/* ── ADMIN PREMIUM THEME: slate profesional ── */
 .admin-theme {
-  --primary:            oklch(0.642 0.108 72);
-  --primary-dark:       oklch(0.548 0.096 68);
-  --primary-light:      oklch(0.918 0.038 76);
-  --background:         oklch(0.955 0.014 80);
-  --surface:            oklch(0.990 0.006 82);
-  --border:             oklch(0.842 0.018 78);
-  --border-dark:        oklch(0.736 0.024 74);
-  --sidebar-bg:         oklch(0.365 0.026 78);
-  --gray-50:            oklch(0.968 0.012 80);
-  --gray-100:           oklch(0.932 0.014 80);
-  --gray-200:           oklch(0.882 0.016 78);
-  --text-1:             oklch(0.188 0.026 74);
-  --text-2:             oklch(0.402 0.022 74);
-  --text-3:             oklch(0.588 0.018 76);
-  --accent:             oklch(0.520 0.082 165);
-  --success:            oklch(0.520 0.126 148);
-  --warning:            oklch(0.654 0.118 76);
-  --danger:             oklch(0.552 0.154 28);
-  --shadow-card:        0 1px 0 oklch(1 0 0 / 0.84), 0 10px 24px oklch(0.188 0.026 74 / 0.07), 0 26px 58px oklch(0.188 0.026 74 / 0.04);
-  --shadow-card-strong: 0 1px 0 oklch(1 0 0 / 0.90), 0 18px 42px oklch(0.188 0.026 74 / 0.11), 0 38px 86px oklch(0.188 0.026 74 / 0.06);
-  --shadow-panel-lift:  0 1px 0 oklch(1 0 0 / 0.88), 0 16px 36px oklch(0.188 0.026 74 / 0.09), 0 42px 90px oklch(0.188 0.026 74 / 0.05);
-  --shadow-sidebar:     18px 0 46px oklch(0.188 0.026 74 / 0.12);
-  --shadow-topbar:      0 8px 24px oklch(0.188 0.026 74 / 0.06);
-  --shadow-modal:       0 0 0 1px var(--border), 0 24px 70px oklch(0.188 0.026 74 / 0.18), 0 42px 120px oklch(0.188 0.026 74 / 0.09);
-  --shadow-btn-primary: 0 10px 22px oklch(0.642 0.108 72 / 0.22), 0 2px 0 oklch(0.188 0.026 74 / 0.08);
+  --primary:            oklch(0.528 0.168 245);
+  --primary-dark:       oklch(0.462 0.178 245);
+  --primary-light:      oklch(0.938 0.018 245);
+  --background:         oklch(0.975 0.003 250);
+  --surface:            oklch(1 0 0);
+  --border:             oklch(0.882 0.006 250);
+  --border-dark:        oklch(0.828 0.008 248);
+  --sidebar-bg:         oklch(0.108 0.016 250);
+  --gray-50:            oklch(0.968 0.003 250);
+  --gray-100:           oklch(0.942 0.004 250);
+  --gray-200:           oklch(0.900 0.005 248);
+  --text-1:             oklch(0.142 0.012 258);
+  --text-2:             oklch(0.400 0.010 252);
+  --text-3:             oklch(0.588 0.007 250);
+  --accent:             oklch(0.548 0.112 195);
+  --success:            oklch(0.555 0.182 148);
+  --warning:            oklch(0.625 0.160 78);
+  --danger:             oklch(0.545 0.212 28);
+  --shadow-card:        0 1px 0 oklch(1 0 0 / 0.82), 0 10px 24px oklch(0.142 0.012 258 / 0.06), 0 26px 58px oklch(0.142 0.012 258 / 0.03);
+  --shadow-card-strong: 0 1px 0 oklch(1 0 0 / 0.88), 0 18px 42px oklch(0.142 0.012 258 / 0.09), 0 38px 86px oklch(0.142 0.012 258 / 0.05);
+  --shadow-panel-lift:  0 1px 0 oklch(1 0 0 / 0.86), 0 16px 36px oklch(0.142 0.012 258 / 0.08), 0 42px 90px oklch(0.142 0.012 258 / 0.04);
+  --shadow-sidebar:     18px 0 46px oklch(0.142 0.012 258 / 0.10);
+  --shadow-topbar:      0 8px 24px oklch(0.142 0.012 258 / 0.05);
+  --shadow-modal:       0 0 0 1px var(--border), 0 24px 70px oklch(0.142 0.012 258 / 0.16), 0 42px 120px oklch(0.142 0.012 258 / 0.08);
+  --shadow-btn-primary: 0 10px 22px oklch(0.528 0.168 245 / 0.20), 0 2px 0 oklch(0.142 0.012 258 / 0.06);
 }
 
 .dark .admin-theme,
 .admin-theme.dark {
-  --background:         oklch(0.118 0.018 72);
-  --surface:            oklch(0.166 0.018 72);
-  --border:             oklch(0.260 0.018 72);
-  --border-dark:        oklch(0.348 0.018 72);
-  --sidebar-bg:         oklch(0.156 0.020 74);
-  --gray-50:            oklch(0.190 0.016 72);
-  --gray-100:           oklch(0.226 0.016 72);
-  --gray-200:           oklch(0.270 0.016 72);
-  --text-1:             oklch(0.932 0.012 78);
-  --text-2:             oklch(0.708 0.014 78);
-  --text-3:             oklch(0.548 0.014 78);
-  --primary:            oklch(0.790 0.126 75);
-  --primary-dark:       oklch(0.718 0.118 72);
-  --shadow-card:        0 1px 0 oklch(1 0 0 / 0.05), 0 14px 34px oklch(0 0 0 / 0.30), 0 34px 80px oklch(0 0 0 / 0.18);
-  --shadow-card-strong: 0 1px 0 oklch(1 0 0 / 0.08), 0 20px 48px oklch(0 0 0 / 0.40), 0 44px 110px oklch(0 0 0 / 0.24);
-  --shadow-panel-lift:  0 1px 0 oklch(1 0 0 / 0.08), 0 24px 58px oklch(0 0 0 / 0.42), 0 52px 120px oklch(0 0 0 / 0.26);
+  --background:         oklch(0.068 0.010 258);
+  --surface:            oklch(0.105 0.012 255);
+  --border:             oklch(0.175 0.012 255);
+  --border-dark:        oklch(0.245 0.014 252);
+  --sidebar-bg:         oklch(0.055 0.008 260);
+  --gray-50:            oklch(0.130 0.010 255);
+  --gray-100:           oklch(0.165 0.010 255);
+  --gray-200:           oklch(0.200 0.010 252);
+  --text-1:             oklch(0.932 0.006 255);
+  --text-2:             oklch(0.658 0.008 252);
+  --text-3:             oklch(0.500 0.008 252);
+  --primary:            oklch(0.658 0.148 245);
+  --primary-dark:       oklch(0.592 0.158 245);
+  --shadow-card:        0 1px 0 oklch(1 0 0 / 0.05), 0 14px 34px oklch(0 0 0 / 0.28), 0 34px 80px oklch(0 0 0 / 0.16);
+  --shadow-card-strong: 0 1px 0 oklch(1 0 0 / 0.08), 0 20px 48px oklch(0 0 0 / 0.38), 0 44px 110px oklch(0 0 0 / 0.22);
+  --shadow-panel-lift:  0 1px 0 oklch(1 0 0 / 0.08), 0 24px 58px oklch(0 0 0 / 0.40), 0 52px 120px oklch(0 0 0 / 0.24);
   --shadow-sidebar:     20px 0 54px oklch(0 0 0 / 0.35);
   --shadow-topbar:      0 10px 28px oklch(0 0 0 / 0.20);
 }
 
 .admin-theme .admin-main {
   background:
-    radial-gradient(circle at 18% -10%, oklch(0.642 0.108 72 / 0.09), transparent 34rem),
-    radial-gradient(circle at 84% 4%, oklch(0.520 0.082 165 / 0.065), transparent 28rem),
-    linear-gradient(180deg, oklch(0.968 0.014 80), var(--background) 260px);
+    radial-gradient(circle at 18% -10%, oklch(0.528 0.168 245 / 0.06), transparent 34rem),
+    radial-gradient(circle at 84% 4%, oklch(0.548 0.112 195 / 0.04), transparent 28rem),
+    linear-gradient(180deg, oklch(0.975 0.003 250), var(--background) 260px);
   padding-bottom: 34px;
 }
 
 .dark .admin-theme .admin-main {
   background:
-    radial-gradient(circle at 18% -10%, oklch(0.790 0.126 75 / 0.12), transparent 34rem),
-    radial-gradient(circle at 84% 4%, oklch(0.545 0.088 165 / 0.09), transparent 28rem),
-    linear-gradient(180deg, oklch(0.138 0.018 72), var(--background) 260px);
+    radial-gradient(circle at 18% -10%, oklch(0.658 0.148 245 / 0.08), transparent 34rem),
+    radial-gradient(circle at 84% 4%, oklch(0.548 0.112 195 / 0.06), transparent 28rem),
+    linear-gradient(180deg, oklch(0.080 0.010 258), var(--background) 260px);
 }
 
 .admin-theme aside > div {
   box-shadow: var(--shadow-sidebar);
   background:
-    radial-gradient(circle at 28% 0%, oklch(0.748 0.162 70 / 0.10), transparent 18rem),
-    linear-gradient(180deg, oklch(0.082 0.009 68), oklch(0.058 0.006 65) 42%, oklch(0.042 0.004 62)) !important;
+    radial-gradient(circle at 28% 0%, oklch(0.528 0.168 245 / 0.12), transparent 18rem),
+    linear-gradient(180deg, oklch(0.108 0.016 250), oklch(0.078 0.012 252) 42%, oklch(0.055 0.008 255)) !important;
 }
 
 .admin-theme header {
   box-shadow: var(--shadow-topbar);
-  backdrop-filter: saturate(1.15) blur(10px);
+  backdrop-filter: saturate(1.10) blur(10px);
 }
 
 .admin-theme .admin-shell,
@@ -566,18 +566,18 @@ main > * { animation: pageEnter 0.16s ease forwards; }
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.64);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.60);
 }
 
 .admin-theme .dashboard-premium-hero {
   background:
-    radial-gradient(circle at 82% 12%, oklch(0.642 0.108 72 / 0.16), transparent 18rem),
-    radial-gradient(circle at 18% 100%, oklch(0.520 0.082 165 / 0.10), transparent 17rem),
-    linear-gradient(135deg, oklch(0.418 0.030 76), oklch(0.560 0.028 78));
-  border: 1px solid oklch(0.642 0.108 72 / 0.24);
+    radial-gradient(circle at 82% 12%, oklch(0.658 0.148 245 / 0.22), transparent 18rem),
+    radial-gradient(circle at 18% 100%, oklch(0.548 0.112 195 / 0.14), transparent 17rem),
+    linear-gradient(135deg, oklch(0.248 0.062 252), oklch(0.365 0.062 250));
+  border: 1px solid oklch(0.528 0.168 245 / 0.28);
   border-radius: 8px;
-  box-shadow: 0 1px 0 oklch(1 0 0 / 0.16) inset, 0 24px 60px oklch(0.188 0.026 74 / 0.18), 0 46px 96px oklch(0.188 0.026 74 / 0.10);
-  color: oklch(0.965 0.012 78);
+  box-shadow: 0 1px 0 oklch(1 0 0 / 0.12) inset, 0 24px 60px oklch(0.142 0.012 258 / 0.16), 0 46px 96px oklch(0.142 0.012 258 / 0.08);
+  color: oklch(0.965 0.008 255);
 }
 
 .admin-theme .dashboard-kpi {
@@ -595,12 +595,12 @@ main > * { animation: pageEnter 0.16s ease forwards; }
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(180deg, oklch(1 0 0 / 0.58), transparent 44%);
-  opacity: 0.54;
+  background: linear-gradient(180deg, oklch(1 0 0 / 0.55), transparent 44%);
+  opacity: 0.50;
 }
 
 .admin-theme .dashboard-kpi:hover {
-  border-color: oklch(0.742 0.126 73 / 0.46);
+  border-color: oklch(0.528 0.168 245 / 0.38);
   box-shadow: var(--shadow-card-strong);
   transform: translateY(-2px);
 }
@@ -619,7 +619,7 @@ main > * { animation: pageEnter 0.16s ease forwards; }
 }
 
 .admin-theme table td {
-  border-bottom-color: oklch(0.835 0.012 78 / 0.62) !important;
+  border-bottom-color: oklch(0.882 0.006 250 / 0.65) !important;
 }
 
 .admin-theme table tbody tr {
@@ -627,7 +627,7 @@ main > * { animation: pageEnter 0.16s ease forwards; }
 }
 
 .admin-theme table tbody tr:hover {
-  background-color: oklch(0.748 0.162 70 / 0.06);
+  background-color: oklch(0.528 0.168 245 / 0.04);
 }
 
 .admin-theme button,
@@ -719,18 +719,20 @@ main > * { animation: pageEnter 0.16s ease forwards; }
 .admin-theme .focus\:ring-amber-400:focus,
 .admin-theme .focus\:ring-primary\/50:focus,
 .admin-theme .focus\:ring-cyan-100:focus {
-  --tw-ring-color: oklch(0.742 0.126 73 / 0.24) !important;
+  --tw-ring-color: oklch(0.528 0.168 245 / 0.22) !important;
 }
 
+/* ── LEAD RENTAL CARDS ── */
 .lead-rental-grid {
-  /* grid only, no perspective — cards use flat elevation not 3D tilt */
+  /* layout handled by Tailwind grid utilities */
 }
 
 .lead-rental-card {
-  min-height: 136px;
+  min-height: auto;
   border-radius: 6px !important;
   background: var(--surface) !important;
   box-shadow: var(--shadow-card) !important;
+  padding: 10px 12px !important;
   transition:
     transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -738,9 +740,9 @@ main > * { animation: pageEnter 0.16s ease forwards; }
 }
 
 .lead-rental-card:hover {
-  border-color: oklch(0.748 0.162 70 / 0.48) !important;
+  border-color: oklch(0.528 0.168 245 / 0.42) !important;
   box-shadow: var(--shadow-card-strong) !important;
-  transform: translateY(-3px);
+  transform: translateY(-2px);
 }
 
 .lead-rental-card:active {
@@ -748,14 +750,38 @@ main > * { animation: pageEnter 0.16s ease forwards; }
   box-shadow: var(--shadow-card) !important;
 }
 
+/* Lead respondió al bot — necesita atención humana */
+.lead-rental-card[class*="ring-amber"] {
+  border-left: 3px solid oklch(0.625 0.160 78) !important;
+  background: oklch(0.994 0.005 78) !important;
+}
+
+.dark .lead-rental-card[class*="ring-amber"] {
+  background: oklch(0.148 0.020 78) !important;
+}
+
+/* Bot activo manejando el lead */
+.lead-rental-card[class*="ring-blue"] {
+  border-left: 3px solid oklch(0.528 0.168 245 / 0.65) !important;
+}
+
+/* Nombre del lead */
 .lead-rental-name {
   letter-spacing: 0;
-  font-size: 1.05rem !important;
+  font-size: 13px !important;
+  line-height: 1.3;
 }
 
 .lead-rental-meta svg {
   color: var(--primary);
-  opacity: 0.78;
+  opacity: 0.75;
+}
+
+/* 4 columnas en pantallas grandes */
+@media (min-width: 1280px) {
+  .lead-rental-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
 }
 
 /* ── RESPONSIVE APP SHELL: iPhone / iPad / desktop ── */
@@ -784,8 +810,8 @@ main > * { animation: pageEnter 0.16s ease forwards; }
 
   .admin-theme .admin-main {
     background:
-      radial-gradient(circle at 20% -8%, oklch(0.642 0.108 72 / 0.075), transparent 24rem),
-      linear-gradient(180deg, oklch(0.970 0.012 80), var(--background) 220px);
+      radial-gradient(circle at 20% -8%, oklch(0.528 0.168 245 / 0.05), transparent 24rem),
+      linear-gradient(180deg, oklch(0.975 0.003 250), var(--background) 220px);
   }
 
   .lead-rental-grid {
@@ -896,7 +922,6 @@ main > * { animation: pageEnter 0.16s ease forwards; }
 
   .lead-rental-card {
     min-height: auto;
-    padding: 14px !important;
     transform: none !important;
   }
 
