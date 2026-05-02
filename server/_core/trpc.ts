@@ -3,7 +3,9 @@ import type { CreateExpressContextOptions } from '@trpc/server/adapters/express'
 import jwt from 'jsonwebtoken'
 import { readEnv } from './env'
 
-const JWT_SECRET = readEnv('SESSION_SECRET') ?? 'dev-secret-change-me'
+const _jwtSecret = readEnv('SESSION_SECRET')
+if (!_jwtSecret) throw new Error('SESSION_SECRET env var is required')
+export const JWT_SECRET = _jwtSecret
 export const JWT_COOKIE = 'docks_token'
 
 export type SessionUser = {
@@ -18,7 +20,7 @@ export function createContext({ req, res }: CreateExpressContextOptions) {
   const token = req.cookies?.[JWT_COOKIE]
   if (token) {
     try {
-      user = jwt.verify(token, JWT_SECRET) as SessionUser
+      user = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as SessionUser
     } catch {}
   }
   return { req, res, user }

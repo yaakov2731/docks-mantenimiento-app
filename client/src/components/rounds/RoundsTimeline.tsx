@@ -165,7 +165,7 @@ export function RoundsTimeline({
                             </select>
                             <button
                               type="button"
-                              className="rounded-[12px] bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                              className="rounded-[12px] bg-[#2D7D52] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
                               disabled={!selectedEmployee || isThisLoading}
                               onClick={async () => {
                                 setLoadingId(item.id)

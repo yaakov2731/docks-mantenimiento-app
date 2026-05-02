@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server'
 import { and, eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { router, publicProcedure, protectedProcedure, JWT_COOKIE } from './_core/trpc'
+import { router, publicProcedure, protectedProcedure, JWT_COOKIE, JWT_SECRET } from './_core/trpc'
 import { notifyOwner, notifyCompleted } from './_core/notification'
 import { readEnv } from './_core/env'
 import * as database from './db'
@@ -549,13 +549,13 @@ export const appRouter = router({
         if (!ok) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Usuario o contraseña incorrectos' })
         const token = jwt.sign(
           { id: user.id, username: user.username, name: user.name, role: user.role },
-          readEnv('SESSION_SECRET') ?? 'dev-secret-change-me',
-          { expiresIn: '7d' }
+          JWT_SECRET,
+          { expiresIn: '7d', algorithm: 'HS256' }
         )
         ctx.res.cookie(JWT_COOKIE, token, {
           httpOnly: true,
           sameSite: 'lax',
-          secure: process.env.NODE_ENV === 'production',
+          secure: ctx.req.secure || ctx.req.headers['x-forwarded-proto'] === 'https',
           maxAge: 7 * 24 * 60 * 60 * 1000,
         })
         return { success: true, user: { id: user.id, name: user.name, role: user.role } }
@@ -569,16 +569,16 @@ export const appRouter = router({
   reportes: router({
     crear: publicProcedure
       .input(z.object({
-        locatario: z.string().min(1),
-        local: z.string().min(1),
+        locatario: z.string().min(1).max(120),
+        local: z.string().min(1).max(120),
         planta: z.enum(['baja', 'alta']),
-        contacto: z.string().optional(),
-        emailLocatario: z.string().optional(),
+        contacto: z.string().max(120).optional(),
+        emailLocatario: z.string().email().max(254).optional(),
         categoria: z.enum(['electrico', 'plomeria', 'estructura', 'limpieza', 'seguridad', 'climatizacion', 'otro']),
         prioridad: z.enum(['baja', 'media', 'alta', 'urgente']),
         titulo: z.string().min(1).max(500),
-        descripcion: z.string().min(10),
-        fotos: z.string().optional(),
+        descripcion: z.string().min(10).max(5000),
+        fotos: z.string().max(2000).optional(),
       }))
       .mutation(async ({ input }) => {
         const id = await crearReporte(input as any)
@@ -696,15 +696,15 @@ export const appRouter = router({
   leads: router({
     crear: publicProcedure
       .input(z.object({
-        nombre: z.string().min(1),
-        telefono: z.string().optional(),
-        email: z.string().optional(),
-        waId: z.string().optional(),
-        rubro: z.string().optional(),
-        tipoLocal: z.string().optional(),
-        mensaje: z.string().optional(),
-        turnoFecha: z.string().optional(),
-        turnoHora: z.string().optional(),
+        nombre: z.string().min(1).max(120),
+        telefono: z.string().max(30).optional(),
+        email: z.string().email().max(254).optional(),
+        waId: z.string().max(30).optional(),
+        rubro: z.string().max(200).optional(),
+        tipoLocal: z.string().max(200).optional(),
+        mensaje: z.string().max(2000).optional(),
+        turnoFecha: z.string().max(20).optional(),
+        turnoHora: z.string().max(10).optional(),
         fuente: z.enum(['whatsapp', 'web', 'otro']).default('web'),
       }))
       .mutation(async ({ input }) => {
@@ -1434,7 +1434,8 @@ export const appRouter = router({
         pagoMensual: payrollAmountSchema,
         puedeVender: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
         await crearEmpleado(input as any)
         return { success: true }
       }),
@@ -1452,14 +1453,16 @@ export const appRouter = router({
         pagoMensual: payrollAmountSchema,
         puedeVender: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
         const { id, ...data } = input
         await actualizarEmpleado(id, data as any)
         return { success: true }
       }),
     desactivar: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
         await actualizarEmpleado(input.id, { activo: false })
         return { success: true }
       }),
@@ -1609,13 +1612,13 @@ export const appRouter = router({
         recibeUrgentes: z.boolean().default(true),
         recibeCompletados: z.boolean().default(false),
       }))
-      .mutation(async ({ input }) => { await crearNotificacion(input as any); return { success: true } }),
+      .mutation(async ({ input, ctx }) => { assertAdmin(ctx.user); await crearNotificacion(input as any); return { success: true } }),
     toggleNotificacion: protectedProcedure
       .input(z.object({ id: z.number(), activo: z.boolean() }))
-      .mutation(async ({ input }) => { await actualizarNotificacion(input.id, { activo: input.activo }); return { success: true } }),
+      .mutation(async ({ input, ctx }) => { assertAdmin(ctx.user); await actualizarNotificacion(input.id, { activo: input.activo }); return { success: true } }),
     eliminarNotificacion: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => { await eliminarNotificacion(input.id); return { success: true } }),
+      .mutation(async ({ input, ctx }) => { assertAdmin(ctx.user); await eliminarNotificacion(input.id); return { success: true } }),
     limpiarDatosDemo: protectedProcedure
       .mutation(async ({ ctx }) => {
         assertAdmin(ctx.user)

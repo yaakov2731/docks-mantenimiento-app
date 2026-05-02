@@ -186,7 +186,7 @@ export function TaskCreateForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-full bg-[linear-gradient(135deg,#2563EB,#1E40AF)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-full bg-[linear-gradient(135deg,#2D7D52,#1A5C3A)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting ? 'Creando...' : 'Crear tarea'}
         </button>

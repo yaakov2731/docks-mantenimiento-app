@@ -7,7 +7,7 @@ import { Bot, Flame, Thermometer, Snowflake, AlertCircle, Save, RotateCcw } from
 const TEMP_LABELS: Record<string, { label: string; color: string; bg: string; icon: JSX.Element }> = {
   hot:      { label: 'Hot',      color: '#dc2626', bg: '#fef2f2', icon: <Flame className="w-4 h-4" /> },
   warm:     { label: 'Warm',     color: '#d97706', bg: '#fffbeb', icon: <Thermometer className="w-4 h-4" /> },
-  cold:     { label: 'Cold',     color: '#2563eb', bg: '#eff6ff', icon: <Snowflake className="w-4 h-4" /> },
+  cold:     { label: 'Cold',     color: '#4B7FA8', bg: '#eff6ff', icon: <Snowflake className="w-4 h-4" /> },
   not_fit:  { label: 'No encaja',color: '#6b7280', bg: '#f9fafb', icon: <AlertCircle className="w-4 h-4" /> },
   sin_score:{ label: 'Sin score',color: '#9ca3af', bg: '#f3f4f6', icon: <Bot className="w-4 h-4" /> },
 }

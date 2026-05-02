@@ -70,7 +70,7 @@ export default function DashboardCharts({
             <XAxis dataKey="categoria" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip />
-            <Bar dataKey="count" fill="#2563EB" radius={[10, 10, 0, 0]} />
+            <Bar dataKey="count" fill="#2D7D52" radius={[10, 10, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

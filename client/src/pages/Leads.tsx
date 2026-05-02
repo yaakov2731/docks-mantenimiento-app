@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button'
 import { Phone, Mail, MessageCircle, Calendar, X, Trash2, Clock, Bot, CheckSquare, Square, Users } from 'lucide-react'
 
 const ESTADOS_LEAD = [
-  { value: 'nuevo', label: 'Nuevo', color: '#2563EB' },
+  { value: 'nuevo', label: 'Nuevo', color: '#2D7D52' },
   { value: 'contactado', label: 'Contactado', color: '#D97706' },
   { value: 'visito', label: 'Visitó', color: '#D97706' },
   { value: 'cerrado', label: 'Cerrado', color: '#059669' },
@@ -72,7 +72,7 @@ function getBotState(lead: {
 
 const BOT_STATE_BORDER: Record<BotState, string> = {
   idle: 'border border-[var(--border)]',
-  bot_active: 'border border-blue-300/50 ring-1 ring-blue-200/30',
+  bot_active: 'border border-emerald-300/50 ring-1 ring-emerald-200/30',
   lead_replied: 'border border-amber-400/60 ring-1 ring-amber-300/30',
 }
 
@@ -366,7 +366,7 @@ export default function Leads() {
                 <div className={`mt-3 pt-2 border-t flex items-center gap-1.5 text-xs font-medium ${
                   botState === 'lead_replied'
                     ? 'border-amber-100 text-amber-700'
-                    : 'border-blue-100 text-blue-600'
+                    : 'border-emerald-100 text-emerald-700'
                 }`}>
                   {botState === 'lead_replied' ? (
                     <>

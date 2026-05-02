@@ -47,6 +47,10 @@ import { parseIntent, buildUnknownIntentResponse } from './messages/intent-parse
 import { handleIncomingMessage } from './bot-menu/engine'
 import { notifyOwner } from './_core/notification'
 import { readEnv } from './_core/env'
+
+const _botApiKey = readEnv('BOT_API_KEY')
+if (!_botApiKey) throw new Error('BOT_API_KEY env var is required')
+const BOT_API_KEY = _botApiKey
 import { createRoundsService } from './rounds/service'
 import { createOperationalTasksService } from './tasks/service'
 import { assignReporteToEmployee } from './reporte-assignment'
@@ -189,11 +193,10 @@ function buildAttendancePayload(status: any) {
 
 function authBot(req: any, res: any, next: any) {
   const key = req.headers['x-bot-api-key']
-  const expected = readEnv('BOT_API_KEY') ?? ''
-  if (!key || typeof key !== 'string' || key.length !== expected.length) {
+  if (!key || typeof key !== 'string' || key.length !== BOT_API_KEY.length) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
-  const match = timingSafeEqual(Buffer.from(key), Buffer.from(expected))
+  const match = timingSafeEqual(Buffer.from(key), Buffer.from(BOT_API_KEY))
   if (!match) return res.status(401).json({ error: 'Unauthorized' })
   next()
 }

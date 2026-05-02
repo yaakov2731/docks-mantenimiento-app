@@ -49,10 +49,10 @@ export function OperationsHeroCard({ resumen, isLoading }: { resumen?: Resumen; 
     tone === 'atrasado'
       ? 'border border-rose-200 bg-rose-50 text-rose-950'
       : tone === 'activo'
-        ? 'border border-blue-200 bg-blue-50 text-blue-950'
+        ? 'border border-emerald-200 bg-emerald-50 text-emerald-950'
         : tone === 'pendiente'
           ? 'border border-amber-200 bg-amber-50 text-amber-950'
-          : 'bg-[linear-gradient(135deg,#2563EB,#1E40AF)] text-white'
+          : 'bg-[linear-gradient(135deg,#2D7D52,#1A5C3A)] text-white'
 
   const eyebrowClass =
     tone === 'estable'
@@ -60,7 +60,7 @@ export function OperationsHeroCard({ resumen, isLoading }: { resumen?: Resumen; 
       : tone === 'pendiente'
         ? 'text-amber-600'
         : tone === 'activo'
-          ? 'text-blue-500'
+          ? 'text-emerald-600'
           : 'text-rose-500'
 
   const bodyClass =
@@ -69,7 +69,7 @@ export function OperationsHeroCard({ resumen, isLoading }: { resumen?: Resumen; 
       : tone === 'pendiente'
         ? 'text-amber-900/80'
         : tone === 'activo'
-          ? 'text-blue-900/80'
+          ? 'text-emerald-900/80'
           : 'text-rose-950/80'
 
   const title =
@@ -131,7 +131,7 @@ function Metric({
     accent === 'green'
       ? 'text-emerald-500'
       : accent === 'blue'
-        ? 'text-blue-400'
+        ? 'text-emerald-500'
         : accent === 'red'
           ? 'text-rose-500'
           : ''

@@ -1,11 +1,10 @@
 import { Router, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
+import { timingSafeEqual } from 'crypto'
 import ExcelJS from 'exceljs'
 import { getLeads, getLeadsForFollowup, updateLeadFollowup, enqueueBotMessage, getAppConfig, createLeadEvento } from '../db'
 import { readEnv } from '../_core/env'
-import { JWT_COOKIE } from '../_core/trpc'
-
-const JWT_SECRET = readEnv('SESSION_SECRET') ?? 'dev-secret-change-me'
+import { JWT_COOKIE, JWT_SECRET } from '../_core/trpc'
 
 const ESTADOS: Record<string, string> = {
   nuevo:      'Nuevo',
@@ -62,7 +61,10 @@ const router = Router()
 router.get('/leads/export', async (req: Request, res: Response) => {
   const token = req.cookies?.[JWT_COOKIE]
   if (!token) { res.status(401).json({ error: 'No autenticado' }); return }
-  try { jwt.verify(token, JWT_SECRET) } catch { res.status(401).json({ error: 'Token inválido' }); return }
+  let payload: { role: string }
+  try { payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as { role: string } }
+  catch { res.status(401).json({ error: 'Token inválido' }); return }
+  if (!['admin', 'sales'].includes(payload.role)) { res.status(403).json({ error: 'No autorizado' }); return }
 
   try {
   const leads = await getLeads()
@@ -186,7 +188,7 @@ router.get('/leads/export', async (req: Request, res: Response) => {
   res.send(Buffer.from(buffer))
   } catch (err) {
     console.error('[leads/export]', err)
-    res.status(500).json({ error: String(err) })
+    res.status(500).json({ error: 'Error al generar el reporte' })
   }
 })
 
@@ -213,9 +215,13 @@ function isQuietHour(): boolean {
   return argHour >= 22 || argHour < 8
 }
 
+function verifyCronSecret(provided: unknown, expected: string | undefined): boolean {
+  if (!expected || typeof provided !== 'string' || provided.length !== expected.length) return false
+  return timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
+}
+
 router.get('/leads-followup', async (req: Request, res: Response) => {
-  const cronSecret = readEnv('CRON_SECRET')
-  if (!cronSecret || req.headers['x-cron-secret'] !== cronSecret) {
+  if (!verifyCronSecret(req.headers['x-cron-secret'], readEnv('CRON_SECRET'))) {
     res.status(401).json({ error: 'Unauthorized' })
     return
   }

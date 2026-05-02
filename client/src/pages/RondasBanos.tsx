@@ -120,7 +120,7 @@ export default function RondasBanos() {
       case 'pendiente_asignacion': return 'bg-gray-100 text-gray-800'
       case 'pendiente_confirmacion': return 'bg-yellow-100 text-yellow-800'
       case 'aceptada': return 'bg-green-100 text-green-800'
-      case 'en_progreso': return 'bg-blue-100 text-blue-800'
+      case 'en_progreso': return 'bg-emerald-100 text-emerald-800'
       case 'pausada': return 'bg-orange-100 text-orange-800'
       case 'terminada': return 'bg-purple-100 text-purple-800'
       case 'cancelada': return 'bg-red-100 text-red-800'
@@ -249,7 +249,7 @@ export default function RondasBanos() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <Clock className="text-blue-500" size={20} />
+                <Clock className="text-emerald-600" size={20} />
                 <div>
                   <p className="text-sm text-gray-600">En progreso</p>
                   <p className="text-2xl font-bold">{rounds?.filter(r => r.estado === 'en_progreso').length || 0}</p>
@@ -320,7 +320,7 @@ export default function RondasBanos() {
                       )}
                     </div>
                     {round.startedAt && (
-                      <div className="mt-2 text-sm text-blue-600">
+                      <div className="mt-2 text-sm text-emerald-700">
                         ⏰ Iniciada: {format(new Date(round.startedAt), 'dd/MM/yyyy HH:mm', { locale: es })}
                       </div>
                     )}

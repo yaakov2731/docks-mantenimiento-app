@@ -286,21 +286,21 @@ export default function Configuracion() {
         )}
 
         {/* Telegram Help */}
-        <div className="bg-blue-50 rounded-xl overflow-hidden">
+        <div className="bg-emerald-50 rounded-xl overflow-hidden">
           <button onClick={() => setShowTgHelp(v => !v)}
             className="w-full flex items-center gap-3 px-5 py-4 text-left">
-            <MessageCircle size={18} className="text-blue-500" />
-            <span className="text-sm font-medium text-blue-700 flex-1">¿Cómo configurar Telegram?</span>
-            <ChevronDown size={16} className={`text-blue-500 transition-transform ${showTgHelp ? 'rotate-180' : ''}`} />
+            <MessageCircle size={18} className="text-emerald-600" />
+            <span className="text-sm font-medium text-emerald-700 flex-1">¿Cómo configurar Telegram?</span>
+            <ChevronDown size={16} className={`text-emerald-600 transition-transform ${showTgHelp ? 'rotate-180' : ''}`} />
           </button>
           {showTgHelp && (
-            <div className="px-5 pb-4 text-sm text-blue-700 space-y-1.5">
+            <div className="px-5 pb-4 text-sm text-emerald-700 space-y-1.5">
               <p>1. Creá un bot en <strong>@BotFather</strong> → copiá el token</p>
               <p>2. Agregá el bot al grupo o canal</p>
               <p>3. Enviá un mensaje al grupo</p>
-              <p>4. Visitá <code className="bg-blue-100 px-1 rounded">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code></p>
-              <p>5. Copiá el <strong>chat_id</strong> negativo (ej: <code className="bg-blue-100 px-1 rounded">-1001234567890</code>)</p>
-              <p>6. Agregá el token como <code className="bg-blue-100 px-1 rounded">TELEGRAM_BOT_TOKEN</code> en tu archivo .env</p>
+              <p>4. Visitá <code className="bg-emerald-100 px-1 rounded">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code></p>
+              <p>5. Copiá el <strong>chat_id</strong> negativo (ej: <code className="bg-emerald-100 px-1 rounded">-1001234567890</code>)</p>
+              <p>6. Agregá el token como <code className="bg-emerald-100 px-1 rounded">TELEGRAM_BOT_TOKEN</code> en tu archivo .env</p>
             </div>
           )}
         </div>
@@ -313,8 +313,8 @@ export default function Configuracion() {
             </div>
           ) : notifs.map(n => (
             <div key={n.id} className={`bg-white rounded-xl shadow-sm p-4 flex items-center gap-4 ${!n.activo ? 'opacity-50' : ''}`}>
-              <div className={`p-2 rounded-lg ${n.tipo === 'telegram' ? 'bg-blue-100' : 'bg-orange-100'}`}>
-                {n.tipo === 'telegram' ? <MessageCircle size={18} className="text-blue-500" /> : <Mail size={18} className="text-orange-500" />}
+              <div className={`p-2 rounded-lg ${n.tipo === 'telegram' ? 'bg-emerald-100' : 'bg-orange-100'}`}>
+                {n.tipo === 'telegram' ? <MessageCircle size={18} className="text-emerald-600" /> : <Mail size={18} className="text-orange-500" />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm">{n.nombre}</div>
