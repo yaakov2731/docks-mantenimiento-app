@@ -362,13 +362,17 @@ async function handleCancelarReclamo(session, input) {
 }
 // ─── Estado general del día ───────────────────────────────────────────────────
 async function buildEstadoGeneral(session) {
-    const [reportes, vencidos, botStatus, pendingMsgs, tareasOverview] = await Promise.all([
+    const [reportes, botStatus, pendingMsgs, tareasOverview] = await Promise.all([
         (0, db_1.getReportes)(),
-        (0, db_1.getReportesVencidos)(),
         (0, db_1.getBotConnectionStatus)(),
         (0, db_1.getPendingBotMessages)(),
         (0, db_1.getOperationalTasksOverview)(),
     ]);
+    const vencidos = reportes.filter(r => {
+        if (['completado', 'cancelado'].includes(r.estado))
+            return false;
+        return (0, db_1.calcularSLA)(r.prioridad, r.createdAt).vencida;
+    });
     const abiertos = reportes.filter(r => !['completado', 'cancelado'].includes(r.estado));
     const completadosHoy = reportes.filter(r => {
         if (r.estado !== 'completado' || !r.completadoAt)

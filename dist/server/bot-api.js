@@ -45,6 +45,10 @@ const intent_parser_1 = require("./messages/intent-parser");
 const engine_1 = require("./bot-menu/engine");
 const notification_1 = require("./_core/notification");
 const env_1 = require("./_core/env");
+const _botApiKey = (0, env_1.readEnv)('BOT_API_KEY');
+if (!_botApiKey)
+    throw new Error('BOT_API_KEY env var is required');
+const BOT_API_KEY = _botApiKey;
 const service_1 = require("./rounds/service");
 const service_2 = require("./tasks/service");
 const reporte_assignment_1 = require("./reporte-assignment");
@@ -177,11 +181,10 @@ function buildAttendancePayload(status) {
 }
 function authBot(req, res, next) {
     const key = req.headers['x-bot-api-key'];
-    const expected = (0, env_1.readEnv)('BOT_API_KEY') ?? '';
-    if (!key || typeof key !== 'string' || key.length !== expected.length) {
+    if (!key || typeof key !== 'string' || key.length !== BOT_API_KEY.length) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
-    const match = (0, crypto_1.timingSafeEqual)(Buffer.from(key), Buffer.from(expected));
+    const match = (0, crypto_1.timingSafeEqual)(Buffer.from(key), Buffer.from(BOT_API_KEY));
     if (!match)
         return res.status(401).json({ error: 'Unauthorized' });
     next();

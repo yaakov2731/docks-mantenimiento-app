@@ -9,10 +9,10 @@ import { AlertCircle, Clock, CheckCircle2, TrendingUp, X, PauseCircle, Download,
 
 const DashboardCharts = lazy(() => import('../components/dashboard/DashboardCharts'))
 const ESTADOS_ASIGNACION = [
-  { value: 'sin_asignar', label: 'Sin asignar', color: '#6B7280' },
-  { value: 'pendiente_confirmacion', label: 'Sin confirmar', color: '#D97706' },
-  { value: 'aceptada', label: 'Aceptada', color: '#059669' },
-  { value: 'rechazada', label: 'Rechazada', color: '#DC2626' },
+  { value: 'sin_asignar', label: 'Sin asignar', color: 'var(--text-3)' },
+  { value: 'pendiente_confirmacion', label: 'Sin confirmar', color: 'var(--warning)' },
+  { value: 'aceptada', label: 'Aceptada', color: 'var(--success)' },
+  { value: 'rechazada', label: 'Rechazada', color: 'var(--danger)' },
 ] as const
 
 function Badge({ value, options }: { value: string; options: readonly { value: string; label: string; color: string }[] }) {
@@ -33,26 +33,18 @@ function Badge({ value, options }: { value: string; options: readonly { value: s
 }
 
 const KPI_TONES: Record<string, { bg: string; color: string }> = {
-  blue:  { bg: 'oklch(0.595 0.210 264 / 0.10)', color: 'var(--primary)' },
-  amber: { bg: 'oklch(0.720 0.150 72 / 0.10)',  color: 'var(--warning)' },
-  green: { bg: 'oklch(0.530 0.130 150 / 0.10)', color: 'var(--success)' },
-  rose:  { bg: 'oklch(0.520 0.185 25 / 0.10)',  color: 'var(--danger)' },
-  gray:  { bg: 'oklch(0.596 0.014 258 / 0.08)', color: 'var(--text-2)' },
+  gold:  { bg: 'oklch(0.742 0.126 73 / 0.13)', color: 'var(--primary)' },
+  amber: { bg: 'oklch(0.640 0.136 76 / 0.13)', color: 'var(--warning)' },
+  green: { bg: 'oklch(0.512 0.118 150 / 0.13)', color: 'var(--success)' },
+  rose:  { bg: 'oklch(0.532 0.174 28 / 0.12)', color: 'var(--danger)' },
+  gray:  { bg: 'oklch(0.568 0.014 76 / 0.10)', color: 'var(--text-2)' },
 }
 
-function KpiCard({ label, value, tone = 'blue', icon: Icon }: any) {
-  const t = KPI_TONES[tone] ?? KPI_TONES.blue
+function KpiCard({ label, value, tone = 'gold', icon: Icon }: any) {
+  const t = KPI_TONES[tone] ?? KPI_TONES.gold
   return (
-    <div style={{
-      background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 10, padding: '10px 14px',
-      boxShadow: 'var(--shadow-card)',
-      transition: 'box-shadow 0.2s, transform 0.2s',
-    }}
-    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-card-strong)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)' }}
-    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-card)'; (e.currentTarget as HTMLElement).style.transform = '' }}
-    >
-      <div style={{ width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, background: t.bg }}>
+    <div className="kpi" style={{ padding: '12px 14px' }}>
+      <div style={{ width: 30, height: 30, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10, background: t.bg }}>
         <Icon size={14} style={{ color: t.color }} />
       </div>
       <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)', lineHeight: 1.4 }}>{label}</div>
@@ -62,12 +54,12 @@ function KpiCard({ label, value, tone = 'blue', icon: Icon }: any) {
 }
 
 const TONE_STYLES: Record<string, { background: string; color: string }> = {
-  blue:  { background: 'oklch(0.595 0.210 264 / 0.12)', color: 'var(--primary)' },
-  amber: { background: 'oklch(0.720 0.150 72 / 0.12)',  color: 'var(--warning)' },
-  green: { background: 'oklch(0.530 0.130 150 / 0.12)', color: 'var(--success)' },
-  rose:  { background: 'oklch(0.520 0.185 25 / 0.12)',  color: 'var(--danger)' },
-  slate: { background: 'oklch(0.596 0.014 258 / 0.10)', color: 'var(--text-2)' },
-  cyan:  { background: 'oklch(0.560 0.130 192 / 0.12)', color: 'var(--accent)' },
+  gold:  { background: 'oklch(0.742 0.126 73 / 0.12)', color: 'var(--primary)' },
+  amber: { background: 'oklch(0.640 0.136 76 / 0.12)', color: 'var(--warning)' },
+  green: { background: 'oklch(0.512 0.118 150 / 0.12)', color: 'var(--success)' },
+  rose:  { background: 'oklch(0.532 0.174 28 / 0.11)', color: 'var(--danger)' },
+  slate: { background: 'oklch(0.568 0.014 76 / 0.10)', color: 'var(--text-2)' },
+  sage:  { background: 'oklch(0.545 0.088 165 / 0.11)', color: 'var(--accent)' },
 }
 
 function TeamMetric({ label, value, tone }: { label: string; value: ReactNode; tone: keyof typeof TONE_STYLES }) {
@@ -125,7 +117,7 @@ export default function Dashboard() {
 
       {tareasResumen ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <KpiCard label="Tareas activas" value={tareasResumen.activas} tone="blue" icon={Clock} />
+          <KpiCard label="Tareas activas" value={tareasResumen.activas} tone="gold" icon={Clock} />
           <KpiCard label="Pausadas" value={tareasResumen.pausadas} tone="amber" icon={PauseCircle} />
           <KpiCard label="Terminadas hoy" value={tareasResumen.terminadasHoy} tone="green" icon={CheckCircle2} />
           <KpiCard label="Rechazadas" value={tareasResumen.rechazadasHoy} tone="rose" icon={AlertCircle} />
@@ -133,29 +125,31 @@ export default function Dashboard() {
       ) : null}
 
       {/* Hero card */}
-      <div style={{
-        background: 'var(--sidebar-bg)',
-        borderRadius: 12, padding: '16px 20px',
+      <div className="hero-card" style={{
         position: 'relative', overflow: 'hidden',
         marginBottom: 14,
-        display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
+        padding: '18px 20px',
+        display: 'grid',
+        gridTemplateColumns: 'minmax(240px, 1fr) auto',
+        gap: 20,
+        alignItems: 'center',
       }}>
         <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'oklch(0.595 0.210 264 / 0.18)', border: '1px solid oklch(0.595 0.210 264 / 0.32)', color: 'oklch(0.780 0.140 264)', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            En vivo
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'oklch(0.742 0.126 73 / 0.14)', border: '1px solid oklch(0.742 0.126 73 / 0.34)', color: 'oklch(0.842 0.120 78)', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 3, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--font-mono)' }}>
+            Centro operativo
           </div>
-          <div style={{ fontFamily: 'var(--font-heading)', fontSize: 16, fontWeight: 600, color: 'var(--fg-on-dark)', lineHeight: 1.3, marginBottom: 4 }}>
-            Seguimiento operativo en tiempo real
+          <div style={{ fontFamily: 'var(--font-heading)', fontSize: 24, fontWeight: 800, color: 'oklch(0.935 0.012 78)', lineHeight: 1.05, marginBottom: 6, letterSpacing: '-0.01em' }}>
+            Mando diario de reclamos, tareas y equipo
           </div>
-          <div style={{ fontSize: 12, color: 'var(--fg-on-dark-dim)', lineHeight: 1.5, maxWidth: 400 }}>
-            Monitoreá reclamos, prioridades y el rendimiento del equipo desde un panel centralizado.
+          <div style={{ fontSize: 12.5, color: 'oklch(0.860 0.016 78 / 0.68)', lineHeight: 1.55, maxWidth: 560 }}>
+            Lectura rápida para supervisión: abiertos, recepción, resolución y carga operativa sin salir del panel.
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             <a
               href="/"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'var(--primary)', color: '#fff', borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 600, textDecoration: 'none', transition: 'all 0.16s', boxShadow: 'var(--shadow-btn-primary)' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'oklch(0.112 0.018 72)', borderRadius: 4, padding: '7px 12px', fontSize: 11, fontWeight: 800, textDecoration: 'none', transition: 'all 0.16s', boxShadow: 'var(--shadow-btn-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}
             >
               <Plus size={13} />
               Nuevo reclamo
@@ -172,7 +166,7 @@ export default function Dashboard() {
                 const a = document.createElement('a'); a.href = url; a.download = 'reclamos.csv'; a.click()
                 URL.revokeObjectURL(url)
               }}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.75)', borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all 0.16s' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'oklch(1 0 0 / 0.055)', border: '1px solid oklch(1 0 0 / 0.13)', color: 'oklch(0.935 0.012 78 / 0.76)', borderRadius: 4, padding: '7px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.16s', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}
             >
               <Download size={13} />
               Exportar
@@ -180,21 +174,21 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ background: 'oklch(0.595 0.210 264 / 0.22)', border: '1px solid oklch(0.595 0.210 264 / 0.35)', borderRadius: 10, padding: '12px 16px', minWidth: 110 }}>
-            <div style={{ fontSize: 9.5, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--fg-on-dark-dim)' }}>Abiertos</div>
-            <div style={{ fontFamily: 'var(--font-heading)', fontSize: 24, fontWeight: 700, lineHeight: 1, marginTop: 3, color: 'var(--fg-on-dark)' }}>{stats ? stats.abiertos : 0}</div>
-            <div style={{ fontSize: 10, marginTop: 2, color: 'var(--fg-on-dark-dim)' }}>Activos ahora</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(92px, 1fr))', gap: 8, width: '100%', maxWidth: 420, minWidth: 0 }}>
+          <div style={{ background: 'oklch(0.742 0.126 73 / 0.15)', border: '1px solid oklch(0.742 0.126 73 / 0.34)', borderRadius: 5, padding: '12px 14px' }}>
+            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'oklch(0.935 0.012 78 / 0.58)', fontFamily: 'var(--font-mono)' }}>Abiertos</div>
+            <div style={{ fontFamily: 'var(--font-heading)', fontSize: 28, fontWeight: 800, lineHeight: 1, marginTop: 4, color: 'oklch(0.935 0.012 78)' }}>{stats ? stats.abiertos : 0}</div>
+            <div style={{ fontSize: 10.5, marginTop: 3, color: 'oklch(0.935 0.012 78 / 0.52)' }}>Activos ahora</div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ background: 'oklch(1 0 0 / 0.05)', border: '1px solid oklch(1 0 0 / 0.10)', borderRadius: 10, padding: '10px 14px' }}>
-              <div style={{ fontSize: 9.5, fontWeight: 500, color: 'var(--fg-on-dark-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>RESOLUCIÓN</div>
-              <div style={{ fontFamily: 'var(--font-heading)', fontSize: 17, fontWeight: 700, color: 'var(--success)', lineHeight: 1, marginTop: 2 }}>{stats?.tasaCompletitud ?? 0}%</div>
-            </div>
-            <div style={{ background: 'oklch(1 0 0 / 0.05)', border: '1px solid oklch(1 0 0 / 0.10)', borderRadius: 10, padding: '10px 14px' }}>
-              <div style={{ fontSize: 9.5, fontWeight: 500, color: 'var(--fg-on-dark-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>EMPLEADOS</div>
-              <div style={{ fontFamily: 'var(--font-heading)', fontSize: 17, fontWeight: 700, color: 'var(--fg-on-dark)', lineHeight: 1, marginTop: 2 }}>{empleados.length}</div>
-            </div>
+          <div style={{ background: 'oklch(1 0 0 / 0.055)', border: '1px solid oklch(1 0 0 / 0.12)', borderRadius: 5, padding: '12px 14px' }}>
+            <div style={{ fontSize: 9.5, fontWeight: 700, color: 'oklch(0.935 0.012 78 / 0.54)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--font-mono)' }}>Resolución</div>
+            <div style={{ fontFamily: 'var(--font-heading)', fontSize: 28, fontWeight: 800, color: 'oklch(0.742 0.126 73)', lineHeight: 1, marginTop: 4 }}>{stats?.tasaCompletitud ?? 0}%</div>
+            <div style={{ fontSize: 10.5, marginTop: 3, color: 'oklch(0.935 0.012 78 / 0.52)' }}>Tasa vigente</div>
+          </div>
+          <div style={{ background: 'oklch(1 0 0 / 0.055)', border: '1px solid oklch(1 0 0 / 0.12)', borderRadius: 5, padding: '12px 14px' }}>
+            <div style={{ fontSize: 9.5, fontWeight: 700, color: 'oklch(0.935 0.012 78 / 0.54)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--font-mono)' }}>Empleados</div>
+            <div style={{ fontFamily: 'var(--font-heading)', fontSize: 28, fontWeight: 800, color: 'oklch(0.935 0.012 78)', lineHeight: 1, marginTop: 4 }}>{empleados.length}</div>
+            <div style={{ fontSize: 10.5, marginTop: 3, color: 'oklch(0.935 0.012 78 / 0.52)' }}>Equipo cargado</div>
           </div>
         </div>
       </div>
@@ -202,7 +196,7 @@ export default function Dashboard() {
       {/* KPIs */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-9 gap-3 mb-4">
-          <KpiCard label="Total" value={stats.total} tone="blue" icon={TrendingUp} />
+          <KpiCard label="Total" value={stats.total} tone="gold" icon={TrendingUp} />
           <KpiCard label="Pendientes" value={stats.pendientes} tone="amber" icon={Clock} />
           <KpiCard label="En progreso" value={stats.enProgreso} tone="amber" icon={AlertCircle} />
           <KpiCard label="Pausados" value={stats.pausados} tone="gray" icon={PauseCircle} />
@@ -210,12 +204,12 @@ export default function Dashboard() {
           <KpiCard label="Sin confirmar" value={stats.asignacionesPendientes} tone="amber" icon={Clock} />
           <KpiCard label="Aceptadas hoy" value={stats.asignacionesAceptadasHoy} tone="green" icon={CheckCircle2} />
           <KpiCard label="Rechazadas hoy" value={stats.asignacionesRechazadasHoy} tone="rose" icon={AlertCircle} />
-          <KpiCard label="Resolución" value={`${stats.tasaCompletitud}%`} tone="blue" icon={TrendingUp} />
+          <KpiCard label="Resolución" value={`${stats.tasaCompletitud}%`} tone="gold" icon={TrendingUp} />
         </div>
       )}
 
       {stats?.rankingEmpleadosHoy?.length > 0 && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: 'var(--shadow-card-strong)' }}>
+        <div className="card" style={{ padding: '16px 18px', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 12 }}>
             <div>
               <div style={{ fontFamily: 'var(--font-heading)', fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>Rendimiento del equipo</div>
@@ -224,24 +218,21 @@ export default function Dashboard() {
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
             {stats.rankingEmpleadosHoy.map((empleado: any) => (
-              <div key={empleado.empleadoId} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, boxShadow: 'var(--shadow-card)', transition: 'box-shadow 0.2s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-card-strong)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-card)' }}
-              >
+              <div key={empleado.empleadoId} className="kpi" style={{ padding: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 2 }}>
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 500, marginBottom: 2 }}>Operativo</div>
                     <div style={{ fontFamily: 'var(--font-heading)', fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{empleado.nombre}</div>
                   </div>
-                  <div style={{ width: 32, height: 32, borderRadius: 9, background: 'oklch(0.560 0.130 192 / 0.12)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 5, background: 'oklch(0.742 0.126 73 / 0.12)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
                     {empleado.nombre?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7, marginTop: 12 }}>
-                  <TeamMetric label="Activas" value={empleado.tareasActivas} tone="blue" />
+                  <TeamMetric label="Activas" value={empleado.tareasActivas} tone="gold" />
                   <TeamMetric label="Sin conf." value={empleado.pendientesConfirmacion} tone="amber" />
                   <TeamMetric label="Cerradas" value={empleado.completadasHoy} tone="green" />
-                  <TeamMetric label="Aceptadas" value={empleado.aceptadasHoy} tone="cyan" />
+                  <TeamMetric label="Aceptadas" value={empleado.aceptadasHoy} tone="sage" />
                   <TeamMetric label="Rechaz." value={empleado.rechazadasHoy} tone="rose" />
                   <TeamMetric label="Horas" value={<WorkingTime seconds={empleado.horasTrabajadasHoySegundos} />} tone="slate" />
                 </div>
@@ -255,7 +246,7 @@ export default function Dashboard() {
       {stats && stats.abiertos > 0 && (
         <Suspense
           fallback={
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 18px', marginBottom: 14, fontSize: 13, color: 'var(--text-3)' }}>
+            <div className="card" style={{ padding: '14px 18px', marginBottom: 14, fontSize: 13, color: 'var(--text-3)' }}>
               Cargando gráficos operativos...
             </div>
           }
@@ -265,7 +256,7 @@ export default function Dashboard() {
       )}
 
       {stats && stats.abiertos === 0 && stats.total > 0 && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 16px', marginBottom: 14, textAlign: 'center', boxShadow: 'var(--shadow-card)' }}>
+        <div className="card" style={{ padding: '20px 16px', marginBottom: 14, textAlign: 'center' }}>
           <CheckCircle2 style={{ margin: '0 auto 10px', color: 'var(--success)' }} size={28} />
           <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: 18, fontWeight: 600, color: 'var(--text-1)' }}>No hay reclamos abiertos</h3>
           <p style={{ marginTop: 8, fontSize: 13, color: 'var(--text-3)' }}>
@@ -275,7 +266,7 @@ export default function Dashboard() {
       )}
 
       {/* Filters + Table */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', boxShadow: 'var(--shadow-card-strong)' }}>
+      <div className="card" style={{ overflow: 'hidden' }}>
         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: 'var(--gray-50)' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
             <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -283,16 +274,16 @@ export default function Dashboard() {
               value={filters.busqueda}
               onChange={e => setFilters(f => ({ ...f, busqueda: e.target.value }))}
               placeholder="Buscar locatario, local o categoría…"
-              style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '7px 14px 7px 34px', fontSize: 12, fontFamily: 'inherit', background: 'var(--surface)', outline: 'none', transition: 'all 0.15s', width: '100%', color: 'var(--text-1)' }}
+              style={{ border: '1px solid var(--border)', borderRadius: 4, padding: '7px 14px 7px 34px', fontSize: 12, fontFamily: 'inherit', background: 'var(--surface)', outline: 'none', transition: 'all 0.15s', width: '100%', color: 'var(--text-1)' }}
             />
           </div>
           <select value={filters.estado} onChange={e => setFilters(f => ({ ...f, estado: e.target.value }))}
-            style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '7px 14px', fontSize: 12, fontFamily: 'inherit', background: 'var(--surface)', outline: 'none', color: 'var(--text-1)', cursor: 'pointer' }}>
+            style={{ border: '1px solid var(--border)', borderRadius: 4, padding: '7px 14px', fontSize: 12, fontFamily: 'inherit', background: 'var(--surface)', outline: 'none', color: 'var(--text-1)', cursor: 'pointer' }}>
             <option value="">Todos los estados</option>
             {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
           </select>
           <select value={filters.prioridad} onChange={e => setFilters(f => ({ ...f, prioridad: e.target.value }))}
-            style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '7px 14px', fontSize: 12, fontFamily: 'inherit', background: 'var(--surface)', outline: 'none', color: 'var(--text-1)', cursor: 'pointer' }}>
+            style={{ border: '1px solid var(--border)', borderRadius: 4, padding: '7px 14px', fontSize: 12, fontFamily: 'inherit', background: 'var(--surface)', outline: 'none', color: 'var(--text-1)', cursor: 'pointer' }}>
             <option value="">Todas las prioridades</option>
             {PRIORIDADES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
@@ -316,19 +307,19 @@ export default function Dashboard() {
                   onMouseEnter={e => { Array.from((e.currentTarget as HTMLElement).cells).forEach(td => (td as HTMLElement).style.background = 'var(--gray-50)') }}
                   onMouseLeave={e => { Array.from((e.currentTarget as HTMLElement).cells).forEach(td => (td as HTMLElement).style.background = '') }}
                 >
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>#{r.id.toString().padStart(4,'0')}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', fontWeight: 600, color: 'var(--text-1)' }}>{r.locatario}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', color: 'var(--text-2)' }}>{r.local}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', color: 'var(--text-2)', textTransform: 'capitalize' }}>{r.categoria}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)' }}><Badge value={r.prioridad} options={PRIORIDADES} /></td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)' }}><Badge value={r.estado} options={ESTADOS} /></td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', color: 'var(--text-2)', fontSize: 12 }}>{r.asignadoA ?? '—'}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)' }}><Badge value={(r as any).asignacionEstado ?? 'sin_asignar'} options={ESTADOS_ASIGNACION} /></td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', color: 'var(--text-2)', fontSize: 12, fontWeight: 500 }}>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>#{r.id.toString().padStart(4,'0')}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 600, color: 'var(--text-1)' }}>{r.locatario}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)' }}>{r.local}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', textTransform: 'capitalize' }}>{r.categoria}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}><Badge value={r.prioridad} options={PRIORIDADES} /></td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}><Badge value={r.estado} options={ESTADOS} /></td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', fontSize: 12 }}>{r.asignadoA ?? '—'}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}><Badge value={(r as any).asignacionEstado ?? 'sin_asignar'} options={ESTADOS_ASIGNACION} /></td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', fontSize: 12, fontWeight: 500 }}>
                     <WorkingTime seconds={(r as any).tiempoTrabajadoSegundos} isRunning={r.estado === 'en_progreso'} />
                   </td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)', color: 'var(--text-3)', fontSize: 12 }}>{r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : ''}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(15,23,42,0.04)' }}>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-3)', fontSize: 12 }}>{r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : ''}</td>
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button style={{ fontSize: 11, color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={e => { e.stopPropagation(); window.open(`/imprimir?id=${r.id}`, '_blank') }}>Imprimir</button>
                       {isAdmin && (
@@ -351,12 +342,12 @@ export default function Dashboard() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 0 0' }}
           className="md:items-center md:p-6"
           onClick={() => setSelected(null)}>
-          <div style={{ background: 'var(--surface)', width: '100%', maxWidth: 600, borderRadius: '16px 16px 0 0', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-modal)' }}
-            className="md:rounded-[16px]"
+          <div style={{ background: 'var(--surface)', width: '100%', maxWidth: 600, borderRadius: '8px 8px 0 0', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-modal)' }}
+            className="md:rounded-lg"
             onClick={e => e.stopPropagation()}>
 
             {/* Modal header */}
-            <div style={{ padding: '16px 18px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 14, position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1, borderRadius: '16px 16px 0 0' }}>
+            <div style={{ padding: '16px 18px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 14, position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1, borderRadius: '8px 8px 0 0' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace', fontWeight: 500, marginBottom: 5 }}>#{reporte.id.toString().padStart(4,'0')} · {reporte.local}</div>
                 <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>{reporte.titulo}</h2>
@@ -378,7 +369,7 @@ export default function Dashboard() {
                 <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', marginBottom: 6 }}>Descripción</div>
                 <p style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.65 }}>{reporte.descripcion}</p>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, background: 'var(--gray-50)', borderRadius: 14, padding: '14px 16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, background: 'var(--gray-50)', borderRadius: 6, padding: '14px 16px' }}>
                 <div><div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)', marginBottom: 3 }}>Locatario</div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{reporte.locatario}</div></div>
                 <div><div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)', marginBottom: 3 }}>Categoría</div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', textTransform: 'capitalize' }}>{reporte.categoria}</div></div>
                 {reporte.contacto && <div><div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)', marginBottom: 3 }}>Teléfono</div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{reporte.contacto}</div></div>}
@@ -439,7 +430,7 @@ export default function Dashboard() {
               {empleados.length > 0 && reporte.estado !== 'completado' && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <select value={assigningTo} onChange={e => setAssigningTo(e.target.value)}
-                    style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontFamily: 'inherit', background: 'var(--surface)', color: 'var(--text-1)', outline: 'none' }}>
+                    style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 4, padding: '8px 12px', fontSize: 13, fontFamily: 'inherit', background: 'var(--surface)', color: 'var(--text-1)', outline: 'none' }}>
                     <option value="">Asignar a empleado...</option>
                     {empleados.map((empleado: any) => (
                       <option key={empleado.id} value={empleado.id}>{empleado.nombre}{empleado.waId ? '' : ' · sin WhatsApp'}</option>
@@ -456,7 +447,7 @@ export default function Dashboard() {
               {showNota ? (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input value={nota} onChange={e => setNota(e.target.value)} placeholder="Escribí una nota..."
-                    style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontFamily: 'inherit', background: 'var(--surface)', outline: 'none', color: 'var(--text-1)' }} />
+                    style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 4, padding: '8px 12px', fontSize: 13, fontFamily: 'inherit', background: 'var(--surface)', outline: 'none', color: 'var(--text-1)' }} />
                   <Button size="sm" disabled={!nota} onClick={() => agregarNota.mutate({ id: reporte.id, nota })} loading={agregarNota.isLoading}>Guardar</Button>
                   <Button size="sm" variant="ghost" onClick={() => setShowNota(false)}>Cancelar</Button>
                 </div>

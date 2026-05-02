@@ -1501,11 +1501,11 @@ async function persistOperationalTaskChange(taskId, data, events) {
     });
 }
 async function getOperationalTasksOverview() {
+    const { start, end } = getBuenosAiresDayRange();
     const [rows, events] = await Promise.all([
         listOperationalTasks(),
-        exports.db.select().from(schema.tareasOperativasEvento),
+        exports.db.select().from(schema.tareasOperativasEvento).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.tareasOperativasEvento.tipo, 'rechazo'), (0, drizzle_orm_1.gte)(schema.tareasOperativasEvento.createdAt, new Date(start)), (0, drizzle_orm_1.lt)(schema.tareasOperativasEvento.createdAt, new Date(end)))),
     ]);
-    const { start, end } = getBuenosAiresDayRange();
     const employeeMap = new Map();
     for (const task of rows) {
         if (!task.empleadoId)
@@ -1537,7 +1537,7 @@ async function getOperationalTasksOverview() {
         pendientesAsignacion: rows.filter(task => task.estado === 'pendiente_asignacion').length,
         pendientesConfirmacion: rows.filter(task => task.estado === 'pendiente_confirmacion').length,
         terminadasHoy: rows.filter(task => isWithinDay(task.terminadoAt, start, end)).length,
-        rechazadasHoy: events.filter(event => event.tipo === 'rechazo' && isWithinDay(event.createdAt, start, end)).length,
+        rechazadasHoy: events.length,
         derivadasDesdeReportes: rows.filter(task => task.origen === 'reclamo').length,
         empleadosConColaAlta: [...employeeMap.values()].filter(item => item.pendientes >= 3).length,
         porEmpleado: [...employeeMap.values()].sort((a, b) => b.activas - a.activas ||

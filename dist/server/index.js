@@ -23,6 +23,8 @@ const fs_1 = __importDefault(require("fs"));
 const app = (0, express_1.default)();
 const PORT = process.env.PORT ?? 3001;
 const isProd = process.env.NODE_ENV === 'production';
+if (isProd)
+    app.set('trust proxy', 1);
 // Security headers
 app.use((0, helmet_1.default)({
     contentSecurityPolicy: false, // Vite assets tienen hashes dinámicos

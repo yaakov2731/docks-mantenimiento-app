@@ -7,11 +7,11 @@ exports.buildFollowup1 = buildFollowup1;
 exports.buildFollowup2 = buildFollowup2;
 const express_1 = require("express");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const crypto_1 = require("crypto");
 const exceljs_1 = __importDefault(require("exceljs"));
 const db_1 = require("../db");
 const env_1 = require("../_core/env");
 const trpc_1 = require("../_core/trpc");
-const JWT_SECRET = (0, env_1.readEnv)('SESSION_SECRET') ?? 'dev-secret-change-me';
 const ESTADOS = {
     nuevo: 'Nuevo',
     contactado: 'Contactado',
@@ -67,11 +67,16 @@ router.get('/leads/export', async (req, res) => {
         res.status(401).json({ error: 'No autenticado' });
         return;
     }
+    let payload;
     try {
-        jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        payload = jsonwebtoken_1.default.verify(token, trpc_1.JWT_SECRET, { algorithms: ['HS256'] });
     }
     catch {
         res.status(401).json({ error: 'Token inválido' });
+        return;
+    }
+    if (!['admin', 'sales'].includes(payload.role)) {
+        res.status(403).json({ error: 'No autorizado' });
         return;
     }
     try {
@@ -183,7 +188,7 @@ router.get('/leads/export', async (req, res) => {
     }
     catch (err) {
         console.error('[leads/export]', err);
-        res.status(500).json({ error: String(err) });
+        res.status(500).json({ error: 'Error al generar el reporte' });
     }
 });
 const DEFAULT_FOLLOWUP1 = '📍 *Docks del Puerto* — seguimos por acá.\n\nHola *{{nombre}}*, ¿pudiste revisar tu consulta sobre los locales comerciales?\n\nSi tenés alguna pregunta o querés coordinar una visita al predio,\nrespondé este mensaje y te damos una mano.\n\n_Docks del Puerto · Puerto de Frutos, Tigre_ 🏢';
@@ -204,9 +209,13 @@ function isQuietHour() {
     const argHour = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCHours();
     return argHour >= 22 || argHour < 8;
 }
+function verifyCronSecret(provided, expected) {
+    if (!expected || typeof provided !== 'string' || provided.length !== expected.length)
+        return false;
+    return (0, crypto_1.timingSafeEqual)(Buffer.from(provided), Buffer.from(expected));
+}
 router.get('/leads-followup', async (req, res) => {
-    const cronSecret = (0, env_1.readEnv)('CRON_SECRET');
-    if (!cronSecret || req.headers['x-cron-secret'] !== cronSecret) {
+    if (!verifyCronSecret(req.headers['x-cron-secret'], (0, env_1.readEnv)('CRON_SECRET'))) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
     }

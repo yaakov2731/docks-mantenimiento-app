@@ -44,7 +44,6 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const trpc_1 = require("./_core/trpc");
 const notification_1 = require("./_core/notification");
-const env_1 = require("./_core/env");
 const database = __importStar(require("./db"));
 const schema = __importStar(require("../drizzle/schema"));
 const http_1 = require("./leads/http");
@@ -478,11 +477,11 @@ exports.appRouter = (0, trpc_1.router)({
             const ok = await bcryptjs_1.default.compare(input.password, user.password);
             if (!ok)
                 throw new server_1.TRPCError({ code: 'UNAUTHORIZED', message: 'Usuario o contraseña incorrectos' });
-            const token = jsonwebtoken_1.default.sign({ id: user.id, username: user.username, name: user.name, role: user.role }, (0, env_1.readEnv)('SESSION_SECRET') ?? 'dev-secret-change-me', { expiresIn: '7d' });
+            const token = jsonwebtoken_1.default.sign({ id: user.id, username: user.username, name: user.name, role: user.role }, trpc_1.JWT_SECRET, { expiresIn: '7d', algorithm: 'HS256' });
             ctx.res.cookie(trpc_1.JWT_COOKIE, token, {
                 httpOnly: true,
                 sameSite: 'lax',
-                secure: process.env.NODE_ENV === 'production',
+                secure: ctx.req.secure || ctx.req.headers['x-forwarded-proto'] === 'https',
                 maxAge: 7 * 24 * 60 * 60 * 1000,
             });
             return { success: true, user: { id: user.id, name: user.name, role: user.role } };
@@ -495,16 +494,16 @@ exports.appRouter = (0, trpc_1.router)({
     reportes: (0, trpc_1.router)({
         crear: trpc_1.publicProcedure
             .input(zod_1.z.object({
-            locatario: zod_1.z.string().min(1),
-            local: zod_1.z.string().min(1),
+            locatario: zod_1.z.string().min(1).max(120),
+            local: zod_1.z.string().min(1).max(120),
             planta: zod_1.z.enum(['baja', 'alta']),
-            contacto: zod_1.z.string().optional(),
-            emailLocatario: zod_1.z.string().optional(),
+            contacto: zod_1.z.string().max(120).optional(),
+            emailLocatario: zod_1.z.string().email().max(254).optional(),
             categoria: zod_1.z.enum(['electrico', 'plomeria', 'estructura', 'limpieza', 'seguridad', 'climatizacion', 'otro']),
             prioridad: zod_1.z.enum(['baja', 'media', 'alta', 'urgente']),
             titulo: zod_1.z.string().min(1).max(500),
-            descripcion: zod_1.z.string().min(10),
-            fotos: zod_1.z.string().optional(),
+            descripcion: zod_1.z.string().min(10).max(5000),
+            fotos: zod_1.z.string().max(2000).optional(),
         }))
             .mutation(async ({ input }) => {
             const id = await (0, db_1.crearReporte)(input);
@@ -620,15 +619,15 @@ exports.appRouter = (0, trpc_1.router)({
     leads: (0, trpc_1.router)({
         crear: trpc_1.publicProcedure
             .input(zod_1.z.object({
-            nombre: zod_1.z.string().min(1),
-            telefono: zod_1.z.string().optional(),
-            email: zod_1.z.string().optional(),
-            waId: zod_1.z.string().optional(),
-            rubro: zod_1.z.string().optional(),
-            tipoLocal: zod_1.z.string().optional(),
-            mensaje: zod_1.z.string().optional(),
-            turnoFecha: zod_1.z.string().optional(),
-            turnoHora: zod_1.z.string().optional(),
+            nombre: zod_1.z.string().min(1).max(120),
+            telefono: zod_1.z.string().max(30).optional(),
+            email: zod_1.z.string().email().max(254).optional(),
+            waId: zod_1.z.string().max(30).optional(),
+            rubro: zod_1.z.string().max(200).optional(),
+            tipoLocal: zod_1.z.string().max(200).optional(),
+            mensaje: zod_1.z.string().max(2000).optional(),
+            turnoFecha: zod_1.z.string().max(20).optional(),
+            turnoHora: zod_1.z.string().max(10).optional(),
             fuente: zod_1.z.enum(['whatsapp', 'web', 'otro']).default('web'),
         }))
             .mutation(async ({ input }) => {
@@ -1308,7 +1307,8 @@ exports.appRouter = (0, trpc_1.router)({
             pagoMensual: payrollAmountSchema,
             puedeVender: zod_1.z.boolean().optional(),
         }))
-            .mutation(async ({ input }) => {
+            .mutation(async ({ input, ctx }) => {
+            assertAdmin(ctx.user);
             await (0, db_1.crearEmpleado)(input);
             return { success: true };
         }),
@@ -1326,14 +1326,16 @@ exports.appRouter = (0, trpc_1.router)({
             pagoMensual: payrollAmountSchema,
             puedeVender: zod_1.z.boolean().optional(),
         }))
-            .mutation(async ({ input }) => {
+            .mutation(async ({ input, ctx }) => {
+            assertAdmin(ctx.user);
             const { id, ...data } = input;
             await (0, db_1.actualizarEmpleado)(id, data);
             return { success: true };
         }),
         desactivar: trpc_1.protectedProcedure
             .input(zod_1.z.object({ id: zod_1.z.number() }))
-            .mutation(async ({ input }) => {
+            .mutation(async ({ input, ctx }) => {
+            assertAdmin(ctx.user);
             await (0, db_1.actualizarEmpleado)(input.id, { activo: false });
             return { success: true };
         }),
@@ -1483,13 +1485,13 @@ exports.appRouter = (0, trpc_1.router)({
             recibeUrgentes: zod_1.z.boolean().default(true),
             recibeCompletados: zod_1.z.boolean().default(false),
         }))
-            .mutation(async ({ input }) => { await (0, db_1.crearNotificacion)(input); return { success: true }; }),
+            .mutation(async ({ input, ctx }) => { assertAdmin(ctx.user); await (0, db_1.crearNotificacion)(input); return { success: true }; }),
         toggleNotificacion: trpc_1.protectedProcedure
             .input(zod_1.z.object({ id: zod_1.z.number(), activo: zod_1.z.boolean() }))
-            .mutation(async ({ input }) => { await (0, db_1.actualizarNotificacion)(input.id, { activo: input.activo }); return { success: true }; }),
+            .mutation(async ({ input, ctx }) => { assertAdmin(ctx.user); await (0, db_1.actualizarNotificacion)(input.id, { activo: input.activo }); return { success: true }; }),
         eliminarNotificacion: trpc_1.protectedProcedure
             .input(zod_1.z.object({ id: zod_1.z.number() }))
-            .mutation(async ({ input }) => { await (0, db_1.eliminarNotificacion)(input.id); return { success: true }; }),
+            .mutation(async ({ input, ctx }) => { assertAdmin(ctx.user); await (0, db_1.eliminarNotificacion)(input.id); return { success: true }; }),
         limpiarDatosDemo: trpc_1.protectedProcedure
             .mutation(async ({ ctx }) => {
             assertAdmin(ctx.user);

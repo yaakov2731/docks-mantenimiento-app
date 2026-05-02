@@ -34,15 +34,20 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const crypto_1 = require("crypto");
 const db = __importStar(require("../db"));
 const env_1 = require("../_core/env");
 const service_1 = require("./service");
 const schedule_1 = require("./schedule");
 const roundsHttpRouter = (0, express_1.Router)();
 const roundsService = (0, service_1.createRoundsService)(db);
+function verifyCronSecret(provided, expected) {
+    if (!expected || typeof provided !== 'string' || provided.length !== expected.length)
+        return false;
+    return (0, crypto_1.timingSafeEqual)(Buffer.from(provided), Buffer.from(expected));
+}
 roundsHttpRouter.post('/internal/rondas/run', async (req, res) => {
-    const cronSecret = (0, env_1.readEnv)('CRON_SECRET');
-    if (!cronSecret || req.headers['x-cron-secret'] !== cronSecret) {
+    if (!verifyCronSecret(req.headers['x-cron-secret'], (0, env_1.readEnv)('CRON_SECRET'))) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const dateKey = typeof req.body?.dateKey === 'string'
