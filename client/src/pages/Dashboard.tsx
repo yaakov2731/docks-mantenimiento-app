@@ -43,12 +43,14 @@ const KPI_TONES: Record<string, { bg: string; color: string }> = {
 function KpiCard({ label, value, tone = 'gold', icon: Icon }: any) {
   const t = KPI_TONES[tone] ?? KPI_TONES.gold
   return (
-    <div className="kpi" style={{ padding: '12px 14px' }}>
-      <div style={{ width: 30, height: 30, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10, background: t.bg }}>
-        <Icon size={14} style={{ color: t.color }} />
+    <div className="kpi" style={{ padding: '10px 12px', borderRadius: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+        <div style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.bg }}>
+          <Icon size={11} style={{ color: t.color }} />
+        </div>
       </div>
-      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)', lineHeight: 1.4 }}>{label}</div>
-      <div style={{ fontFamily: 'var(--font-heading)', fontSize: 22, fontWeight: 700, lineHeight: 1, margin: '4px 0 0', color: t.color }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-heading)', fontSize: 26, fontWeight: 700, lineHeight: 1, color: t.color }}>{value}</div>
     </div>
   )
 }
@@ -116,7 +118,7 @@ export default function Dashboard() {
       ) : null}
 
       {tareasResumen ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
           <KpiCard label="Tareas activas" value={tareasResumen.activas} tone="gold" icon={Clock} />
           <KpiCard label="Pausadas" value={tareasResumen.pausadas} tone="amber" icon={PauseCircle} />
           <KpiCard label="Terminadas hoy" value={tareasResumen.terminadasHoy} tone="green" icon={CheckCircle2} />
@@ -126,13 +128,15 @@ export default function Dashboard() {
 
       {/* Hero card */}
       <div className="hero-card" style={{
+        background: 'linear-gradient(135deg, #0F172A 0%, #162032 50%, #1a2e50 100%)',
         position: 'relative', overflow: 'hidden',
-        marginBottom: 14,
-        padding: '18px 20px',
+        marginBottom: 12,
+        padding: '16px 20px',
         display: 'grid',
-        gridTemplateColumns: 'minmax(240px, 1fr) auto',
-        gap: 20,
+        gridTemplateColumns: 'minmax(200px, 1fr) auto',
+        gap: 16,
         alignItems: 'center',
+        borderRadius: 18,
       }}>
         <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'oklch(0.742 0.126 73 / 0.14)', border: '1px solid oklch(0.742 0.126 73 / 0.34)', color: 'oklch(0.842 0.120 78)', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 3, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--font-mono)' }}>
@@ -195,7 +199,7 @@ export default function Dashboard() {
 
       {/* KPIs */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-9 gap-3 mb-4">
+        <div className="grid grid-cols-3 md:grid-cols-5 xl:grid-cols-9 gap-2 mb-3">
           <KpiCard label="Total" value={stats.total} tone="gold" icon={TrendingUp} />
           <KpiCard label="Pendientes" value={stats.pendientes} tone="amber" icon={Clock} />
           <KpiCard label="En progreso" value={stats.enProgreso} tone="amber" icon={AlertCircle} />
@@ -267,7 +271,7 @@ export default function Dashboard() {
 
       {/* Filters + Table */}
       <div className="card" style={{ overflow: 'hidden' }}>
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: 'var(--gray-50)' }}>
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #F1F5F9', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', background: '#F8FAFC' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
             <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input
@@ -290,41 +294,41 @@ export default function Dashboard() {
         </div>
 
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ background: 'var(--gray-50)' }}>
-                {['#','Locatario','Local','Categoría','Prioridad','Estado','Asignado','Recepción','Tiempo','Fecha','Acciones'].map(h => (
-                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' }}>{h}</th>
+              <tr style={{ background: '#F8FAFC' }}>
+                {['#','Locatario','Local','Categoría','Prioridad','Estado','Asignado','Recepción','Tiempo','Fecha',''].map(h => (
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 9.5, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap', borderBottom: '1px solid #F1F5F9' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {reportes.length === 0 ? (
-                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 32, color: 'var(--text-3)', fontSize: 13 }}>No hay reclamos</td></tr>
+                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 28, color: 'var(--text-3)', fontSize: 13 }}>No hay reclamos</td></tr>
               ) : reportes.map(r => (
-                <tr key={r.id} style={{ transition: 'background 0.12s', cursor: 'pointer' }}
+                <tr key={r.id} style={{ transition: 'background 0.1s', cursor: 'pointer' }}
                   onClick={() => setSelected(r.id)}
-                  onMouseEnter={e => { Array.from((e.currentTarget as HTMLElement).cells).forEach(td => (td as HTMLElement).style.background = 'var(--gray-50)') }}
+                  onMouseEnter={e => { Array.from((e.currentTarget as HTMLElement).cells).forEach(td => (td as HTMLElement).style.background = '#F8FAFC') }}
                   onMouseLeave={e => { Array.from((e.currentTarget as HTMLElement).cells).forEach(td => (td as HTMLElement).style.background = '') }}
                 >
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>#{r.id.toString().padStart(4,'0')}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 600, color: 'var(--text-1)' }}>{r.locatario}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)' }}>{r.local}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', textTransform: 'capitalize' }}>{r.categoria}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}><Badge value={r.prioridad} options={PRIORIDADES} /></td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}><Badge value={r.estado} options={ESTADOS} /></td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', fontSize: 12 }}>{r.asignadoA ?? '—'}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}><Badge value={(r as any).asignacionEstado ?? 'sin_asignar'} options={ESTADOS_ASIGNACION} /></td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', fontSize: 12, fontWeight: 500 }}>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9', fontFamily: 'monospace', fontSize: 10.5, color: '#94A3B8', fontWeight: 600 }}>#{r.id.toString().padStart(4,'0')}</td>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9', fontWeight: 600, color: '#0F172A', fontSize: 12.5 }}>{r.locatario}</td>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9', color: '#64748B', fontSize: 12 }}>{r.local}</td>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9', color: '#64748B', fontSize: 12, textTransform: 'capitalize' }}>{r.categoria}</td>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9' }}><Badge value={r.prioridad} options={PRIORIDADES} /></td>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9' }}><Badge value={r.estado} options={ESTADOS} /></td>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9', color: '#64748B', fontSize: 12 }}>{r.asignadoA ?? <span style={{ color: '#CBD5E1' }}>—</span>}</td>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9' }}><Badge value={(r as any).asignacionEstado ?? 'sin_asignar'} options={ESTADOS_ASIGNACION} /></td>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9', color: '#64748B', fontSize: 11.5, fontWeight: 500 }}>
                     <WorkingTime seconds={(r as any).tiempoTrabajadoSegundos} isRunning={r.estado === 'en_progreso'} />
                   </td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-3)', fontSize: 12 }}>{r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : ''}</td>
-                  <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button style={{ fontSize: 11, color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={e => { e.stopPropagation(); window.open(`/imprimir?id=${r.id}`, '_blank') }}>Imprimir</button>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9', color: '#94A3B8', fontSize: 11.5 }}>{r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : ''}</td>
+                  <td style={{ padding: '9px 12px', borderBottom: '1px solid #F1F5F9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button style={{ fontSize: 10.5, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, transition: 'background 0.1s' }} onClick={e => { e.stopPropagation(); window.open(`/imprimir?id=${r.id}`, '_blank') }}>Imprimir</button>
                       {isAdmin && (
-                        <button style={{ fontSize: 11, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                          onClick={e => { e.stopPropagation(); if (window.confirm('¿Eliminar este reclamo demo? Esta acción no se puede deshacer.')) { eliminarReporte.mutate({ id: r.id }) } }}>
+                        <button style={{ fontSize: 10.5, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 }}
+                          onClick={e => { e.stopPropagation(); if (window.confirm('¿Eliminar este reclamo? Esta acción no se puede deshacer.')) { eliminarReporte.mutate({ id: r.id }) } }}>
                           Eliminar
                         </button>
                       )}
