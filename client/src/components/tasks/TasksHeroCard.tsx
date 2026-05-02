@@ -39,9 +39,9 @@ export function TasksHeroCard({
   const tone = deriveTaskTone(resumen)
   const pendingLoad = Number(resumen?.pendientesAsignacion ?? 0) + Number(resumen?.pendientesConfirmacion ?? 0)
   const wrapperClass = tone === 'requiere_accion'
-    ? 'border border-amber-200 bg-amber-50 text-amber-950'
+    ? 'border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-amber-100 text-amber-950'
     : tone === 'seguimiento'
-      ? 'border border-slate-200 bg-white text-slate-950'
+      ? 'border border-slate-300 bg-gradient-to-br from-slate-50 to-white text-slate-950'
       : tone === 'activo'
         ? 'bg-[linear-gradient(135deg,#2D7D52,#1A5C3A)] text-white'
         : 'bg-[linear-gradient(135deg,#14532D,#166534)] text-white'
@@ -82,20 +82,21 @@ export function TasksHeroCard({
           </p>
         </div>
         <div className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-4 ${bodyClass}`}>
-          <Metric label="Activas" value={resumen?.activas ?? 0} />
-          <Metric label="Pendientes" value={pendingLoad} />
-          <Metric label="Terminadas hoy" value={resumen?.terminadasHoy ?? 0} />
-          <Metric label="Colas altas" value={resumen?.empleadosConColaAlta ?? 0} />
+          <Metric label="Activas" value={resumen?.activas ?? 0} tone={tone} />
+          <Metric label="Pendientes" value={pendingLoad} tone={tone} />
+          <Metric label="Terminadas hoy" value={resumen?.terminadasHoy ?? 0} tone={tone} />
+          <Metric label="Colas altas" value={resumen?.empleadosConColaAlta ?? 0} tone={tone} />
         </div>
       </div>
     </div>
   )
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
+function Metric({ label, value, tone }: { label: string; value: string | number; tone: string }) {
+  const isDark = tone === 'activo' || tone === 'estable'
   return (
-    <div className="min-w-[132px] rounded-[20px] border border-white/15 bg-white/12 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] backdrop-blur-sm">
-      <div className="text-[11px] uppercase tracking-[0.14em] opacity-70">{label}</div>
+    <div className={`min-w-[132px] rounded-[20px] border px-4 py-3 ${isDark ? 'border-white/20 bg-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-md' : 'border-slate-200 bg-white shadow-sm'}`}>
+      <div className="text-[11px] uppercase tracking-[0.14em] opacity-80">{label}</div>
       <div className="mt-2 font-heading text-[22px] leading-none font-semibold">{value}</div>
     </div>
   )

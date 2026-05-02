@@ -39,7 +39,7 @@ type TaskBoardProps = {
 export function TaskBoard({ items, selectable = false, selectedIds = [], onToggleSelection }: TaskBoardProps) {
   return (
     <div className="surface-panel relative overflow-hidden rounded-[22px] p-5">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(135deg,rgba(14,116,144,0.08),transparent_70%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(135deg,rgba(14,116,144,0.12),transparent_70%)]" />
       <div className="relative">
         <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Visión por estado</div>
         <h3 className="mt-2 font-heading text-lg font-semibold text-sidebar-bg">Tablero operativo</h3>
@@ -181,19 +181,19 @@ function renderTimingSummary(item: any) {
   if (rows.length === 0 && !shouldShowTime) return null
 
   return (
-    <div className="mt-3 border-t border-white/60 pt-3">
+    <div className="mt-3 border-t border-slate-200 pt-3">
       <div className="flex flex-wrap gap-2">
         {rows.map((row) => (
           <span
             key={`${item.id}-${row.label}`}
-            className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500"
+            className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500"
           >
             <span>{row.label}</span>
             <span className="font-semibold text-slate-700">{row.value}</span>
           </span>
         ))}
         {shouldShowTime ? (
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
             <span>Tiempo</span>
             <WorkingTime
               seconds={item.tiempoTrabajadoSegundos}
@@ -213,56 +213,56 @@ function getSectionTone(state: string) {
     case 'pendiente_asignacion':
       return {
         label: 'Sin asignar',
-        border: '#FCD34D',
-        background: 'linear-gradient(180deg, rgba(254,243,199,0.52), rgba(255,255,255,0.9))',
-        panel: 'linear-gradient(180deg, rgba(255,247,237,0.9), rgba(255,255,255,0.96))',
-        badgeBg: '#FEF3C7',
-        badgeText: '#B45309',
+        border: '#F59E0B',
+        background: 'linear-gradient(180deg, #FEF3C7, #FFFBEB)',
+        panel: '#FFF7ED',
+        badgeBg: '#F59E0B',
+        badgeText: '#FFFFFF',
       }
     case 'pendiente_confirmacion':
       return {
         label: 'Pendiente',
-        border: '#FDBA74',
-        background: 'linear-gradient(180deg, rgba(255,237,213,0.56), rgba(255,255,255,0.92))',
-        panel: 'linear-gradient(180deg, rgba(255,247,237,0.92), rgba(255,255,255,0.96))',
-        badgeBg: '#FFEDD5',
-        badgeText: '#C2410C',
+        border: '#F97316',
+        background: 'linear-gradient(180deg, #FFEDD5, #FFF7ED)',
+        panel: '#FFF7ED',
+        badgeBg: '#F97316',
+        badgeText: '#FFFFFF',
       }
     case 'en_progreso':
       return {
         label: 'Activa',
-        border: '#67E8F9',
-        background: 'linear-gradient(180deg, rgba(207,250,254,0.7), rgba(255,255,255,0.92))',
-        panel: 'linear-gradient(180deg, rgba(236,254,255,0.9), rgba(255,255,255,0.98))',
-        badgeBg: '#CFFAFE',
-        badgeText: '#0F766E',
+        border: '#0891B2',
+        background: 'linear-gradient(180deg, #CFFAFE, #ECFEFF)',
+        panel: '#F0FDFA',
+        badgeBg: '#0891B2',
+        badgeText: '#FFFFFF',
       }
     case 'pausada':
       return {
         label: 'Pausada',
-        border: '#CBD5E1',
-        background: 'linear-gradient(180deg, rgba(241,245,249,0.9), rgba(255,255,255,0.94))',
-        panel: 'linear-gradient(180deg, rgba(248,250,252,0.9), rgba(255,255,255,0.98))',
-        badgeBg: '#E2E8F0',
-        badgeText: '#475569',
+        border: '#94A3B8',
+        background: 'linear-gradient(180deg, #E2E8F0, #F1F5F9)',
+        panel: '#F8FAFC',
+        badgeBg: '#64748B',
+        badgeText: '#FFFFFF',
       }
     case 'terminada':
       return {
         label: 'Terminada',
-        border: '#86EFAC',
-        background: 'linear-gradient(180deg, rgba(220,252,231,0.82), rgba(255,255,255,0.94))',
-        panel: 'linear-gradient(180deg, rgba(240,253,244,0.9), rgba(255,255,255,0.98))',
-        badgeBg: '#DCFCE7',
-        badgeText: '#15803D',
+        border: '#16A34A',
+        background: 'linear-gradient(180deg, #DCFCE7, #F0FDF4)',
+        panel: '#F0FDF4',
+        badgeBg: '#16A34A',
+        badgeText: '#FFFFFF',
       }
     default:
       return {
         label: state,
-        border: '#E2E8F0',
-        background: 'linear-gradient(180deg, rgba(248,250,252,0.9), rgba(255,255,255,0.94))',
-        panel: 'linear-gradient(180deg, rgba(248,250,252,0.9), rgba(255,255,255,0.98))',
-        badgeBg: '#E2E8F0',
-        badgeText: '#475569',
+        border: '#CBD5E1',
+        background: 'linear-gradient(180deg, #F1F5F9, #F8FAFC)',
+        panel: '#F8FAFC',
+        badgeBg: '#64748B',
+        badgeText: '#FFFFFF',
       }
   }
 }
