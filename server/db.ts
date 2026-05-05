@@ -3245,7 +3245,7 @@ export async function getPoolTasks() {
 // ─── Gastronomía ─────────────────────────────────────────────────────────────
 
 export async function getEmpleadosGastronomia(sector?: string) {
-  const conditions: any[] = [eq(schema.empleados.tipoEmpleado, 'gastronomia'), eq(schema.empleados.activo, true)]
+  const conditions: any[] = [eq(schema.empleados.tipoEmpleado, 'gastronomia')]
   if (sector && sector !== 'todos') {
     conditions.push(eq(schema.empleados.sector, sector as any))
   }
