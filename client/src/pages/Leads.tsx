@@ -389,7 +389,7 @@ export default function Leads() {
       {/* Detail Dialog */}
       {selected && lead && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-0 md:p-4" onClick={() => setSelected(null)}>
-          <div className="w-full md:max-w-lg md:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }} onClick={e => e.stopPropagation()}>
+          <div className="w-full md:max-w-lg md:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900" style={{ border: '1px solid var(--color-border, #e2e8f0)' }} onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b flex items-start gap-3">
               <div className="flex-1">
                 <h2 className="font-heading font-bold text-lg">{lead.nombre}</h2>
