@@ -545,10 +545,10 @@ async function markLiquidacionAsPaid(params: {
 
 const gastronomiaRouter = router({
   listEmpleados: protectedProcedure
-    .input(z.object({ sector: z.string().optional() }))
+    .input(z.object({ sector: z.string().optional(), activo: z.boolean().optional() }))
     .query(async ({ input, ctx }) => {
       assertAdmin(ctx.user)
-      return getEmpleadosGastronomia(input.sector)
+      return getEmpleadosGastronomia(input.sector, input.activo)
     }),
 
   getEmpleado: protectedProcedure
@@ -614,6 +614,7 @@ const gastronomiaRouter = router({
       assertAdmin(ctx.user)
       return getLiquidacionGastronomia(input.sector, input.year, input.month)
     }),
+
 })
 
 export const appRouter = router({

@@ -18,11 +18,16 @@ const emptyForm: EmpleadoForm = {
 
 export default function GastronomiaPersonal() {
   const [sector, setSector] = useState<string>('todos')
+  const [estado, setEstado] = useState<'activos' | 'inactivos' | 'todos'>('activos')
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState<EmpleadoForm>(emptyForm)
   const [showForm, setShowForm] = useState(false)
 
-  const { data: empleados = [], refetch } = trpc.gastronomia.listEmpleados.useQuery({ sector: sector === 'todos' ? undefined : sector })
+  const activoFilter = estado === 'todos' ? undefined : estado === 'activos'
+  const { data: empleados = [], refetch } = trpc.gastronomia.listEmpleados.useQuery({
+    sector: sector === 'todos' ? undefined : sector,
+    activo: activoFilter,
+  })
   const createMut = trpc.gastronomia.createEmpleado.useMutation({ onSuccess: () => { refetch(); setShowForm(false); setForm(emptyForm) } })
   const updateMut = trpc.gastronomia.updateEmpleado.useMutation({ onSuccess: () => { refetch(); setEditId(null); setShowForm(false) } })
 
@@ -84,6 +89,22 @@ export default function GastronomiaPersonal() {
         ))}
       </div>
 
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {[
+          { value: 'activos', label: 'Activos' },
+          { value: 'inactivos', label: 'Dados de baja' },
+          { value: 'todos', label: 'Todos' },
+        ].map(option => (
+          <button
+            key={option.value}
+            onClick={() => setEstado(option.value as typeof estado)}
+            className={`px-3 py-1 rounded-full text-sm font-medium border ${estado === option.value ? 'bg-slate-900 text-white border-slate-900' : 'border-gray-300 text-gray-600 hover:border-slate-500'}`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
       {/* Employee list */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -117,23 +138,30 @@ export default function GastronomiaPersonal() {
                   <button onClick={() => startEdit(emp)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
                     Editar
                   </button>
-                  {emp.activo === true && (
+                  {emp.activo === true ? (
                     <button
                       onClick={() => {
-                        if (window.confirm(`¿Desactivar a ${emp.nombre}?`)) {
+                        if (window.confirm(`¿Dar de baja a ${emp.nombre}? No se borran sus registros históricos.`)) {
                           updateMut.mutate({ id: emp.id, activo: false })
                         }
                       }}
                       className="text-red-500 hover:text-red-700 text-sm font-medium ml-3"
                     >
-                      Desactivar
+                      Dar de baja
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => updateMut.mutate({ id: emp.id, activo: true })}
+                      className="text-green-600 hover:text-green-800 text-sm font-medium ml-3"
+                    >
+                      Reactivar
                     </button>
                   )}
                 </td>
               </tr>
             ))}
             {empleados.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Sin empleados en este sector</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Sin empleados para este filtro</td></tr>
             )}
           </tbody>
         </table>

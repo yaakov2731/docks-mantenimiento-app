@@ -3244,10 +3244,13 @@ export async function getPoolTasks() {
 
 // ─── Gastronomía ─────────────────────────────────────────────────────────────
 
-export async function getEmpleadosGastronomia(sector?: string) {
+export async function getEmpleadosGastronomia(sector?: string, activo?: boolean) {
   const conditions: any[] = [eq(schema.empleados.tipoEmpleado, 'gastronomia')]
   if (sector && sector !== 'todos') {
     conditions.push(eq(schema.empleados.sector, sector as any))
+  }
+  if (typeof activo === 'boolean') {
+    conditions.push(eq(schema.empleados.activo, activo))
   }
   return db.select().from(schema.empleados).where(and(...conditions)).orderBy(schema.empleados.nombre)
 }
