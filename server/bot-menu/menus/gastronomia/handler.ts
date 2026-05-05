@@ -4,7 +4,7 @@
 import { BotSession } from '../../session'
 import { SEP, parseMenuOption, invalidOption } from '../../shared/guards'
 import { registerEmpleadoAttendance } from '../../../db'
-import { writePlanificacionCheckmark, getTodayDayKey } from '../../../gastronomia/sheets'
+import { writeAsistenciaAppRow } from '../../../gastronomia/sheets'
 import { SECTORES_GASTRONOMIA } from '../../../../shared/const'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -95,12 +95,14 @@ export async function handleGastronomia(session: BotSession, input: string): Pro
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires',
   })
 
-  // Fire-and-forget: marcar checkmark en planilla si es la primera entrada del día
-  if (accion === 'entrada') {
-    const sheetsRow = session.contextData?.sheetsRow as number | null | undefined
-    const dayKey = getTodayDayKey()
-    writePlanificacionCheckmark(sheetsRow, dayKey).catch(console.error)
-  }
+  // Fire-and-forget: la planilla real de sueldos lee Asistencia_App.
+  writeAsistenciaAppRow({
+    sector: session.contextData?.sector as string | null | undefined,
+    empleadoNombre: session.userName,
+    puesto: session.contextData?.puesto as string | null | undefined,
+    canal: 'whatsapp',
+    status: result.status,
+  }).catch(console.error)
 
   const label = LABEL_MAP[accion]
   return [

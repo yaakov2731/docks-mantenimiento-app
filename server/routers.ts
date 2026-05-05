@@ -568,11 +568,25 @@ const gastronomiaRouter = router({
       sector: z.string().min(1),
       puesto: z.string().optional(),
       pagoDiario: z.number().int().min(0).default(0),
-      sheetsRow: z.number().int().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       assertAdmin(ctx.user)
       return createEmpleadoGastro(input)
+    }),
+
+  bulkImportEmpleados: protectedProcedure
+    .input(z.array(z.object({
+      nombre: z.string().min(1),
+      sector: z.string().min(1),
+      puesto: z.string().optional(),
+      pagoDiario: z.number().int().min(0).default(0),
+    })))
+    .mutation(async ({ input, ctx }) => {
+      assertAdmin(ctx.user)
+      const results = await Promise.allSettled(input.map(emp => createEmpleadoGastro(emp)))
+      const created = results.filter(r => r.status === 'fulfilled').length
+      const errors = results.filter(r => r.status === 'rejected').length
+      return { created, errors }
     }),
 
   updateEmpleado: protectedProcedure
