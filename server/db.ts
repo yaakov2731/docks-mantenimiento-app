@@ -3247,7 +3247,7 @@ export async function getPoolTasks() {
 export async function getEmpleadosGastronomia(sector?: string) {
   const conditions: any[] = [eq(schema.empleados.tipoEmpleado, 'gastronomia'), eq(schema.empleados.activo, true)]
   if (sector && sector !== 'todos') {
-    conditions.push(eq(schema.empleados.sector, sector))
+    conditions.push(eq(schema.empleados.sector, sector as any))
   }
   return db.select().from(schema.empleados).where(and(...conditions)).orderBy(schema.empleados.nombre)
 }

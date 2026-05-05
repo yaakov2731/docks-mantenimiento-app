@@ -38,6 +38,12 @@ import {
   limpiarDatosDemo,
   reiniciarMetricasOperacion,
   getAppConfig, setAppConfig, getAllBotConfig,
+  getEmpleadosGastronomia,
+  getEmpleadoGastroById,
+  createEmpleadoGastro,
+  updateEmpleadoGastro,
+  getMarcacionesGastronomia,
+  getLiquidacionGastronomia,
 } from './db'
 
 const roundsService = createRoundsService(database as any)
@@ -536,6 +542,79 @@ async function markLiquidacionAsPaid(params: {
   return { success: true, updated }
 }
 
+
+const gastronomiaRouter = router({
+  listEmpleados: protectedProcedure
+    .input(z.object({ sector: z.string().optional() }))
+    .query(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      return getEmpleadosGastronomia(input.sector)
+    }),
+
+  getEmpleado: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      const emp = await getEmpleadoGastroById(input.id)
+      if (!emp) throw new TRPCError({ code: 'NOT_FOUND' })
+      return emp
+    }),
+
+  createEmpleado: protectedProcedure
+    .input(z.object({
+      nombre: z.string().min(1),
+      telefono: z.string().optional(),
+      waId: z.string().optional(),
+      sector: z.string().min(1),
+      puesto: z.string().optional(),
+      pagoDiario: z.number().int().min(0).default(0),
+      sheetsRow: z.number().int().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      return createEmpleadoGastro(input)
+    }),
+
+  updateEmpleado: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nombre: z.string().min(1).optional(),
+      telefono: z.string().optional(),
+      waId: z.string().optional(),
+      sector: z.string().optional(),
+      puesto: z.string().optional(),
+      pagoDiario: z.number().int().min(0).optional(),
+      sheetsRow: z.number().int().optional(),
+      activo: z.boolean().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      const { id, ...data } = input
+      return updateEmpleadoGastro(id, data)
+    }),
+
+  getMarcaciones: protectedProcedure
+    .input(z.object({
+      sector: z.string().optional(),
+      year: z.number(),
+      month: z.number().min(1).max(12),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      return getMarcacionesGastronomia(input.sector, input.year, input.month)
+    }),
+
+  getLiquidacion: protectedProcedure
+    .input(z.object({
+      sector: z.string().optional(),
+      year: z.number(),
+      month: z.number().min(1).max(12),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      return getLiquidacionGastronomia(input.sector, input.year, input.month)
+    }),
+})
 
 export const appRouter = router({
   auth: router({
@@ -1600,6 +1679,8 @@ export const appRouter = router({
         })
       }),
   }),
+
+  gastronomia: gastronomiaRouter,
 
   configuracion: router({
     listarNotificaciones: protectedProcedure.query(() => getNotificaciones()),
