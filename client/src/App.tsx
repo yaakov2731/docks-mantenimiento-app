@@ -17,6 +17,9 @@ const Operaciones = lazy(() => import('./pages/Operaciones'))
 const TareasOperativas = lazy(() => import('./pages/TareasOperativas'))
 const Cobranzas = lazy(() => import('./pages/Cobranzas'))
 const BotComercial = lazy(() => import('./pages/BotComercial'))
+const GastronomiaPersonal = lazy(() => import('./pages/Gastronomia/Personal'))
+const GastronomiaAsistencia = lazy(() => import('./pages/Gastronomia/Asistencia'))
+const GastronomiaLiquidacion = lazy(() => import('./pages/Gastronomia/Liquidacion'))
 
 type PanelRole = 'admin' | 'employee' | 'sales' | 'collections'
 
@@ -64,6 +67,9 @@ export default function App() {
       <Route path="/bot-comercial">{() => <ProtectedRoute component={BotComercial} allowedRoles={['admin']} />}</Route>
       <Route path="/cobranzas">{() => <ProtectedRoute component={Cobranzas} allowedRoles={['admin', 'collections']} />}</Route>
       <Route path="/imprimir">{() => <ProtectedRoute component={ImprimirReclamo} allowedRoles={['admin', 'employee']} />}</Route>
+      <Route path="/gastronomia/personal">{() => <ProtectedRoute component={GastronomiaPersonal} allowedRoles={['admin']} />}</Route>
+      <Route path="/gastronomia/asistencia">{() => <ProtectedRoute component={GastronomiaAsistencia} allowedRoles={['admin']} />}</Route>
+      <Route path="/gastronomia/liquidacion">{() => <ProtectedRoute component={GastronomiaLiquidacion} allowedRoles={['admin']} />}</Route>
       <Route>
         <div className="flex flex-col items-center justify-center h-screen">
           <h1 className="text-4xl font-heading font-bold text-primary">404</h1>
