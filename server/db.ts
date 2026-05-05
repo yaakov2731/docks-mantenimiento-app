@@ -420,6 +420,10 @@ export async function initDb() {
     `ALTER TABLE empleados ADD COLUMN pago_quincenal INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE empleados ADD COLUMN pago_mensual INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE empleados ADD COLUMN puede_vender INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE empleados ADD COLUMN sector TEXT NOT NULL DEFAULT 'operativo'`,
+    `ALTER TABLE empleados ADD COLUMN tipo_empleado TEXT NOT NULL DEFAULT 'operativo'`,
+    `ALTER TABLE empleados ADD COLUMN puesto TEXT`,
+    `ALTER TABLE empleados ADD COLUMN sheets_row INTEGER`,
     `ALTER TABLE rondas_ocurrencia ADD COLUMN inicio_real_at INTEGER`,
     `ALTER TABLE rondas_ocurrencia ADD COLUMN pausado_at INTEGER`,
     `ALTER TABLE rondas_ocurrencia ADD COLUMN fin_real_at INTEGER`,
@@ -3236,4 +3240,103 @@ export async function getPoolTasks() {
   return rows.map(toOperationalTaskRecord).sort((a, b) =>
     (a.ordenAsignacion ?? 0) - (b.ordenAsignacion ?? 0) || a.id - b.id
   )
+}
+
+// ─── Gastronomía ─────────────────────────────────────────────────────────────
+
+export async function getEmpleadosGastronomia(sector?: string) {
+  const conditions: any[] = [eq(schema.empleados.tipoEmpleado, 'gastronomia'), eq(schema.empleados.activo, true)]
+  if (sector && sector !== 'todos') {
+    conditions.push(eq(schema.empleados.sector, sector))
+  }
+  return db.select().from(schema.empleados).where(and(...conditions)).orderBy(schema.empleados.nombre)
+}
+
+export async function getEmpleadoGastroById(id: number) {
+  const rows = await db.select().from(schema.empleados)
+    .where(and(eq(schema.empleados.id, id), eq(schema.empleados.tipoEmpleado, 'gastronomia')))
+  return rows[0] ?? null
+}
+
+export async function createEmpleadoGastro(data: {
+  nombre: string
+  telefono?: string | null
+  waId?: string | null
+  sector: string
+  puesto?: string | null
+  pagoDiario?: number
+  sheetsRow?: number | null
+}) {
+  const result = await db.insert(schema.empleados).values({
+    nombre: data.nombre,
+    telefono: data.telefono ?? null,
+    waId: data.waId ?? null,
+    sector: data.sector as any,
+    tipoEmpleado: 'gastronomia' as any,
+    puesto: data.puesto ?? null,
+    pagoDiario: data.pagoDiario ?? 0,
+    sheetsRow: data.sheetsRow ?? null,
+    activo: true,
+  }).returning()
+  return result[0]
+}
+
+export async function updateEmpleadoGastro(id: number, data: {
+  nombre?: string
+  telefono?: string | null
+  waId?: string | null
+  sector?: string
+  puesto?: string | null
+  pagoDiario?: number
+  sheetsRow?: number | null
+  activo?: boolean
+}) {
+  const result = await db.update(schema.empleados)
+    .set({ ...data as any, updatedAt: new Date() })
+    .where(eq(schema.empleados.id, id))
+    .returning()
+  return result[0]
+}
+
+export async function getMarcacionesGastronomia(sector: string | undefined, year: number, month: number) {
+  const startDate = new Date(year, month - 1, 1)
+  const endDate = new Date(year, month, 1)
+
+  const employees = await getEmpleadosGastronomia(sector)
+  if (employees.length === 0) return { employees: [], events: [] }
+
+  const empleadoIds = employees.map(e => e.id)
+
+  const events = await db.select()
+    .from(schema.empleadoAsistencia)
+    .where(
+      and(
+        inArray(schema.empleadoAsistencia.empleadoId, empleadoIds),
+        gte(schema.empleadoAsistencia.timestamp, startDate),
+        lt(schema.empleadoAsistencia.timestamp, endDate)
+      )
+    )
+    .orderBy(schema.empleadoAsistencia.timestamp)
+
+  return { employees, events }
+}
+
+export async function getLiquidacionGastronomia(sector: string | undefined, year: number, month: number) {
+  const { employees, events } = await getMarcacionesGastronomia(sector, year, month)
+
+  return (employees as any[]).map((emp: any) => {
+    const empEvents = (events as any[]).filter((e: any) => e.empleadoId === emp.id && e.tipo === 'entrada')
+    const dias = new Set(
+      empEvents.map((e: any) => {
+        const d = new Date(e.timestamp)
+        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+      })
+    ).size
+    return {
+      empleado: emp,
+      diasTrabajados: dias,
+      valorDia: emp.pagoDiario,
+      total: dias * emp.pagoDiario,
+    }
+  })
 }
