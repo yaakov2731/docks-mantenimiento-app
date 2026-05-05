@@ -117,6 +117,18 @@ export default function GastronomiaPersonal() {
                   <button onClick={() => startEdit(emp)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
                     Editar
                   </button>
+                  {emp.activo === true && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`¿Desactivar a ${emp.nombre}?`)) {
+                          updateMut.mutate({ id: emp.id, activo: false })
+                        }
+                      }}
+                      className="text-red-500 hover:text-red-700 text-sm font-medium ml-3"
+                    >
+                      Desactivar
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

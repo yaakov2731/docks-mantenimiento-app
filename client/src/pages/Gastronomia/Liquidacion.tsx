@@ -28,6 +28,27 @@ export default function GastronomiaLiquidacion() {
     else setMonth(m => m + 1)
   }
 
+  function exportCsv() {
+    const header = ['Empleado', 'Local', 'Puesto', 'Días trabajados', 'Valor día', 'Total']
+    const rowLines = (rows as any[]).map((r: any) => [
+      r.empleado.nombre,
+      getSectorLabel(r.empleado.sector),
+      r.empleado.puesto ?? '',
+      r.diasTrabajados,
+      r.valorDia,
+      r.total,
+    ].join('\t'))
+
+    const content = [header.join('\t'), ...rowLines].join('\n')
+    const blob = new Blob(['﻿' + content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `liquidacion-gastronomia-${year}-${String(month).padStart(2, '0')}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Liquidación — Gastronomía</h1>
@@ -44,6 +65,7 @@ export default function GastronomiaLiquidacion() {
           <option value="todos">Todos los locales</option>
           {SECTORES_GASTRONOMIA.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+        <button onClick={exportCsv} className="ml-auto bg-green-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50" disabled={rows.length === 0}>⬇ Exportar Excel</button>
       </div>
 
       {/* Table */}
