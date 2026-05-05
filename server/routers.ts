@@ -547,14 +547,14 @@ const gastronomiaRouter = router({
   listEmpleados: protectedProcedure
     .input(z.object({ sector: z.string().optional() }))
     .query(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      assertAdmin(ctx.user)
       return getEmpleadosGastronomia(input.sector)
     }),
 
   getEmpleado: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      assertAdmin(ctx.user)
       const emp = await getEmpleadoGastroById(input.id)
       if (!emp) throw new TRPCError({ code: 'NOT_FOUND' })
       return emp
@@ -571,7 +571,7 @@ const gastronomiaRouter = router({
       sheetsRow: z.number().int().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      assertAdmin(ctx.user)
       return createEmpleadoGastro(input)
     }),
 
@@ -588,7 +588,7 @@ const gastronomiaRouter = router({
       activo: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      assertAdmin(ctx.user)
       const { id, ...data } = input
       return updateEmpleadoGastro(id, data)
     }),
@@ -600,7 +600,7 @@ const gastronomiaRouter = router({
       month: z.number().min(1).max(12),
     }))
     .query(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      assertAdmin(ctx.user)
       return getMarcacionesGastronomia(input.sector, input.year, input.month)
     }),
 
@@ -611,7 +611,7 @@ const gastronomiaRouter = router({
       month: z.number().min(1).max(12),
     }))
     .query(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' })
+      assertAdmin(ctx.user)
       return getLiquidacionGastronomia(input.sector, input.year, input.month)
     }),
 })
