@@ -90,6 +90,9 @@ import {
   handleNuevaTareaConfirmar,
 } from './menus/admin/tasks'
 
+// Gastronomía
+import { buildGastronomiaMenu, handleGastronomia } from './menus/gastronomia/handler'
+
 // Sales
 import {
   buildLeadsLista, handleLeadsLista,
@@ -172,6 +175,17 @@ async function identifyUser(waNumber: string): Promise<{ userType: UserType; use
     if (empleado.puedeVender) {
       return { userType: 'sales', userId: empleado.id, userName: empleado.nombre }
     }
+    if ((empleado as any).tipoEmpleado === 'gastronomia') {
+      return {
+        userType: 'gastronomia' as any,
+        userId: empleado.id,
+        userName: empleado.nombre,
+        contextData: {
+          sector: (empleado as any).sector ?? '',
+          sheetsRow: (empleado as any).sheetsRow ?? null,
+        },
+      } as any
+    }
     return { userType: 'employee', userId: empleado.id, userName: empleado.nombre }
   }
 
@@ -222,6 +236,14 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
       userId: user.userId,
       userName: user.userName,
     })
+
+    // For gastro employees, store sector/sheetsRow context and show gastro menu
+    if (user.userType === ('gastronomia' as any)) {
+      const { sector, sheetsRow } = (user as any).contextData ?? {}
+      await updateSession(normalized, { contextData: { sector, sheetsRow } })
+      return buildGastronomiaMenu(sector ?? '', user.userName)
+    }
+
     return buildMainMenu(session)
   }
 
@@ -278,6 +300,11 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
 
 async function routeMessage(session: BotSession, input: string): Promise<string | null> {
   const { currentMenu, userType, contextData } = session
+
+  // ── GASTRONOMÍA ───────────────────────────────────────────────────────────────
+  if (userType === ('gastronomia' as any)) {
+    return handleGastronomia(session, input)
+  }
 
   // ── EMPLEADO ─────────────────────────────────────────────────────────────────
   if (userType === 'employee') {
@@ -468,6 +495,12 @@ async function buildMainMenu(session: BotSession): Promise<string> {
   if (session.userType === 'employee') return buildEmployeeMainMenu(session)
   if (session.userType === 'admin')    return buildAdminMainMenu(session)
   if (session.userType === 'public')   return buildPublicMainMenu()
+  if ((session.userType as any) === 'gastronomia') {
+    return buildGastronomiaMenu(
+      session.contextData?.sector as string ?? '',
+      session.userName,
+    )
+  }
   return buildSalesMainMenu(session)
 }
 
