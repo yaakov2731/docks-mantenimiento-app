@@ -67,3 +67,15 @@ export const RONDAS_ESTADOS = [
   { value: 'cumplido_con_observacion', label: 'Con observación', color: '#92400E' },
   { value: 'vencido', label: 'Vencido', color: '#DC2626' },
 ] as const
+
+export const SECTORES_GASTRONOMIA = [
+  { value: 'uno_grill', label: 'Uno Grill' },
+  { value: 'brooklyn', label: 'Brooklyn' },
+  { value: 'heladeria', label: 'Puerto Gelato / Heladería' },
+  { value: 'trento_cafe', label: 'Trento Café' },
+  { value: 'inflables', label: 'Inflables' },
+  { value: 'encargados', label: 'Encargados' },
+  { value: 'promotoras', label: 'Promotoras' },
+] as const
+
+export type SectorGastronomia = typeof SECTORES_GASTRONOMIA[number]['value']

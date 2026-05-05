@@ -68,6 +68,12 @@ export const empleados = sqliteTable('empleados', {
   pagoMensual: integer('pago_mensual').default(0).notNull(),
   activo: integer('activo', { mode: 'boolean' }).default(true).notNull(),
   puedeVender: integer('puede_vender', { mode: 'boolean' }).default(false).notNull(),
+  sector: text('sector').default('operativo').notNull(),
+  // values: 'operativo' | 'uno_grill' | 'brooklyn' | 'heladeria' | 'trento_cafe' | 'inflables' | 'encargados' | 'promotoras'
+  tipoEmpleado: text('tipo_empleado').default('operativo').notNull(),
+  // values: 'operativo' | 'gastronomia'
+  puesto: text('puesto'),
+  sheetsRow: integer('sheets_row'),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
