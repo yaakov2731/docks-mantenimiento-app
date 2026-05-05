@@ -260,7 +260,7 @@ describe('gastronomia bot routing', () => {
 
   it('rebuilds gastro menu when handleGastronomia returns null (option 0)', async () => {
     sessionMock.getSession.mockResolvedValue(gastroSession('main'))
-    gastroMock.handleGastronomia.mockResolvedValue(null)
+    gastroMock.handleGastronomia.mockResolvedValue(null as any)
     sessionMock.navigateBack.mockResolvedValue({
       session: gastroSession('main'),
       previousMenu: 'main',
