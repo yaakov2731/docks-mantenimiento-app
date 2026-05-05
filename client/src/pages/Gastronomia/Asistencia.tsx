@@ -9,7 +9,12 @@ function getDaysInMonth(year: number, month: number): number {
 }
 
 function getDateKey(date: Date): string {
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date) // returns "YYYY-MM-DD"
 }
 
 export default function GastronomiaAsistencia() {
