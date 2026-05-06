@@ -22,25 +22,66 @@ type CsvRow = {
   puesto: string
 }
 
+function parseCsvLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') { inQuotes = !inQuotes }
+    else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = '' }
+    else { current += ch }
+  }
+  result.push(current.trim())
+  return result
+}
+
 function parseCsv(text: string): CsvRow[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim())
-  if (lines.length < 2) return []
+  const lines = text.split(/\r?\n/)
 
-  const header = lines[0].split(/[,;\t]/).map(h => h.trim().toLowerCase().replace(/[^a-záéíóúüñ\s]/gi, '').trim())
+  // Find header row: must have NOMBRE and MONTO columns
+  let headerIdx = -1
+  let nameIdx = -1, puestoIdx = -1, montoIdx = -1
 
-  const nameIdx = header.findIndex(h => /nombre|empleado|name|trabajador/.test(h))
-  const payIdx  = header.findIndex(h => /pago|valor|jornal|diario|dia|sueldo|salario/.test(h))
+  for (let i = 0; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i]).map(c => c.toUpperCase())
+    const ni = cols.indexOf('NOMBRE')
+    const mi = cols.indexOf('MONTO')
+    if (ni !== -1 && mi !== -1) {
+      headerIdx = i
+      nameIdx = ni
+      puestoIdx = cols.indexOf('PUESTO')
+      montoIdx = mi
+      break
+    }
+  }
 
-  if (nameIdx === -1) return []
+  // Fallback: fuzzy header detection for other CSV formats
+  if (headerIdx === -1) {
+    for (let i = 0; i < lines.length; i++) {
+      const cols = parseCsvLine(lines[i]).map(c => c.toLowerCase())
+      const ni = cols.findIndex(h => /nombre|empleado|name/.test(h))
+      const mi = cols.findIndex(h => /monto|pago|valor|jornal|sueldo/.test(h))
+      if (ni !== -1 && mi !== -1) {
+        headerIdx = i; nameIdx = ni; puestoIdx = cols.findIndex(h => /puesto|cargo|rol/.test(h)); montoIdx = mi
+        break
+      }
+    }
+  }
+
+  if (headerIdx === -1) return []
 
   const rows: CsvRow[] = []
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(/[,;\t]/).map(c => c.trim().replace(/^["']|["']$/g, ''))
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i])
     const nombre = cols[nameIdx]?.trim()
-    if (!nombre || nombre === '') continue
-    const rawPay = payIdx !== -1 ? cols[payIdx]?.replace(/[^0-9]/g, '') : ''
-    const pagoDiario = rawPay ? parseInt(rawPay) : 0
-    rows.push({ nombre, pagoDiario, sector: 'brooklyn', puesto: '' })
+    const montoRaw = cols[montoIdx]?.trim()
+    if (!nombre) continue
+    // Skip section headers (nombre present but monto empty or zero) and total rows
+    const pagoDiario = parseInt((montoRaw ?? '').replace(/[$,.]/g, '').replace(/\s/g, ''))
+    if (!pagoDiario || pagoDiario <= 0) continue
+    const puesto = puestoIdx !== -1 ? (cols[puestoIdx]?.trim() ?? '') : ''
+    rows.push({ nombre, pagoDiario, sector: 'brooklyn', puesto })
   }
   return rows
 }
