@@ -297,10 +297,10 @@ export default function GastronomiaPersonal() {
                 <div className="flex gap-3">
                   <button
                     onClick={handleImport}
-                    disabled={importing || bulkMut.isPending}
+                    disabled={importing || bulkMut.isLoading}
                     className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
                   >
-                    {importing || bulkMut.isPending ? 'Importando...' : `Importar ${csvRows.length} empleados`}
+                    {importing || bulkMut.isLoading ? 'Importando...' : `Importar ${csvRows.length} empleados`}
                   </button>
                   <button
                     onClick={() => { setCsvRows(null); setCsvError(null) }}
