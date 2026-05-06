@@ -42,6 +42,7 @@ import {
   getEmpleadoGastroById,
   createEmpleadoGastro,
   updateEmpleadoGastro,
+  deleteEmpleadoGastro,
   getMarcacionesGastronomia,
   getLiquidacionGastronomia,
 } from './db'
@@ -587,6 +588,13 @@ const gastronomiaRouter = router({
       const created = results.filter(r => r.status === 'fulfilled').length
       const errors = results.filter(r => r.status === 'rejected').length
       return { created, errors }
+    }),
+
+  deleteEmpleado: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      assertAdmin(ctx.user)
+      await deleteEmpleadoGastro(input.id)
     }),
 
   updateEmpleado: protectedProcedure

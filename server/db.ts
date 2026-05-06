@@ -3301,6 +3301,10 @@ export async function updateEmpleadoGastro(id: number, data: {
   return result[0]
 }
 
+export async function deleteEmpleadoGastro(id: number) {
+  await db.delete(schema.empleados).where(eq(schema.empleados.id, id))
+}
+
 export async function getMarcacionesGastronomia(sector: string | undefined, year: number, month: number) {
   const startDate = new Date(year, month - 1, 1)
   const endDate = new Date(year, month, 1)

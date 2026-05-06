@@ -22,6 +22,18 @@ type CsvRow = {
   puesto: string
 }
 
+const SHEET_LOCAL_TO_SECTOR: Record<string, string> = {
+  'UMO GRILL': 'uno_grill',
+  'BROOKLYN': 'brooklyn',
+  'HELADERÍA': 'heladeria',
+  'HELADERIA': 'heladeria',
+  'TRENTO CAFÉ': 'trento_cafe',
+  'TRENTO CAFE': 'trento_cafe',
+  'INFLABLES': 'inflables',
+  'ENCARGADOS': 'encargados',
+  'PROMOTORAS': 'promotoras',
+}
+
 function parseCsvLine(line: string): string[] {
   const result: string[] = []
   let current = ''
@@ -71,17 +83,26 @@ function parseCsv(text: string): CsvRow[] {
 
   if (headerIdx === -1) return []
 
+  // Detect sector from first non-empty line before header
+  let defaultSector = 'brooklyn'
+  for (let i = 0; i < headerIdx; i++) {
+    const firstCol = parseCsvLine(lines[i])[0]?.trim().toUpperCase()
+    if (firstCol && SHEET_LOCAL_TO_SECTOR[firstCol]) {
+      defaultSector = SHEET_LOCAL_TO_SECTOR[firstCol]
+      break
+    }
+  }
+
   const rows: CsvRow[] = []
   for (let i = headerIdx + 1; i < lines.length; i++) {
     const cols = parseCsvLine(lines[i])
     const nombre = cols[nameIdx]?.trim()
     const montoRaw = cols[montoIdx]?.trim()
     if (!nombre) continue
-    // Skip section headers (nombre present but monto empty or zero) and total rows
     const pagoDiario = parseInt((montoRaw ?? '').replace(/[$,.]/g, '').replace(/\s/g, ''))
     if (!pagoDiario || pagoDiario <= 0) continue
     const puesto = puestoIdx !== -1 ? (cols[puestoIdx]?.trim() ?? '') : ''
-    rows.push({ nombre, pagoDiario, sector: 'brooklyn', puesto })
+    rows.push({ nombre, pagoDiario, sector: defaultSector, puesto })
   }
   return rows
 }
@@ -104,6 +125,7 @@ export default function GastronomiaPersonal() {
   })
   const createMut = trpc.gastronomia.createEmpleado.useMutation({ onSuccess: () => { refetch(); setShowForm(false); setForm(emptyForm) } })
   const updateMut = trpc.gastronomia.updateEmpleado.useMutation({ onSuccess: () => { refetch(); setEditId(null); setShowForm(false) } })
+  const deleteMut = trpc.gastronomia.deleteEmpleado.useMutation({ onSuccess: () => refetch() })
   const bulkMut   = trpc.gastronomia.bulkImportEmpleados.useMutation({
     onSuccess: (res) => {
       refetch()
@@ -271,6 +293,16 @@ export default function GastronomiaPersonal() {
                       Reactivar
                     </button>
                   )}
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`¿BORRAR PERMANENTEMENTE a ${emp.nombre}? Esto elimina el empleado y no se puede deshacer.`)) {
+                        deleteMut.mutate({ id: emp.id })
+                      }
+                    }}
+                    className="text-gray-400 hover:text-red-700 text-sm font-medium ml-3"
+                  >
+                    Borrar
+                  </button>
                 </td>
               </tr>
             ))}
