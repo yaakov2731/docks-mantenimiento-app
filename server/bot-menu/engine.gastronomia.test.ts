@@ -260,6 +260,32 @@ describe('gastronomia bot routing', () => {
     expect(result).toBe('handled gastro')
   })
 
+  it('confirms a pending planning shift without routing to the gastro menu', async () => {
+    sessionMock.getSession.mockResolvedValue(gastroSession('main'))
+    const dbMock = await import('../db')
+    vi.mocked(dbMock.getPendingPlanificacionForEmpleado).mockResolvedValue([
+      {
+        id: 77,
+        empleadoId: 42,
+        empleadoNombre: 'Ana García',
+        fecha: '2026-05-08',
+        horaEntrada: '18:00',
+        horaSalida: '00:00',
+      },
+    ] as any)
+    vi.mocked(dbMock.responderPlanificacionGastronomia).mockResolvedValue({ id: 77, estado: 'confirmado' } as any)
+
+    const result = await handleIncomingMessage('5491112345678', 'Confirmo asistencia')
+
+    expect(dbMock.responderPlanificacionGastronomia).toHaveBeenCalledWith({
+      turnoId: 77,
+      empleadoId: 42,
+      respuesta: 'confirmado',
+    })
+    expect(gastroMock.handleGastronomia).not.toHaveBeenCalled()
+    expect(result).toContain('Turno confirmado')
+  })
+
   it('rebuilds gastro menu when handleGastronomia returns null (option 0)', async () => {
     sessionMock.getSession.mockResolvedValue(gastroSession('main'))
     gastroMock.handleGastronomia.mockResolvedValue(null as any)

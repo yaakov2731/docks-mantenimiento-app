@@ -228,17 +228,50 @@ async function identifyUser(waNumber: string): Promise<{ userType: UserType; use
   return null
 }
 
-function parsePlanificacionResponse(input: string): { turnoId?: number; respuesta: 'confirmado' | 'no_trabaja' } | null {
-  const normalized = input.trim().toLowerCase()
-  const explicit = normalized.match(/^(confirmo|confirmar|si|sí|no)\s+#?(\d+)$/i)
+function normalizePlanificacionInput(input: string) {
+  return input
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}#\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function parsePlanificacionResponse(input: string): { turnoId?: number; respuesta: 'confirmado' | 'no_trabaja'; planningSpecific: boolean } | null {
+  const normalized = normalizePlanificacionInput(input)
+  const explicit = normalized.match(/^(confirmo|confirmar|si|s|no|no puedo|no trabajo|no puedo trabajar)\s+#?(\d+)$/i)
   if (explicit) {
     return {
       turnoId: Number(explicit[2]),
-      respuesta: ['no'].includes(explicit[1].toLowerCase()) ? 'no_trabaja' : 'confirmado',
+      respuesta: explicit[1].toLowerCase().startsWith('no') ? 'no_trabaja' : 'confirmado',
+      planningSpecific: true,
     }
   }
-  if (['1', 'confirmo', 'confirmar', 'si', 'sí'].includes(normalized)) return { respuesta: 'confirmado' }
-  if (['2', 'no', 'no puedo', 'no trabajo'].includes(normalized)) return { respuesta: 'no_trabaja' }
+  if (['1'].includes(normalized)) return { respuesta: 'confirmado', planningSpecific: false }
+  if (['2'].includes(normalized)) return { respuesta: 'no_trabaja', planningSpecific: false }
+  if ([
+    'confirmo',
+    'confirmar',
+    'si',
+    's',
+    'confirmo asistencia',
+    'confirmar asistencia',
+    'confirmo mi asistencia',
+    'confirmo turno',
+    'confirmo el turno',
+    'asistencia confirmada',
+  ].includes(normalized)) return { respuesta: 'confirmado', planningSpecific: true }
+  if ([
+    'no',
+    'no puedo',
+    'no trabajo',
+    'no puedo trabajar',
+    'no puedo asistir',
+    'no voy',
+    'no voy a poder',
+  ].includes(normalized)) return { respuesta: 'no_trabaja', planningSpecific: true }
   return null
 }
 
@@ -260,12 +293,21 @@ async function handlePlanificacionBotResponse(session: BotSession, input: string
     }
     if (pending.length > 1) {
       return [
-        `Tenés más de un turno pendiente.`,
-        `Respondé con el número del turno:`,
+        `📅 *Tenés más de un turno pendiente*`,
+        ``,
+        `Para confirmar, respondé con el número del turno:`,
         ``,
         ...pending.map((item: any) => `• Turno #${item.id}: ${item.fecha} ${item.horaEntrada}-${item.horaSalida}`),
         ``,
         `Ejemplo: *CONFIRMO ${pending[0].id}* o *NO ${pending[0].id}*`,
+      ].join('\n')
+    }
+    if (parsed.planningSpecific) {
+      return [
+        `📅 *Planificación Docks*`,
+        ``,
+        `No tenés turnos pendientes para confirmar en este momento.`,
+        `Si te llegó un mensaje viejo o hubo un cambio, avisale al encargado.`,
       ].join('\n')
     }
     return null
@@ -280,24 +322,27 @@ async function handlePlanificacionBotResponse(session: BotSession, input: string
 
   if (parsed.respuesta === 'confirmado') {
     return [
-      `*Asistencia confirmada*`,
+      `✅ *Turno confirmado*`,
       ``,
-      `${turno.empleadoNombre}, quedó confirmado el turno #${turno.id}.`,
-      `Día: ${turno.fecha}`,
-      `Horario: ${turno.horaEntrada} a ${turno.horaSalida}`,
+      `Gracias, ${turno.empleadoNombre}.`,
+      `Quedó registrada tu confirmación para el turno #${turno.id}.`,
       ``,
-      `El día del turno fichá entrada desde este bot.`,
+      `📅 Día: ${turno.fecha}`,
+      `🕐 Horario: ${turno.horaEntrada} a ${turno.horaSalida}`,
+      ``,
+      `Cuando llegues, fichá la entrada desde este mismo bot.`,
     ].join('\n')
   }
 
   return [
-    `*Marcado como no disponible*`,
+    `⚠️ *Disponibilidad registrada*`,
     ``,
-    `${turno.empleadoNombre}, registramos que no podés trabajar el turno #${turno.id}.`,
-    `Día: ${turno.fecha}`,
-    `Horario: ${turno.horaEntrada} a ${turno.horaSalida}`,
+    `${turno.empleadoNombre}, registramos que no podés cubrir el turno #${turno.id}.`,
     ``,
-    `El encargado lo verá en Planificación para reorganizar el equipo.`,
+    `📅 Día: ${turno.fecha}`,
+    `🕐 Horario: ${turno.horaEntrada} a ${turno.horaSalida}`,
+    ``,
+    `El encargado lo va a ver en Planificación para reorganizar el equipo.`,
   ].join('\n')
 }
 
