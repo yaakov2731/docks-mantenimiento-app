@@ -2,7 +2,7 @@
  * Flujo de Leads para administradores/gerentes.
  * admin_leads_sin_asignar → admin_lead_detalle → admin_lead_elegir_vendedor → admin_lead_confirmar
  */
-import { BotSession, navigateTo } from '../../session'
+import { BotSession, navigateTo, updateSession } from '../../session'
 import { SEP, parseMenuOption, invalidOption, paginate, errorMsg } from '../../shared/guards'
 import {
   listUnassignedLeads,
@@ -76,7 +76,7 @@ export async function buildAdminLeadsSinAsignar(session: BotSession): Promise<st
   ]
 
   paged.items.forEach((lead, index) => {
-    const num = (page - 1) * PAGE_SIZE + index + 1
+    const num = index + 1
     lines.push(
       `${num}️⃣  *${lead.nombre ?? 'Sin nombre'}* — ${lead.rubro ?? '—'}`,
       `   ${estadoLeadEmoji(lead.estado)} ${lead.estado} | ${lead.telefono ?? '—'}`,
@@ -86,6 +86,7 @@ export async function buildAdminLeadsSinAsignar(session: BotSession): Promise<st
 
   const activo = (await getAppConfig('bot_autoresponder_activo')) !== '0'
   lines.push(SEP)
+  lines.push(`Página ${paged.page}/${paged.totalPages}`)
   lines.push(`🤖  *7*  →  Bot autorespuesta: ${activo ? '🟢 Activo' : '⏸️ Inactivo'}`)
   if (paged.hasPrev) lines.push(`8️⃣  ◀️ Anterior`)
   if (paged.hasNext) lines.push(`9️⃣  ▶️ Ver más`)
@@ -215,7 +216,11 @@ function buildAdminLeadConfirmar(lead: any, vendedor: any): string {
 
 export async function handleAdminLeadConfirmar(session: BotSession, input: string): Promise<string> {
   if (input === '2' || input === '0') {
-    await navigateTo(session, 'admin_leads_sin_asignar', { page: 1 })
+    await updateSession(session.waNumber, {
+      currentMenu: 'admin_leads_sin_asignar',
+      contextData: { page: 1 },
+      menuHistory: [],
+    })
     return buildAdminLeadsSinAsignar({ ...session, contextData: { page: 1 } })
   }
 
@@ -267,12 +272,18 @@ export async function handleAdminLeadConfirmar(session: BotSession, input: strin
     await enqueueBotMessage(vendedor.waId, mensaje)
   }
 
-  await navigateTo(session, 'admin_leads_sin_asignar', { page: 1 })
+  const listSession = { ...session, currentMenu: 'admin_leads_sin_asignar', contextData: { page: 1 }, menuHistory: [] }
+  await updateSession(session.waNumber, {
+    currentMenu: 'admin_leads_sin_asignar',
+    contextData: { page: 1 },
+    menuHistory: [],
+  })
+  const updatedList = await buildAdminLeadsSinAsignar(listSession)
   return [
     `✅ *Lead #${leadId} asignado a ${vendedorNombre}.*`,
     vendedor?.waId ? `📱 Se notificó al vendedor por WhatsApp.` : `⚠️ El vendedor no tiene WhatsApp registrado.`,
     SEP,
-    `0️⃣  Volver`,
+    updatedList,
   ].join('\n')
 }
 

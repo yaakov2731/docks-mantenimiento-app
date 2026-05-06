@@ -126,7 +126,6 @@ export default function GastronomiaPersonal() {
   })
   const createMut = trpc.gastronomia.createEmpleado.useMutation({ onSuccess: () => { refetch(); setShowForm(false); setForm(emptyForm) } })
   const updateMut = trpc.gastronomia.updateEmpleado.useMutation({ onSuccess: () => { refetch(); setEditId(null); setShowForm(false) } })
-  const deleteMut = trpc.gastronomia.deleteEmpleado.useMutation({ onSuccess: () => refetch() })
   const bulkMut   = trpc.gastronomia.bulkImportEmpleados.useMutation({
     onSuccess: (res) => {
       refetch()
@@ -296,16 +295,6 @@ export default function GastronomiaPersonal() {
                       Reactivar
                     </button>
                   )}
-                  <button
-                    onClick={() => {
-                      if (window.confirm(`¿BORRAR PERMANENTEMENTE a ${emp.nombre}? Esto elimina el empleado y no se puede deshacer.`)) {
-                        deleteMut.mutate({ id: emp.id })
-                      }
-                    }}
-                    className="text-gray-400 hover:text-red-700 text-sm font-medium ml-3"
-                  >
-                    Borrar
-                  </button>
                 </td>
               </tr>
             ))}

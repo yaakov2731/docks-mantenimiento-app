@@ -16,7 +16,7 @@ const navItems = [
   { href: '/operaciones',   label: 'Operaciones',         icon: ClipboardCheck,  roles: ['admin'] as PanelRole[] },
   { href: '/tareas-operativas', label: 'Tareas operativas', icon: Wrench,        roles: ['admin'] as PanelRole[] },
   { href: '/tareas',        label: 'Mis Tareas',          icon: ClipboardList,   roles: ['admin', 'employee'] as PanelRole[] },
-  { href: '/gastronomia/personal', label: 'Gastronomía', icon: UtensilsCrossed, roles: ['admin'] as PanelRole[] },
+  { href: '/gastronomia', label: 'Gastronomía', icon: UtensilsCrossed, roles: ['admin'] as PanelRole[] },
   { href: '/leads',         label: 'Leads Alquiler',      icon: UserCheck,       roles: ['admin', 'sales'] as PanelRole[] },
   { href: '/historial',     label: 'Historial',           icon: History,         roles: ['admin', 'employee'] as PanelRole[] },
   { href: '/empleados',     label: 'Empleados',           icon: Users,           roles: ['admin'] as PanelRole[] },
