@@ -3451,32 +3451,33 @@ function buildPlanificacionBotMessage(turno: typeof schema.gastronomiaPlanificac
   const local = SECTOR_LABELS[(turno.sector as keyof typeof SECTOR_LABELS)] ?? turno.sector
   if (!turno.trabaja) {
     return [
-      `🍽️ *Planificación Docks*`,
+      `*Planificación Docks*`,
       ``,
-      `Hola *${turno.empleadoNombre}*.`,
-      `El ${formatPlanificacionFecha(turno.fecha)} figurás como *franco / no trabaja*.`,
+      `Hola ${turno.empleadoNombre}, buen día.`,
+      `Para el ${formatPlanificacionFecha(turno.fecha)} figurás como franco / no trabaja.`,
       ``,
-      `Si esto está mal, respondé al admin.`,
+      `Si hubo algún cambio, avisale al encargado para revisarlo.`,
       ``,
       `Turno #${turno.id}`,
     ].join('\n')
   }
   return [
-    `🍽️ *Planificación Docks*`,
+    `*Planificación Docks*`,
     ``,
-    `Hola *${turno.empleadoNombre}*. Te planificaron para presentarte a trabajar:`,
+    `Hola ${turno.empleadoNombre}, buen día.`,
+    `Te confirmamos la planificación para presentarte a trabajar:`,
     ``,
-    `📍 Local: *${local}*`,
-    `📅 Día: *${formatPlanificacionFecha(turno.fecha)}*`,
-    `🕐 Horario: *${turno.horaEntrada} a ${turno.horaSalida}*`,
-    turno.puesto ? `👤 Rol: *${turno.puesto}*` : null,
-    turno.nota ? `📝 Nota: ${turno.nota}` : null,
+    `Local: *${local}*`,
+    `Día: *${formatPlanificacionFecha(turno.fecha)}*`,
+    `Horario: *${turno.horaEntrada} a ${turno.horaSalida}*`,
+    turno.puesto ? `Rol: *${turno.puesto}*` : null,
+    turno.nota ? `Nota: ${turno.nota}` : null,
     ``,
-    `Respondé:`,
-    `1️⃣ Confirmo asistencia`,
-    `2️⃣ No puedo trabajar`,
+    `Por favor respondé con una opción:`,
+    `1 - Confirmo asistencia`,
+    `2 - No puedo trabajar`,
     ``,
-    `También podés responder *CONFIRMO ${turno.id}* o *NO ${turno.id}*.`,
+    `Si tenés varios turnos pendientes, respondé *CONFIRMO ${turno.id}* o *NO ${turno.id}*.`,
     `Turno #${turno.id}`,
   ].filter(Boolean).join('\n')
 }

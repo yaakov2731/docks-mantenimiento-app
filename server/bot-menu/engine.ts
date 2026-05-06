@@ -256,11 +256,11 @@ async function handlePlanificacionBotResponse(session: BotSession, input: string
 
   if (!turno) {
     if (parsed.turnoId) {
-      return `⚠️ No encontré un turno pendiente con ese número.\n\nRespondé *menú* para volver al inicio.`
+      return `No encontré un turno pendiente con ese número.\n\nRespondé *menú* para volver al inicio.`
     }
     if (pending.length > 1) {
       return [
-        `📅 Tenés más de un turno pendiente.`,
+        `Tenés más de un turno pendiente.`,
         `Respondé con el número del turno:`,
         ``,
         ...pending.map((item: any) => `• Turno #${item.id}: ${item.fecha} ${item.horaEntrada}-${item.horaSalida}`),
@@ -276,28 +276,28 @@ async function handlePlanificacionBotResponse(session: BotSession, input: string
     empleadoId: session.userId,
     respuesta: parsed.respuesta,
   })
-  if (!updated) return `⚠️ No pude registrar la respuesta. Probá de nuevo o avisá al admin.`
+  if (!updated) return `No pude registrar la respuesta. Probá de nuevo o avisale al encargado.`
 
   if (parsed.respuesta === 'confirmado') {
     return [
-      `✅ *Asistencia confirmada*`,
+      `*Asistencia confirmada*`,
       ``,
       `${turno.empleadoNombre}, quedó confirmado el turno #${turno.id}.`,
-      `📅 ${turno.fecha}`,
-      `🕐 ${turno.horaEntrada} a ${turno.horaSalida}`,
+      `Día: ${turno.fecha}`,
+      `Horario: ${turno.horaEntrada} a ${turno.horaSalida}`,
       ``,
       `El día del turno fichá entrada desde este bot.`,
     ].join('\n')
   }
 
   return [
-    `⚠️ *Marcado como no disponible*`,
+    `*Marcado como no disponible*`,
     ``,
-    `${turno.empleadoNombre}, avisamos que no podés trabajar el turno #${turno.id}.`,
-    `📅 ${turno.fecha}`,
-    `🕐 ${turno.horaEntrada} a ${turno.horaSalida}`,
+    `${turno.empleadoNombre}, registramos que no podés trabajar el turno #${turno.id}.`,
+    `Día: ${turno.fecha}`,
+    `Horario: ${turno.horaEntrada} a ${turno.horaSalida}`,
     ``,
-    `El admin lo verá en rojo en Planificación.`,
+    `El encargado lo verá en Planificación para reorganizar el equipo.`,
   ].join('\n')
 }
 
