@@ -184,6 +184,8 @@ vi.mock('../db', () => ({
   getEmpleadoByWaId: vi.fn(),
   getUsers: vi.fn(),
   getLeadByWaId: vi.fn(),
+  getPendingPlanificacionForEmpleado: vi.fn(async () => []),
+  responderPlanificacionGastronomia: vi.fn(async () => undefined),
 }))
 
 import { handleIncomingMessage } from './engine'

@@ -148,6 +148,25 @@ export async function initDb() {
       pagado_por_id INTEGER,
       pagado_por_nombre TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS gastronomia_planificacion_turnos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      empleado_id INTEGER NOT NULL,
+      empleado_nombre TEXT NOT NULL,
+      empleado_wa_id TEXT,
+      sector TEXT NOT NULL,
+      puesto TEXT,
+      fecha TEXT NOT NULL,
+      trabaja INTEGER NOT NULL DEFAULT 1,
+      hora_entrada TEXT NOT NULL,
+      hora_salida TEXT NOT NULL,
+      nota TEXT,
+      estado TEXT NOT NULL DEFAULT 'borrador',
+      publicado_at INTEGER,
+      respondido_at INTEGER,
+      respuesta_nota TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
     `CREATE TABLE IF NOT EXISTS marcaciones_empleados (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       empleado_id INTEGER NOT NULL,
@@ -392,6 +411,8 @@ export async function initDb() {
     `CREATE INDEX IF NOT EXISTS cobranzas_saldos_importacion_idx ON cobranzas_saldos(importacion_id)`,
     `CREATE INDEX IF NOT EXISTS cobranzas_saldos_estado_idx ON cobranzas_saldos(estado)`,
     `CREATE INDEX IF NOT EXISTS cobranzas_notificaciones_saldo_idx ON cobranzas_notificaciones(saldo_id)`,
+    `CREATE INDEX IF NOT EXISTS gastronomia_planificacion_semana_idx ON gastronomia_planificacion_turnos(fecha, sector)`,
+    `CREATE INDEX IF NOT EXISTS gastronomia_planificacion_empleado_idx ON gastronomia_planificacion_turnos(empleado_id, fecha)`,
   ]
   for (const sql of indexStmts) {
     try {
@@ -3344,4 +3365,195 @@ export async function getLiquidacionGastronomia(sector: string | undefined, year
       total: dias * emp.pagoDiario,
     }
   })
+}
+
+export type GastronomiaPlanificacionInput = {
+  id?: number
+  empleadoId: number
+  fecha: string
+  trabaja: boolean
+  horaEntrada: string
+  horaSalida: string
+  sector?: string
+  puesto?: string | null
+  nota?: string | null
+}
+
+export async function listPlanificacionGastronomia(params: {
+  desde: string
+  hasta: string
+  sector?: string
+}) {
+  const conditions: any[] = [
+    gte(schema.gastronomiaPlanificacionTurnos.fecha, params.desde),
+    lt(schema.gastronomiaPlanificacionTurnos.fecha, params.hasta),
+  ]
+  if (params.sector && params.sector !== 'todos') {
+    conditions.push(eq(schema.gastronomiaPlanificacionTurnos.sector, params.sector))
+  }
+  return db.select()
+    .from(schema.gastronomiaPlanificacionTurnos)
+    .where(and(...conditions))
+    .orderBy(schema.gastronomiaPlanificacionTurnos.fecha, schema.gastronomiaPlanificacionTurnos.empleadoNombre)
+}
+
+export async function savePlanificacionTurnoGastronomia(input: GastronomiaPlanificacionInput) {
+  const empleado = await getEmpleadoGastroById(input.empleadoId)
+  if (!empleado) throw new Error('Empleado gastronomico no encontrado')
+
+  const values = {
+    empleadoId: empleado.id,
+    empleadoNombre: empleado.nombre,
+    empleadoWaId: empleado.waId ?? null,
+    sector: input.sector || (empleado as any).sector || 'brooklyn',
+    puesto: input.puesto ?? (empleado as any).puesto ?? null,
+    fecha: input.fecha,
+    trabaja: input.trabaja,
+    horaEntrada: input.horaEntrada,
+    horaSalida: input.horaSalida,
+    nota: input.nota ?? null,
+    estado: 'borrador' as const,
+    updatedAt: new Date(),
+  }
+
+  if (input.id) {
+    const rows = await db.update(schema.gastronomiaPlanificacionTurnos)
+      .set(values as any)
+      .where(eq(schema.gastronomiaPlanificacionTurnos.id, input.id))
+      .returning()
+    return rows[0] ?? null
+  }
+
+  const rows = await db.insert(schema.gastronomiaPlanificacionTurnos)
+    .values(values as any)
+    .returning()
+  return rows[0]
+}
+
+export async function deletePlanificacionTurnoGastronomia(id: number) {
+  await db.delete(schema.gastronomiaPlanificacionTurnos)
+    .where(eq(schema.gastronomiaPlanificacionTurnos.id, id))
+    .run()
+}
+
+function formatPlanificacionFecha(fecha: string) {
+  const [year, month, day] = fecha.split('-').map(Number)
+  const date = new Date(year, (month ?? 1) - 1, day ?? 1)
+  return date.toLocaleDateString('es-AR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  })
+}
+
+function buildPlanificacionBotMessage(turno: typeof schema.gastronomiaPlanificacionTurnos.$inferSelect) {
+  const local = SECTOR_LABELS[(turno.sector as keyof typeof SECTOR_LABELS)] ?? turno.sector
+  if (!turno.trabaja) {
+    return [
+      `🍽️ *Planificación Docks*`,
+      ``,
+      `Hola *${turno.empleadoNombre}*.`,
+      `El ${formatPlanificacionFecha(turno.fecha)} figurás como *franco / no trabaja*.`,
+      ``,
+      `Si esto está mal, respondé al admin.`,
+      ``,
+      `Turno #${turno.id}`,
+    ].join('\n')
+  }
+  return [
+    `🍽️ *Planificación Docks*`,
+    ``,
+    `Hola *${turno.empleadoNombre}*. Te planificaron para presentarte a trabajar:`,
+    ``,
+    `📍 Local: *${local}*`,
+    `📅 Día: *${formatPlanificacionFecha(turno.fecha)}*`,
+    `🕐 Horario: *${turno.horaEntrada} a ${turno.horaSalida}*`,
+    turno.puesto ? `👤 Rol: *${turno.puesto}*` : null,
+    turno.nota ? `📝 Nota: ${turno.nota}` : null,
+    ``,
+    `Respondé:`,
+    `1️⃣ Confirmo asistencia`,
+    `2️⃣ No puedo trabajar`,
+    ``,
+    `También podés responder *CONFIRMO ${turno.id}* o *NO ${turno.id}*.`,
+    `Turno #${turno.id}`,
+  ].filter(Boolean).join('\n')
+}
+
+const SECTOR_LABELS: Record<string, string> = {
+  uno_grill: 'UMO Grill',
+  brooklyn: 'Brooklyn',
+  heladeria: 'Heladería',
+  trento_cafe: 'Trento Café',
+  inflables: 'Inflables',
+  encargados: 'Encargados',
+  promotoras: 'Promotoras',
+}
+
+export async function publishPlanificacionGastronomia(ids: number[]) {
+  if (ids.length === 0) return { published: 0, skipped: 0 }
+  const turnos = await db.select()
+    .from(schema.gastronomiaPlanificacionTurnos)
+    .where(inArray(schema.gastronomiaPlanificacionTurnos.id, ids))
+
+  let published = 0
+  let skipped = 0
+  for (const turno of turnos) {
+    if (!turno.empleadoWaId) {
+      skipped++
+      continue
+    }
+    await enqueueBotMessage(turno.empleadoWaId, buildPlanificacionBotMessage(turno))
+    await db.update(schema.gastronomiaPlanificacionTurnos)
+      .set({
+        estado: turno.trabaja ? 'enviado' : 'confirmado',
+        publicadoAt: new Date(),
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(schema.gastronomiaPlanificacionTurnos.id, turno.id))
+      .run()
+    published++
+  }
+  return { published, skipped }
+}
+
+export async function responderPlanificacionGastronomia(params: {
+  turnoId: number
+  empleadoId: number
+  respuesta: 'confirmado' | 'no_trabaja'
+  nota?: string | null
+}) {
+  const rows = await db.select()
+    .from(schema.gastronomiaPlanificacionTurnos)
+    .where(and(
+      eq(schema.gastronomiaPlanificacionTurnos.id, params.turnoId),
+      eq(schema.gastronomiaPlanificacionTurnos.empleadoId, params.empleadoId),
+    ))
+  const turno = rows[0]
+  if (!turno) return null
+
+  const updated = await db.update(schema.gastronomiaPlanificacionTurnos)
+    .set({
+      estado: params.respuesta,
+      respondidoAt: new Date(),
+      respuestaNota: params.nota ?? null,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(schema.gastronomiaPlanificacionTurnos.id, turno.id))
+    .returning()
+  return updated[0] ?? null
+}
+
+export async function getPendingPlanificacionForEmpleado(empleadoId: number) {
+  const today = new Date()
+  const todayKey = today.toISOString().slice(0, 10)
+  return db.select()
+    .from(schema.gastronomiaPlanificacionTurnos)
+    .where(and(
+      eq(schema.gastronomiaPlanificacionTurnos.empleadoId, empleadoId),
+      eq(schema.gastronomiaPlanificacionTurnos.estado, 'enviado'),
+      gte(schema.gastronomiaPlanificacionTurnos.fecha, todayKey),
+    ))
+    .orderBy(schema.gastronomiaPlanificacionTurnos.fecha)
 }

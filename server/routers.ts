@@ -44,6 +44,10 @@ import {
   updateEmpleadoGastro,
   getMarcacionesGastronomia,
   getLiquidacionGastronomia,
+  listPlanificacionGastronomia,
+  savePlanificacionTurnoGastronomia,
+  deletePlanificacionTurnoGastronomia,
+  publishPlanificacionGastronomia,
 } from './db'
 
 const roundsService = createRoundsService(database as any)
@@ -628,6 +632,49 @@ const gastronomiaRouter = router({
     .query(async ({ input, ctx }) => {
       assertAdmin(ctx.user)
       return getLiquidacionGastronomia(input.sector, input.year, input.month)
+    }),
+
+  listPlanificacion: protectedProcedure
+    .input(z.object({
+      desde: z.string().min(10),
+      hasta: z.string().min(10),
+      sector: z.string().optional(),
+    }))
+    .query(async ({ input, ctx }) => {
+      assertAdmin(ctx.user)
+      return listPlanificacionGastronomia(input)
+    }),
+
+  savePlanificacionTurno: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      empleadoId: z.number(),
+      fecha: z.string().min(10),
+      trabaja: z.boolean(),
+      horaEntrada: z.string().min(4),
+      horaSalida: z.string().min(4),
+      sector: z.string().optional(),
+      puesto: z.string().optional().nullable(),
+      nota: z.string().optional().nullable(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      assertAdmin(ctx.user)
+      return savePlanificacionTurnoGastronomia(input)
+    }),
+
+  deletePlanificacionTurno: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      assertAdmin(ctx.user)
+      await deletePlanificacionTurnoGastronomia(input.id)
+      return { success: true }
+    }),
+
+  publishPlanificacion: protectedProcedure
+    .input(z.object({ ids: z.array(z.number()).min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      assertAdmin(ctx.user)
+      return publishPlanificacionGastronomia(input.ids)
     }),
 
 })

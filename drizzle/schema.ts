@@ -131,6 +131,28 @@ export const empleadoLiquidacionCierre = sqliteTable('empleado_liquidacion_cierr
   pagadoPorNombre: text('pagado_por_nombre'),
 })
 
+export const gastronomiaPlanificacionTurnos = sqliteTable('gastronomia_planificacion_turnos', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  empleadoId: integer('empleado_id').notNull(),
+  empleadoNombre: text('empleado_nombre').notNull(),
+  empleadoWaId: text('empleado_wa_id'),
+  sector: text('sector').notNull(),
+  puesto: text('puesto'),
+  fecha: text('fecha').notNull(),
+  trabaja: integer('trabaja', { mode: 'boolean' }).default(true).notNull(),
+  horaEntrada: text('hora_entrada').notNull(),
+  horaSalida: text('hora_salida').notNull(),
+  nota: text('nota'),
+  estado: text('estado', {
+    enum: ['borrador', 'enviado', 'confirmado', 'no_trabaja', 'sin_respuesta', 'cancelado'],
+  }).default('borrador').notNull(),
+  publicadoAt: integer('publicado_at', { mode: 'timestamp' }),
+  respondidoAt: integer('respondido_at', { mode: 'timestamp' }),
+  respuestaNota: text('respuesta_nota'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
 export const marcacionesEmpleados = sqliteTable('marcaciones_empleados', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   empleadoId: integer('empleado_id').notNull(),

@@ -138,7 +138,13 @@ import {
 } from './menus/public/comercial'
 
 // ── DB helpers para identificación ───────────────────────────────────────────
-import { getEmpleadoByWaId, getUsers, getLeadByWaId } from '../db'
+import {
+  getEmpleadoByWaId,
+  getUsers,
+  getLeadByWaId,
+  getPendingPlanificacionForEmpleado,
+  responderPlanificacionGastronomia,
+} from '../db'
 
 function buildAdminGastroSectorMenu(): string {
   return [
@@ -222,6 +228,79 @@ async function identifyUser(waNumber: string): Promise<{ userType: UserType; use
   return null
 }
 
+function parsePlanificacionResponse(input: string): { turnoId?: number; respuesta: 'confirmado' | 'no_trabaja' } | null {
+  const normalized = input.trim().toLowerCase()
+  const explicit = normalized.match(/^(confirmo|confirmar|si|sí|no)\s+#?(\d+)$/i)
+  if (explicit) {
+    return {
+      turnoId: Number(explicit[2]),
+      respuesta: ['no'].includes(explicit[1].toLowerCase()) ? 'no_trabaja' : 'confirmado',
+    }
+  }
+  if (['1', 'confirmo', 'confirmar', 'si', 'sí'].includes(normalized)) return { respuesta: 'confirmado' }
+  if (['2', 'no', 'no puedo', 'no trabajo'].includes(normalized)) return { respuesta: 'no_trabaja' }
+  return null
+}
+
+async function handlePlanificacionBotResponse(session: BotSession, input: string): Promise<string | null> {
+  if (session.userType !== ('gastronomia' as any)) return null
+  const parsed = parsePlanificacionResponse(input)
+  if (!parsed) return null
+
+  const pending = await getPendingPlanificacionForEmpleado(session.userId)
+  const turno = parsed.turnoId
+    ? pending.find((item: any) => item.id === parsed.turnoId)
+    : pending.length === 1
+      ? pending[0]
+      : null
+
+  if (!turno) {
+    if (parsed.turnoId) {
+      return `⚠️ No encontré un turno pendiente con ese número.\n\nRespondé *menú* para volver al inicio.`
+    }
+    if (pending.length > 1) {
+      return [
+        `📅 Tenés más de un turno pendiente.`,
+        `Respondé con el número del turno:`,
+        ``,
+        ...pending.map((item: any) => `• Turno #${item.id}: ${item.fecha} ${item.horaEntrada}-${item.horaSalida}`),
+        ``,
+        `Ejemplo: *CONFIRMO ${pending[0].id}* o *NO ${pending[0].id}*`,
+      ].join('\n')
+    }
+    return null
+  }
+
+  const updated = await responderPlanificacionGastronomia({
+    turnoId: turno.id,
+    empleadoId: session.userId,
+    respuesta: parsed.respuesta,
+  })
+  if (!updated) return `⚠️ No pude registrar la respuesta. Probá de nuevo o avisá al admin.`
+
+  if (parsed.respuesta === 'confirmado') {
+    return [
+      `✅ *Asistencia confirmada*`,
+      ``,
+      `${turno.empleadoNombre}, quedó confirmado el turno #${turno.id}.`,
+      `📅 ${turno.fecha}`,
+      `🕐 ${turno.horaEntrada} a ${turno.horaSalida}`,
+      ``,
+      `El día del turno fichá entrada desde este bot.`,
+    ].join('\n')
+  }
+
+  return [
+    `⚠️ *Marcado como no disponible*`,
+    ``,
+    `${turno.empleadoNombre}, avisamos que no podés trabajar el turno #${turno.id}.`,
+    `📅 ${turno.fecha}`,
+    `🕐 ${turno.horaEntrada} a ${turno.horaSalida}`,
+    ``,
+    `El admin lo verá en rojo en Planificación.`,
+  ].join('\n')
+}
+
 // ── Main entry point ──────────────────────────────────────────────────────────
 
 export async function handleIncomingMessage(waNumber: string, rawMessage: string): Promise<string> {
@@ -271,6 +350,14 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
     if (user.userType === ('gastronomia' as any)) {
       const { sector, sheetsRow } = (user as any).contextData ?? {}
       await updateSession(normalized, { contextData: { sector, sheetsRow } })
+      const maybePlanResponse = await handlePlanificacionBotResponse({
+        ...session,
+        userType: user.userType,
+        userId: user.userId,
+        userName: user.userName,
+        contextData: { sector, sheetsRow },
+      } as any, message)
+      if (maybePlanResponse) return maybePlanResponse
       return buildGastronomiaMenu(sector ?? '', user.userName)
     }
 
@@ -308,6 +395,9 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
 
   // ── Comandos globales ────────────────────────────────────────────────────────
   const msgLower = message.toLowerCase()
+  const maybePlanResponse = await handlePlanificacionBotResponse(session, message)
+  if (maybePlanResponse) return maybePlanResponse
+
   if (['menu', 'menú', 'inicio', 'start', 'hola', 'hi'].includes(msgLower)) {
     session = await resetToMain(session)
     return buildMainMenu(session)

@@ -142,8 +142,11 @@ export default function GastronomiaIndex() {
                 Control por local, asistencia propia y sueldos del equipo gastronómico sin mezclar datos de mantenimiento.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Link href="/gastronomia/asistencia" className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
-                  Abrir reloj <ArrowRight size={15} />
+                <Link href="/gastronomia/planificacion" className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
+                  Planificar semana <ArrowRight size={15} />
+                </Link>
+                <Link href="/gastronomia/asistencia" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white hover:bg-white/12">
+                  Abrir reloj
                 </Link>
                 <Link href="/gastronomia/personal" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white hover:bg-white/12">
                   Personal
@@ -215,7 +218,7 @@ export default function GastronomiaIndex() {
               { href: '/gastronomia/personal', icon: Users, title: 'Personal', text: 'Altas, bajas, locales, WhatsApp y valores por día.' },
               { href: '/gastronomia/asistencia', icon: Clock3, title: 'Reloj y asistencia', text: 'Tarjetas de empleados, estado del día y grilla mensual.' },
               { href: '/gastronomia/liquidacion', icon: ReceiptText, title: 'Liquidación', text: 'Pago por local, días trabajados y totales.' },
-              { href: '/gastronomia/asistencia', icon: CalendarDays, title: 'Planificación vs asistencia', text: 'Planificación queda para organizar; asistencia registra la realidad.' },
+              { href: '/gastronomia/planificacion', icon: CalendarDays, title: 'Planificación semanal', text: 'Horarios editables, publicación por WhatsApp y confirmación del empleado.' },
             ].map(item => (
               <Link key={item.title} href={item.href} className="group rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all">
                 <div className="flex items-center justify-between gap-3">
