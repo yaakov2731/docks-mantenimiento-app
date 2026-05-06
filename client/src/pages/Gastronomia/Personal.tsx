@@ -8,11 +8,12 @@ type EmpleadoForm = {
   sector: string
   puesto: string
   pagoDiario: string
+  puedeGastronomia: boolean
   activo: boolean
 }
 
 const emptyForm: EmpleadoForm = {
-  nombre: '', waId: '', sector: 'brooklyn', puesto: '', pagoDiario: '0', activo: true,
+  nombre: '', waId: '', sector: 'brooklyn', puesto: '', pagoDiario: '0', puedeGastronomia: false, activo: true,
 }
 
 type CsvRow = {
@@ -142,6 +143,7 @@ export default function GastronomiaPersonal() {
       sector: form.sector,
       puesto: form.puesto || undefined,
       pagoDiario: parseInt(form.pagoDiario) || 0,
+      puedeGastronomia: form.puedeGastronomia,
     }
     if (editId !== null) {
       updateMut.mutate({ id: editId, ...payload, activo: form.activo })
@@ -158,6 +160,7 @@ export default function GastronomiaPersonal() {
       sector: emp.sector ?? 'brooklyn',
       puesto: emp.puesto ?? '',
       pagoDiario: String(emp.pagoDiario ?? 0),
+      puedeGastronomia: emp.puedeGastronomia ?? false,
       activo: emp.activo ?? true,
     })
     setShowForm(true)
@@ -431,6 +434,10 @@ export default function GastronomiaPersonal() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Valor d&iacute;a ($)</label>
                 <input type="number" min="0" value={form.pagoDiario} onChange={e => setForm(f => ({ ...f, pagoDiario: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="puedeGastronomia" checked={form.puedeGastronomia} onChange={e => setForm(f => ({ ...f, puedeGastronomia: e.target.checked }))} className="h-4 w-4 rounded border-gray-300" />
+                <label htmlFor="puedeGastronomia" className="text-sm text-gray-700">También trabaja en mantenimiento (menú dual en el bot)</label>
               </div>
               {editId !== null && (
                 <div className="flex items-center gap-2">

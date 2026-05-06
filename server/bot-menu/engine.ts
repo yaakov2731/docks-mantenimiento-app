@@ -140,6 +140,31 @@ import {
 // ── DB helpers para identificación ───────────────────────────────────────────
 import { getEmpleadoByWaId, getUsers, getLeadByWaId } from '../db'
 
+function buildAdminGastroSectorMenu(): string {
+  return [
+    `🍽️ *Gastronomía — Seleccioná el local*`,
+    SEP,
+    `1️⃣  Uno Grill`,
+    `2️⃣  Brooklyn`,
+    `3️⃣  Heladería`,
+    `4️⃣  Trento Café`,
+    `5️⃣  Inflables`,
+    `6️⃣  Encargados`,
+    SEP,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
+function buildEmpleadoModoSelectorMenu(userName: string): string {
+  return [
+    `👋 Hola, *${userName}*`,
+    `¿Qué menú necesitás hoy?`,
+    SEP,
+    `1️⃣  🔧 Mantenimiento`,
+    `2️⃣  🍽️ Gastronomía`,
+  ].join('\n')
+}
+
 const MSG_NO_REGISTRADO = [
   `❌ *Tu número no está registrado en Docks del Puerto.*`,
   ``,
@@ -186,7 +211,12 @@ async function identifyUser(waNumber: string): Promise<{ userType: UserType; use
         },
       } as any
     }
-    return { userType: 'employee', userId: empleado.id, userName: empleado.nombre }
+    return {
+      userType: 'employee',
+      userId: empleado.id,
+      userName: empleado.nombre,
+      contextData: { puedeGastronomia: !!(empleado as any).puedeGastronomia, gastroSector: (empleado as any).sector ?? '' },
+    } as any
   }
 
   return null
@@ -237,11 +267,18 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
       userName: user.userName,
     })
 
-    // For gastro employees, store sector/sheetsRow context and show gastro menu
+    // For gastro employees, store sector context and show gastro menu
     if (user.userType === ('gastronomia' as any)) {
       const { sector, sheetsRow } = (user as any).contextData ?? {}
       await updateSession(normalized, { contextData: { sector, sheetsRow } })
       return buildGastronomiaMenu(sector ?? '', user.userName)
+    }
+
+    // For dual employees (mantenimiento + gastronomia), store contextData and show selector
+    if (user.userType === 'employee' && (user as any).contextData?.puedeGastronomia) {
+      const ctx = (user as any).contextData
+      await updateSession(normalized, { currentMenu: 'empleado_modo_selector', contextData: ctx })
+      return buildEmpleadoModoSelectorMenu(user.userName)
     }
 
     return buildMainMenu(session)
@@ -309,6 +346,25 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
   // ── EMPLEADO ─────────────────────────────────────────────────────────────────
   if (userType === 'employee') {
 
+    // Selector mantenimiento / gastronomía para empleados duales
+    if (currentMenu === 'empleado_modo_selector') {
+      if (input === '1') {
+        await updateSession(session.waNumber, { currentMenu: 'main', menuHistory: [] })
+        const updated = { ...session, currentMenu: 'main' as any }
+        return buildEmployeeMainMenu(updated)
+      }
+      if (input === '2') {
+        const gastroSector = contextData?.gastroSector as string ?? ''
+        if (gastroSector && gastroSector !== 'operativo') {
+          await navigateTo(session, 'admin_gastro', { sector: gastroSector })
+          return buildGastronomiaMenu(gastroSector, session.userName)
+        }
+        await navigateTo(session, 'admin_gastro_sector', {})
+        return buildAdminGastroSectorMenu()
+      }
+      return buildEmpleadoModoSelectorMenu(session.userName)
+    }
+
     // Menú principal empleado
     if (currentMenu === 'main') {
       if (isAttendanceShortcut(input)) {
@@ -365,8 +421,28 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
         await navigateTo(session, 'admin_leads_sin_asignar', { page: 1 })
         return buildAdminLeadsSinAsignar({ ...session, currentMenu: 'admin_leads_sin_asignar', contextData: { page: 1 } })
       }
+      if (input === '5') {
+        await navigateTo(session, 'admin_gastro_sector', {})
+        return buildAdminGastroSectorMenu()
+      }
       if (input === '0') return buildHelpMessage('admin')
       return invalidMenuOption(await buildAdminMainMenu(session))
+    }
+
+    if (currentMenu === 'admin_gastro_sector') {
+      const sectorMap: Record<string, string> = {
+        '1': 'uno_grill', '2': 'brooklyn', '3': 'heladeria',
+        '4': 'trento_cafe', '5': 'inflables', '6': 'encargados',
+      }
+      if (input === '0') return null
+      const sector = sectorMap[input]
+      if (!sector) return `⚠️ Opción inválida.\n\n${buildAdminGastroSectorMenu()}`
+      await navigateTo(session, 'admin_gastro', { sector })
+      return buildGastronomiaMenu(sector, session.userName)
+    }
+
+    if (currentMenu === 'admin_gastro') {
+      return handleGastronomia({ ...session, contextData: { ...session.contextData, sector: session.contextData?.sector ?? '' } }, input)
     }
 
     if (currentMenu === 'admin_reclamos_home') {

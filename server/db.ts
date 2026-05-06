@@ -444,6 +444,7 @@ export async function initDb() {
     `ALTER TABLE leads ADD COLUMN auto_followup_count INTEGER`,
     `ALTER TABLE leads ADD COLUMN last_bot_msg_at INTEGER`,
     `ALTER TABLE leads ADD COLUMN needs_attention_at INTEGER`,
+    `ALTER TABLE empleados ADD COLUMN puede_gastronomia INTEGER NOT NULL DEFAULT 0`,
   ]
   for (const sql of alterStmts) {
     try {
@@ -3293,6 +3294,7 @@ export async function updateEmpleadoGastro(id: number, data: {
   pagoDiario?: number
   sheetsRow?: number | null
   activo?: boolean
+  puedeGastronomia?: boolean
 }) {
   const result = await db.update(schema.empleados)
     .set({ ...data as any, updatedAt: new Date() })

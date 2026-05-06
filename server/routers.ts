@@ -608,6 +608,7 @@ const gastronomiaRouter = router({
       pagoDiario: z.number().int().min(0).optional(),
       sheetsRow: z.number().int().optional(),
       activo: z.boolean().optional(),
+      puedeGastronomia: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       assertAdmin(ctx.user)
@@ -1535,6 +1536,7 @@ export const appRouter = router({
         pagoQuincenal: payrollAmountSchema,
         pagoMensual: payrollAmountSchema,
         puedeVender: z.boolean().optional(),
+        puedeGastronomia: z.boolean().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         assertAdmin(ctx.user)
@@ -1554,6 +1556,7 @@ export const appRouter = router({
         pagoQuincenal: payrollAmountSchema,
         pagoMensual: payrollAmountSchema,
         puedeVender: z.boolean().optional(),
+        puedeGastronomia: z.boolean().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         assertAdmin(ctx.user)

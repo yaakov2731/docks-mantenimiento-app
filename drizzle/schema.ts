@@ -68,6 +68,7 @@ export const empleados = sqliteTable('empleados', {
   pagoMensual: integer('pago_mensual').default(0).notNull(),
   activo: integer('activo', { mode: 'boolean' }).default(true).notNull(),
   puedeVender: integer('puede_vender', { mode: 'boolean' }).default(false).notNull(),
+  puedeGastronomia: integer('puede_gastronomia', { mode: 'boolean' }).default(false).notNull(),
   sector: text('sector', {
     enum: ['operativo', 'uno_grill', 'brooklyn', 'heladeria', 'trento_cafe', 'inflables', 'encargados', 'promotoras'],
   }).default('operativo').notNull(),

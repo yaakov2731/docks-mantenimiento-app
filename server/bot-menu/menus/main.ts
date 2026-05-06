@@ -102,6 +102,7 @@ export async function buildAdminMainMenu(session: BotSession): Promise<string> {
     `2️⃣  Operación diaria`,
     `3️⃣  Rondas de baños`,
     `4️⃣  Comercial`,
+    `5️⃣  🍽️ Gastronomía`,
     ``,
     `0️⃣  Ayuda`,
   ].join('\n')
