@@ -219,6 +219,7 @@ export default function GastronomiaIndex() {
               { href: '/gastronomia/asistencia', icon: Clock3, title: 'Reloj y asistencia', text: 'Tarjetas de empleados, estado del día y grilla mensual.' },
               { href: '/gastronomia/liquidacion', icon: ReceiptText, title: 'Liquidación', text: 'Pago por local, días trabajados y totales.' },
               { href: '/gastronomia/planificacion', icon: CalendarDays, title: 'Planificación semanal', text: 'Horarios editables, publicación por WhatsApp y confirmación del empleado.' },
+              { href: '/gastronomia/confirmaciones', icon: UserRoundCheck, title: 'Confirmaciones', text: 'Control semanal de quién confirmó, quién falta responder y cantidad de empleados.' },
             ].map(item => (
               <Link key={item.title} href={item.href} className="group rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all">
                 <div className="flex items-center justify-between gap-3">

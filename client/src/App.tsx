@@ -19,6 +19,7 @@ const Cobranzas = lazy(() => import('./pages/Cobranzas'))
 const BotComercial = lazy(() => import('./pages/BotComercial'))
 const Gastronomia = lazy(() => import('./pages/Gastronomia/Index'))
 const GastronomiaPlanificacion = lazy(() => import('./pages/Gastronomia/Planificacion'))
+const GastronomiaConfirmaciones = lazy(() => import('./pages/Gastronomia/Confirmaciones'))
 const GastronomiaPersonal = lazy(() => import('./pages/Gastronomia/Personal'))
 const GastronomiaAsistencia = lazy(() => import('./pages/Gastronomia/Asistencia'))
 const GastronomiaLiquidacion = lazy(() => import('./pages/Gastronomia/Liquidacion'))
@@ -71,6 +72,7 @@ export default function App() {
       <Route path="/imprimir">{() => <ProtectedRoute component={ImprimirReclamo} allowedRoles={['admin', 'employee']} />}</Route>
       <Route path="/gastronomia">{() => <ProtectedRoute component={Gastronomia} allowedRoles={['admin']} />}</Route>
       <Route path="/gastronomia/planificacion">{() => <ProtectedRoute component={GastronomiaPlanificacion} allowedRoles={['admin']} />}</Route>
+      <Route path="/gastronomia/confirmaciones">{() => <ProtectedRoute component={GastronomiaConfirmaciones} allowedRoles={['admin']} />}</Route>
       <Route path="/gastronomia/personal">{() => <ProtectedRoute component={GastronomiaPersonal} allowedRoles={['admin']} />}</Route>
       <Route path="/gastronomia/asistencia">{() => <ProtectedRoute component={GastronomiaAsistencia} allowedRoles={['admin']} />}</Route>
       <Route path="/gastronomia/liquidacion">{() => <ProtectedRoute component={GastronomiaLiquidacion} allowedRoles={['admin']} />}</Route>
