@@ -8,8 +8,12 @@ async function seed() {
     console.log('[Seed] Ya existe un usuario admin. No se creó nada.')
     process.exit(0)
   }
-  const username = process.env.ADMIN_USERNAME ?? 'admin'
-  const password = process.env.ADMIN_PASSWORD ?? 'admin123'
+  const username = process.env.ADMIN_USERNAME
+  const password = process.env.ADMIN_PASSWORD
+
+  if (!username || !password) {
+    throw new Error('ADMIN_USERNAME and ADMIN_PASSWORD environment variables are required')
+  }
   const hash = await bcrypt.hash(password, 10)
   await createUser({ username, password: hash, name: 'Administrador', role: 'admin' })
   console.log(`[Seed] Usuario admin creado: ${username} / ${password}`)
