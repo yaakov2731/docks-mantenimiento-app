@@ -31,7 +31,7 @@ const allowedOrigin = readEnv('CLIENT_URL') ?? (isProd ? false : 'http://localho
 app.use(cors({ origin: allowedOrigin, credentials: true }))
 
 // Body limit reducido — los mensajes del bot nunca necesitan 10mb
-app.use(express.json({ limit: '256kb' }))
+app.use(express.json({ limit: '10kb' }))
 app.use(cookieParser())
 
 // Rate limiting — bot API: 120 req/min por IP (el bot hace polling, no explosiones)
