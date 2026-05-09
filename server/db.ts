@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client'
 import { drizzle } from 'drizzle-orm/libsql'
-import { eq, and, or, like, inArray, sql, desc, not, isNull, isNotNull, lt, gte } from 'drizzle-orm'
+import { eq, and, or, like, inArray, sql, desc, not, isNull, isNotNull, lt, lte, gte } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import * as schema from '../drizzle/schema'
 import { readEnv } from './_core/env'
@@ -167,12 +167,24 @@ export async function initDb() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    `CREATE TABLE IF NOT EXISTS gastronomia_planificacion_auditoria (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tipo TEXT NOT NULL,
+      sector TEXT NOT NULL,
+      desde TEXT NOT NULL,
+      hasta TEXT NOT NULL,
+      affected_count INTEGER NOT NULL DEFAULT 0,
+      actor_user_id INTEGER,
+      actor_nombre TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
     `CREATE TABLE IF NOT EXISTS marcaciones_empleados (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       empleado_id INTEGER NOT NULL,
       entrada_at INTEGER NOT NULL,
       salida_at INTEGER,
       duracion_segundos INTEGER,
+      local_asignado TEXT,
       fuente TEXT NOT NULL DEFAULT 'whatsapp',
       nota_entrada TEXT,
       nota_salida TEXT,
@@ -200,6 +212,24 @@ export async function initDb() {
       error_msg TEXT,
       last_attempt_at INTEGER,
       priority INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS bot_heartbeat (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      last_seen_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      bot_version TEXT,
+      pending_count INTEGER NOT NULL DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS bot_session (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wa_number TEXT NOT NULL UNIQUE,
+      user_type TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      user_name TEXT NOT NULL,
+      current_menu TEXT NOT NULL DEFAULT 'main',
+      context_data TEXT,
+      menu_history TEXT,
+      last_activity_at INTEGER NOT NULL DEFAULT (unixepoch()),
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
     `CREATE TABLE IF NOT EXISTS leads (
@@ -466,6 +496,7 @@ export async function initDb() {
     `ALTER TABLE leads ADD COLUMN last_bot_msg_at INTEGER`,
     `ALTER TABLE leads ADD COLUMN needs_attention_at INTEGER`,
     `ALTER TABLE empleados ADD COLUMN puede_gastronomia INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE marcaciones_empleados ADD COLUMN local_asignado TEXT`,
   ]
   for (const sql of alterStmts) {
     try {
@@ -534,6 +565,8 @@ function assertNotFutureAttendanceDate(fechaHora: Date) {
 
 export const ATTENDANCE_ACTIONS = ['entrada', 'inicio_almuerzo', 'fin_almuerzo', 'salida'] as const
 export type AttendanceAction = typeof ATTENDANCE_ACTIONS[number]
+const ATTENDANCE_DUPLICATE_WINDOW_MS = 15_000
+const attendanceRegistrationTails = new Map<number, Promise<void>>()
 
 function logAttendanceDebug(message: string, payload?: Record<string, unknown>) {
   if (payload) {
@@ -541,6 +574,33 @@ function logAttendanceDebug(message: string, payload?: Record<string, unknown>) 
     return
   }
   console.log(`[attendance] ${message}`)
+}
+
+async function withAttendanceRegistrationLock<T>(empleadoId: number, task: () => Promise<T>) {
+  const previousTail = attendanceRegistrationTails.get(empleadoId) ?? Promise.resolve()
+  let releaseCurrent = () => {}
+  const currentGate = new Promise<void>((resolve) => {
+    releaseCurrent = resolve
+  })
+  const currentTail = previousTail.catch(() => undefined).then(() => currentGate)
+  attendanceRegistrationTails.set(empleadoId, currentTail)
+  await previousTail.catch(() => undefined)
+
+  try {
+    return await task()
+  } finally {
+    releaseCurrent()
+    if (attendanceRegistrationTails.get(empleadoId) === currentTail) {
+      attendanceRegistrationTails.delete(empleadoId)
+    }
+  }
+}
+
+function isRecentDuplicateAttendanceAction(status: Awaited<ReturnType<typeof getEmpleadoAttendanceStatus>>, tipo: AttendanceAction, canal: 'whatsapp' | 'panel' | 'manual_admin', nowMs: number) {
+  if (status.lastAction !== tipo || !status.lastActionAt) return false
+  if (status.lastChannel && status.lastChannel !== canal) return false
+  const diffMs = Math.max(0, nowMs - status.lastActionAt.getTime())
+  return diffMs <= ATTENDANCE_DUPLICATE_WINDOW_MS
 }
 
 function getAttendanceEventTime(evento: { timestamp?: Date | number | null; createdAt?: Date | number | null }) {
@@ -591,6 +651,9 @@ export function buildAttendanceTurns(events: Array<any>, now = Date.now()) {
     const eventMs = getAttendanceEventTime(event)
 
     if (event.tipo === 'entrada') {
+      if (currentTurn) {
+        continue
+      }
       currentTurn = {
         fecha: toBuenosAiresDateKey(eventMs),
         entradaAt: new Date(eventMs),
@@ -658,6 +721,7 @@ export function buildAttendanceTurns(events: Array<any>, now = Date.now()) {
 export async function getEmpleadoAttendanceStatus(empleadoId: number) {
   const rows = await getEmpleadoAttendanceEvents(empleadoId)
   const latest = rows[rows.length - 1] ?? null
+  const marcaciones = await db.select().from(schema.marcacionesEmpleados).where(eq(schema.marcacionesEmpleados.empleadoId, empleadoId))
   const { start, end } = getBuenosAiresDayRange()
   const now = Date.now()
   const turns = buildAttendanceTurns(rows, now)
@@ -672,6 +736,12 @@ export async function getEmpleadoAttendanceStatus(empleadoId: number) {
   const lastLunchEnd = [...rows].reverse().find(row => row.tipo === 'fin_almuerzo') ?? null
   const currentTurn = [...turns].reverse().find(turn => turn.turnoAbierto) ?? null
   const lastCompletedTurn = [...turns].reverse().find(turn => !turn.turnoAbierto) ?? null
+  const currentMarcacion = [...marcaciones]
+    .filter(row => !row.salidaAt)
+    .sort((a, b) => new Date(b.entradaAt as any).getTime() - new Date(a.entradaAt as any).getTime())[0] ?? null
+  const lastMarcacion = [...marcaciones]
+    .sort((a, b) => new Date(b.entradaAt as any).getTime() - new Date(a.entradaAt as any).getTime())[0] ?? null
+  const assignedSector = currentMarcacion?.localAsignado ?? lastMarcacion?.localAsignado ?? null
   const onShift = !!currentTurn
   const onLunch = !!currentTurn?.lunchStartedAt
   const currentShiftGrossSeconds = onShift ? Number(currentTurn?.grossSeconds ?? 0) : 0
@@ -707,6 +777,8 @@ export async function getEmpleadoAttendanceStatus(empleadoId: number) {
     lastShiftWorkedSeconds: Number(lastCompletedTurn?.workedSeconds ?? 0),
     lastShiftStartedAt: lastCompletedTurn?.entradaAt ?? null,
     lastShiftEndedAt: lastCompletedTurn?.salidaAt ?? null,
+    assignedSector,
+    assignedLocalLabel: assignedSector ? getGastronomiaSectorLabel(assignedSector) : null,
     todayEntries: todayRows.filter(row => row.tipo === 'entrada').length,
     todayLunchStarts: todayRows.filter(row => row.tipo === 'inicio_almuerzo').length,
     todayLunchEnds: todayRows.filter(row => row.tipo === 'fin_almuerzo').length,
@@ -721,115 +793,135 @@ export async function registerEmpleadoAttendance(
   canal: 'whatsapp' | 'panel' | 'manual_admin' = 'panel',
   nota?: string
 ) {
-  logAttendanceDebug('register:start', {
-    empleadoId,
-    tipo,
-    canal,
-    nota: nota ?? null,
-  })
-  const current = await getEmpleadoAttendanceStatus(empleadoId)
-
-  if (tipo === 'entrada' && current.onShift) {
-    logAttendanceDebug('register:blocked', {
+  return withAttendanceRegistrationLock(empleadoId, async () => {
+    logAttendanceDebug('register:start', {
       empleadoId,
       tipo,
       canal,
-      code: 'already_on_shift',
-      current,
+      nota: nota ?? null,
     })
-    return { success: false, code: 'already_on_shift' as const, status: current }
-  }
+    const current = await getEmpleadoAttendanceStatus(empleadoId)
+    const nowMs = Date.now()
 
-  if (tipo === 'inicio_almuerzo') {
-    if (!current.onShift) {
+    if (isRecentDuplicateAttendanceAction(current, tipo, canal, nowMs)) {
       logAttendanceDebug('register:blocked', {
         empleadoId,
         tipo,
         canal,
-        code: 'not_on_shift',
+        code: 'duplicate_ignored',
         current,
       })
-      return { success: false, code: 'not_on_shift' as const, status: current }
+      return { success: true, code: 'ok' as const, status: current }
     }
-    if (current.onLunch) {
+
+    if (tipo === 'entrada' && current.onShift) {
       logAttendanceDebug('register:blocked', {
         empleadoId,
         tipo,
         canal,
-        code: 'already_on_lunch',
+        code: 'already_on_shift',
         current,
       })
-      return { success: false, code: 'already_on_lunch' as const, status: current }
+      return { success: false, code: 'already_on_shift' as const, status: current }
     }
-  }
 
-  if (tipo === 'fin_almuerzo' && !current.onLunch) {
-    logAttendanceDebug('register:blocked', {
+    if (tipo === 'inicio_almuerzo') {
+      if (!current.onShift) {
+        logAttendanceDebug('register:blocked', {
+          empleadoId,
+          tipo,
+          canal,
+          code: 'not_on_shift',
+          current,
+        })
+        return { success: false, code: 'not_on_shift' as const, status: current }
+      }
+      if (current.onLunch) {
+        logAttendanceDebug('register:blocked', {
+          empleadoId,
+          tipo,
+          canal,
+          code: 'already_on_lunch',
+          current,
+        })
+        return { success: false, code: 'already_on_lunch' as const, status: current }
+      }
+    }
+
+    if (tipo === 'fin_almuerzo' && !current.onLunch) {
+      logAttendanceDebug('register:blocked', {
+        empleadoId,
+        tipo,
+        canal,
+        code: 'not_on_lunch',
+        current,
+      })
+      return { success: false, code: 'not_on_lunch' as const, status: current }
+    }
+
+    if (tipo === 'salida') {
+      if (!current.onShift) {
+        logAttendanceDebug('register:blocked', {
+          empleadoId,
+          tipo,
+          canal,
+          code: 'not_on_shift',
+          current,
+        })
+        return { success: false, code: 'not_on_shift' as const, status: current }
+      }
+      if (current.onLunch) {
+        logAttendanceDebug('register:blocked', {
+          empleadoId,
+          tipo,
+          canal,
+          code: 'on_lunch',
+          current,
+        })
+        return { success: false, code: 'on_lunch' as const, status: current }
+      }
+    }
+
+    await db.insert(schema.empleadoAsistencia).values({
+      empleadoId,
+      tipo,
+      timestamp: new Date(),
+      canal,
+      nota,
+    }).run()
+    logAttendanceDebug('register:event_inserted', {
       empleadoId,
       tipo,
       canal,
-      code: 'not_on_lunch',
-      current,
     })
-    return { success: false, code: 'not_on_lunch' as const, status: current }
-  }
 
-  if (tipo === 'salida') {
-    if (!current.onShift) {
-      logAttendanceDebug('register:blocked', {
-        empleadoId,
-        tipo,
-        canal,
-        code: 'not_on_shift',
-        current,
-      })
-      return { success: false, code: 'not_on_shift' as const, status: current }
-    }
-    if (current.onLunch) {
-      logAttendanceDebug('register:blocked', {
-        empleadoId,
-        tipo,
-        canal,
-        code: 'on_lunch',
-        current,
-      })
-      return { success: false, code: 'on_lunch' as const, status: current }
-    }
-  }
-
-  await db.insert(schema.empleadoAsistencia).values({
-    empleadoId,
-    tipo,
-    timestamp: new Date(),
-    canal,
-    nota,
-  }).run()
-  logAttendanceDebug('register:event_inserted', {
-    empleadoId,
-    tipo,
-    canal,
-  })
+    const assignedLocal = tipo === 'entrada'
+      ? await resolveAttendanceAssignedLocal(empleadoId, new Date())
+      : null
 
   await syncLegacyAttendanceMirror({
     empleadoId,
     tipo,
     canal,
     nota,
+    localAsignado: assignedLocal?.sector ?? null,
+    statusBeforeChange: current,
   })
 
-  const status = await getEmpleadoAttendanceStatus(empleadoId)
-  logAttendanceDebug('register:success', {
-    empleadoId,
-    tipo,
-    canal,
-    status,
-  })
+    const status = await getEmpleadoAttendanceStatus(empleadoId)
+    logAttendanceDebug('register:success', {
+      empleadoId,
+      tipo,
+      canal,
+      status,
+    })
 
-  return {
-    success: true,
-    code: 'ok' as const,
-    status,
-  }
+    return {
+      success: true,
+      code: 'ok' as const,
+      status,
+    }
+  })
 }
 
 export async function createManualAttendanceEvent({
@@ -1161,12 +1253,29 @@ export async function getEmpleadoActivoById(id: number) {
 export async function getEmpleadoByWaId(waNumber: string) {
   const normalized = waNumber.replace(/\D/g, '')
   const rows = await db.select().from(schema.empleados).where(eq(schema.empleados.activo, true))
-  return rows.find(e => {
+  const matches = rows.filter(e => {
     if (!e.waId) return false
     const stored = e.waId.replace(/\D/g, '')
     // Match exact OR if incoming number ends with stored (handles missing country code)
     return normalized === stored || normalized.endsWith(stored)
-  }) ?? null
+  })
+
+  if (matches.length === 0) return null
+
+  matches.sort((left, right) => {
+    const score = (empleado: typeof matches[number]) => {
+      let total = 0
+      if ((empleado as any).puedeVender) total += 4
+      if ((empleado as any).puedeGastronomia) total += 3
+      if ((empleado as any).tipoEmpleado === 'gastronomia') total += 2
+      if ((empleado as any).sector && (empleado as any).sector !== 'operativo') total += 1
+      return total
+    }
+
+    return score(right) - score(left)
+  })
+
+  return matches[0] ?? null
 }
 export async function getJornadaActivaEmpleado(empleadoId: number) {
   const rows = await db.select().from(schema.marcacionesEmpleados).where(eq(schema.marcacionesEmpleados.empleadoId, empleadoId))
@@ -1955,14 +2064,27 @@ export async function clearCobranzaLista() {
 }
 
 // --- BOT QUEUE ---
-export async function enqueueBotMessage(waNumber: string, message: string) {
+export async function enqueueBotMessage(waNumber: string, message: string, scheduledAt?: Date) {
   const normalized = normalizeWaNumber(waNumber)
   if (!normalized) return null
-  const rows = await db.insert(schema.botQueue).values({ waNumber: normalized, message }).returning({ id: schema.botQueue.id })
+  const rows = await db.insert(schema.botQueue).values({
+    waNumber: normalized,
+    message,
+    ...(scheduledAt ? { scheduledAt } : {}),
+  } as any).returning({ id: schema.botQueue.id })
   return rows[0]?.id ?? null
 }
 export async function getPendingBotMessages() {
-  return db.select().from(schema.botQueue).where(eq(schema.botQueue.status, 'pending'))
+  const now = new Date()
+  return db.select().from(schema.botQueue).where(
+    and(
+      eq(schema.botQueue.status, 'pending'),
+      or(
+        isNull(schema.botQueue.scheduledAt),
+        lte(schema.botQueue.scheduledAt, now),
+      ),
+    ),
+  )
 }
 export async function markBotMessageSent(id: number) {
   await db.update(schema.botQueue).set({ status: 'sent' }).where(eq(schema.botQueue.id, id)).run()
@@ -2540,9 +2662,16 @@ export async function notifySupervisor(item: {
 }
 
 // --- LEADS ---
-export async function crearLead(data: typeof schema.leads.$inferInsert): Promise<number> {
-  const rows = await db.insert(schema.leads).values(data).returning({ id: schema.leads.id })
-  return rows[0].id
+export async function crearLead(data: typeof schema.leads.$inferInsert): Promise<{ id: number; created: boolean }> {
+  const normalized = normalizeLeadInsert(data)
+  const existing = await findReusableLeadForContact(normalized)
+  if (existing) {
+    await actualizarLead(existing.id, buildLeadDuplicateUpdate(existing, normalized))
+    return { id: existing.id, created: false }
+  }
+
+  const rows = await db.insert(schema.leads).values(normalized).returning({ id: schema.leads.id })
+  return { id: rows[0].id, created: true }
 }
 export async function getLeads(filters?: { estado?: string }) {
   const q = db.select().from(schema.leads)
@@ -2611,8 +2740,77 @@ export async function updateLeadFollowup(id: number, newCount: number) {
 }
 
 export async function getLeadByWaId(waId: string) {
-  const rows = await db.select().from(schema.leads).where(eq(schema.leads.waId, waId)).limit(1)
-  return rows[0] ?? null
+  const normalized = normalizeWaNumber(waId)
+  if (!normalized) return null
+  const rows = await db.select().from(schema.leads)
+  return rows.find((lead) => {
+    const stored = normalizeWaNumber(lead.waId)
+    return stored === normalized
+  }) ?? null
+}
+
+function normalizeLeadInsert(data: typeof schema.leads.$inferInsert): typeof schema.leads.$inferInsert {
+  return {
+    ...data,
+    telefono: normalizeWaNumber(data.telefono ?? undefined) || data.telefono || null,
+    waId: normalizeWaNumber(data.waId ?? undefined) || null,
+  }
+}
+
+async function findReusableLeadForContact(data: typeof schema.leads.$inferInsert) {
+  const waId = normalizeWaNumber(data.waId ?? undefined)
+  const telefono = normalizeWaNumber(data.telefono ?? undefined)
+  const candidates = new Set([waId, telefono].filter(Boolean))
+  if (candidates.size === 0) return null
+
+  const rows = await db.select().from(schema.leads)
+  return rows
+    .filter((lead) => !['cerrado', 'descartado'].includes(lead.estado))
+    .filter((lead) => {
+      const leadWa = normalizeWaNumber(lead.waId)
+      const leadPhone = normalizeWaNumber(lead.telefono)
+      return (!!leadWa && candidates.has(leadWa)) || (!!leadPhone && candidates.has(leadPhone))
+    })
+    .sort((left, right) => toMs(right.updatedAt ?? right.createdAt) - toMs(left.updatedAt ?? left.createdAt))[0] ?? null
+}
+
+function buildLeadDuplicateUpdate(
+  existing: schema.Lead,
+  incoming: typeof schema.leads.$inferInsert,
+): Partial<typeof schema.leads.$inferInsert> {
+  return {
+    nombre: pickLeadValue(existing.nombre, incoming.nombre, { preferIncomingPlaceholderReplacement: true }),
+    telefono: pickLeadValue(existing.telefono, incoming.telefono),
+    email: pickLeadValue(existing.email, incoming.email),
+    waId: pickLeadValue(existing.waId, incoming.waId),
+    rubro: pickLeadValue(existing.rubro, incoming.rubro),
+    tipoLocal: pickLeadValue(existing.tipoLocal, incoming.tipoLocal),
+    mensaje: pickLeadValue(existing.mensaje, incoming.mensaje),
+    turnoFecha: pickLeadValue(existing.turnoFecha, incoming.turnoFecha),
+    turnoHora: pickLeadValue(existing.turnoHora, incoming.turnoHora),
+    fuente: incoming.fuente ?? existing.fuente,
+    score: incoming.score ?? existing.score,
+    temperature: incoming.temperature ?? existing.temperature,
+    lastBotMsgAt: incoming.lastBotMsgAt ?? existing.lastBotMsgAt,
+  }
+}
+
+function pickLeadValue<T>(
+  current: T | null | undefined,
+  incoming: T | null | undefined,
+  options?: { preferIncomingPlaceholderReplacement?: boolean },
+) {
+  if (incoming === undefined || incoming === null || incoming === '') return current ?? undefined
+  if (options?.preferIncomingPlaceholderReplacement && isLeadPlaceholderName(current) && !isLeadPlaceholderName(incoming)) {
+    return incoming
+  }
+  return incoming
+}
+
+function isLeadPlaceholderName(value: unknown) {
+  if (typeof value !== 'string') return false
+  const normalized = value.trim().toLowerCase()
+  return normalized === '' || normalized === 'sin nombre'
 }
 
 export async function flagLeadNeedsAttention(leadId: number, intent: string) {
@@ -3107,6 +3305,8 @@ async function syncLegacyAttendanceMirror(params: {
   tipo: AttendanceAction
   canal: 'whatsapp' | 'panel' | 'manual_admin'
   nota?: string
+  localAsignado?: string | null
+  statusBeforeChange?: Awaited<ReturnType<typeof getEmpleadoAttendanceStatus>>
 }) {
   if (params.tipo === 'inicio_almuerzo' || params.tipo === 'fin_almuerzo') return
 
@@ -3117,17 +3317,39 @@ async function syncLegacyAttendanceMirror(params: {
 
   if (params.tipo === 'entrada') {
     if (open) {
-      logAttendanceDebug('legacy_sync:skip_open_exists', {
-        empleadoId: params.empleadoId,
-        tipo: params.tipo,
-        canal: params.canal,
-        openId: open.id,
-      })
-      return
+      if (params.statusBeforeChange && !params.statusBeforeChange.onShift) {
+        const closeAt = params.statusBeforeChange.lastExitAt ?? new Date(open.entradaAt as any)
+        const entradaMs = new Date(open.entradaAt as any).getTime()
+        const closeMs = closeAt.getTime()
+        const duracionSegundos = Math.max(0, Math.floor((closeMs - entradaMs) / 1000))
+        await db.update(schema.marcacionesEmpleados).set({
+          salidaAt: closeAt,
+          duracionSegundos,
+          notaSalida: open.notaSalida ?? 'Auto-cierre por reconciliacion de asistencia',
+          updatedAt: new Date(),
+        } as any).where(eq(schema.marcacionesEmpleados.id, open.id)).run()
+        logAttendanceDebug('legacy_sync:auto_closed_stale_open', {
+          empleadoId: params.empleadoId,
+          tipo: params.tipo,
+          canal: params.canal,
+          openId: open.id,
+          closeAt: closeAt.toISOString(),
+          duracionSegundos,
+        })
+      } else {
+        logAttendanceDebug('legacy_sync:skip_open_exists', {
+          empleadoId: params.empleadoId,
+          tipo: params.tipo,
+          canal: params.canal,
+          openId: open.id,
+        })
+        return
+      }
     }
     await db.insert(schema.marcacionesEmpleados).values({
       empleadoId: params.empleadoId,
       entradaAt: new Date(),
+      localAsignado: params.localAsignado ?? null,
       fuente: mapAttendanceChannelToLegacyFuente(params.canal),
       notaEntrada: params.nota?.trim() || null,
     } as any).run()
@@ -3329,7 +3551,7 @@ export async function getMarcacionesGastronomia(sector: string | undefined, year
   const endDate = new Date(year, month, 1)
 
   const employees = await getEmpleadosGastronomia(sector)
-  if (employees.length === 0) return { employees: [], events: [] }
+  if (employees.length === 0) return { employees: [], events: [], statusesByEmployee: {} }
 
   const empleadoIds = employees.map(e => e.id)
 
@@ -3344,7 +3566,15 @@ export async function getMarcacionesGastronomia(sector: string | undefined, year
     )
     .orderBy(schema.empleadoAsistencia.timestamp)
 
-  return { employees, events }
+  const statuses = await Promise.all(
+    employees.map(async (employee) => [employee.id, await getEmpleadoAttendanceStatus(employee.id)] as const)
+  )
+
+  return {
+    employees,
+    events,
+    statusesByEmployee: Object.fromEntries(statuses),
+  }
 }
 
 export async function getLiquidacionGastronomia(sector: string | undefined, year: number, month: number) {
@@ -3436,6 +3666,52 @@ export async function deletePlanificacionTurnoGastronomia(id: number) {
     .run()
 }
 
+function getBuenosAiresDateKey(value: Date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value)
+}
+
+function getGastronomiaSectorLabel(sector?: string | null) {
+  if (!sector) return ''
+  return SECTOR_LABELS[sector as keyof typeof SECTOR_LABELS] ?? sector
+}
+
+async function resolveAttendanceAssignedLocal(empleadoId: number, referenceDate: Date) {
+  const fecha = getBuenosAiresDateKey(referenceDate)
+  const plannedRows = await db.select({
+    sector: schema.gastronomiaPlanificacionTurnos.sector,
+  })
+    .from(schema.gastronomiaPlanificacionTurnos)
+    .where(and(
+      eq(schema.gastronomiaPlanificacionTurnos.empleadoId, empleadoId),
+      eq(schema.gastronomiaPlanificacionTurnos.fecha, fecha),
+      eq(schema.gastronomiaPlanificacionTurnos.trabaja, true),
+    ))
+
+  const planned = plannedRows[0]
+  if (planned?.sector) {
+    return {
+      sector: planned.sector,
+      label: getGastronomiaSectorLabel(planned.sector),
+    }
+  }
+
+  const empleado = await getEmpleadoById(empleadoId)
+  const fallbackSector = (empleado as any)?.sector
+  if (fallbackSector && fallbackSector !== 'operativo') {
+    return {
+      sector: fallbackSector,
+      label: getGastronomiaSectorLabel(fallbackSector),
+    }
+  }
+
+  return null
+}
+
 function formatPlanificacionFecha(fecha: string) {
   const [year, month, day] = fecha.split('-').map(Number)
   const date = new Date(year, (month ?? 1) - 1, day ?? 1)
@@ -3473,18 +3749,126 @@ function buildPlanificacionBotMessage(turno: typeof schema.gastronomiaPlanificac
     turno.puesto ? `👤 *Rol:* ${turno.puesto}` : null,
     turno.nota ? `📝 *Nota:* ${turno.nota}` : null,
     ``,
-    `👇 *Confirmá tu disponibilidad tocando o respondiendo:*`,
+    `👇 *Confirmá tu disponibilidad:*`,
     ``,
-    `╭──────────────╮`,
-    `│ 1 ✅ Confirmo asistencia │`,
-    `╰──────────────╯`,
-    `╭──────────────╮`,
-    `│ 2 ❌ No puedo trabajar  │`,
-    `╰──────────────╯`,
+    `1. Confirmo asistencia`,
+    `2. No puedo trabajar`,
     ``,
-    `Si WhatsApp no muestra botones, escribí *Confirmo asistencia* o *No puedo trabajar*.`,
+    `Si WhatsApp no muestra los botones, respondé *Confirmo asistencia* o *No puedo trabajar*.`,
     `Turno #${turno.id}`,
   ].filter(Boolean).join('\n')
+}
+
+function buildPlanificacionWeeklyBotMessage(turnos: Array<typeof schema.gastronomiaPlanificacionTurnos.$inferSelect>) {
+  const sorted = [...turnos].sort((a, b) => {
+    const dateCompare = String(a.fecha).localeCompare(String(b.fecha))
+    if (dateCompare !== 0) return dateCompare
+    return a.id - b.id
+  })
+  const first = sorted[0]
+  const workingTurnos = sorted.filter(turno => turno.trabaja)
+
+  return [
+    `🍽️ *Docks | Planificación semanal*`,
+    ``,
+    `Hola *${first?.empleadoNombre ?? 'equipo'}*, ¿cómo estás?`,
+    `Te compartimos tu planificación de la semana:`,
+    ``,
+    ...sorted.map(turno => {
+      const local = SECTOR_LABELS[(turno.sector as keyof typeof SECTOR_LABELS)] ?? turno.sector
+      const base = `• Turno #${turno.id} | ${formatPlanificacionFecha(turno.fecha)}`
+      if (!turno.trabaja) {
+        return `${base} | *Franco / no trabaja*`
+      }
+      return [
+        `${base}`,
+        `  📍 ${local}`,
+        `  🕐 ${turno.horaEntrada} a ${turno.horaSalida}`,
+        turno.puesto ? `  👤 ${turno.puesto}` : null,
+        turno.nota ? `  📝 ${turno.nota}` : null,
+      ].filter(Boolean).join('\n')
+    }),
+    ``,
+    workingTurnos.length > 0
+      ? `Respondé *CONFIRMO <número>* o *NO <número>* para cada turno que necesite respuesta.`
+      : `Esta planificación no requiere confirmación.`,
+    workingTurnos.length > 0
+      ? `Ejemplo: *CONFIRMO ${workingTurnos[0]?.id}*`
+      : null,
+  ].filter(Boolean).join('\n')
+}
+
+function parsePlanificacionDateKey(fecha: string) {
+  const [year, month, day] = fecha.split('-').map(Number)
+  return new Date(year, (month ?? 1) - 1, day ?? 1)
+}
+
+function getPlanificacionWeekStart(fecha: string) {
+  const date = parsePlanificacionDateKey(fecha)
+  const day = date.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  date.setDate(date.getDate() + diff)
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+function formatPlanificacionDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getPlanificacionWeekBounds(fecha: string) {
+  const start = getPlanificacionWeekStart(fecha)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 7)
+  return {
+    start: formatPlanificacionDateKey(start),
+    end: formatPlanificacionDateKey(end),
+  }
+}
+
+async function upsertPendingPlanificacionMessage(
+  waNumber: string,
+  turnos: Array<typeof schema.gastronomiaPlanificacionTurnos.$inferSelect>,
+) {
+  const message = turnos.length === 1
+    ? buildPlanificacionBotMessage(turnos[0]!)
+    : buildPlanificacionWeeklyBotMessage(turnos)
+  const turnoMarkers = turnos.map(turno => `Turno #${turno.id}`)
+  const pendingRows = await db.select()
+    .from(schema.botQueue)
+    .where(and(
+      eq(schema.botQueue.waNumber, normalizeWaNumber(waNumber)),
+      eq(schema.botQueue.status, 'pending'),
+    ))
+
+  const matchingRows = pendingRows.filter(row => {
+    const body = String(row.message ?? '')
+    return body.includes('Planificación semanal')
+      && turnoMarkers.some(marker => body.includes(marker))
+  })
+
+  if (matchingRows.length === 0) {
+    await enqueueBotMessage(waNumber, message)
+    return
+  }
+
+  const keeper = matchingRows.sort((a, b) => a.id - b.id)[0]!
+  await db.update(schema.botQueue)
+    .set({ message } as any)
+    .where(eq(schema.botQueue.id, keeper.id))
+    .run()
+
+  const duplicateIds = matchingRows
+    .slice(1)
+    .map(row => row.id)
+  if (duplicateIds.length > 0) {
+    await db.delete(schema.botQueue)
+      .where(inArray(schema.botQueue.id, duplicateIds))
+      .run()
+  }
 }
 
 const SECTOR_LABELS: Record<string, string> = {
@@ -3505,20 +3889,61 @@ export async function publishPlanificacionGastronomia(ids: number[]) {
 
   let published = 0
   let skipped = 0
+  const grouped = new Map<string, Array<typeof schema.gastronomiaPlanificacionTurnos.$inferSelect>>()
+
   for (const turno of turnos) {
     if (!turno.empleadoWaId) {
       skipped++
       continue
     }
-    await enqueueBotMessage(turno.empleadoWaId, buildPlanificacionBotMessage(turno))
-    await db.update(schema.gastronomiaPlanificacionTurnos)
-      .set({
-        estado: turno.trabaja ? 'enviado' : 'confirmado',
-        publicadoAt: new Date(),
-        updatedAt: new Date(),
-      } as any)
-      .where(eq(schema.gastronomiaPlanificacionTurnos.id, turno.id))
-      .run()
+    const key = `${turno.empleadoId}:${turno.empleadoWaId}`
+    const existing = grouped.get(key) ?? []
+    existing.push(turno)
+    grouped.set(key, existing)
+  }
+
+  const weekGrouped = new Map<string, Array<typeof schema.gastronomiaPlanificacionTurnos.$inferSelect>>()
+  for (const employeeTurnos of grouped.values()) {
+    for (const turno of employeeTurnos) {
+      const weekStart = getPlanificacionWeekBounds(turno.fecha).start
+      const key = `${turno.empleadoId}:${turno.empleadoWaId}:${weekStart}`
+      const existing = weekGrouped.get(key) ?? []
+      existing.push(turno)
+      weekGrouped.set(key, existing)
+    }
+  }
+
+  for (const employeeTurnos of weekGrouped.values()) {
+    const waId = employeeTurnos[0]?.empleadoWaId
+    if (!waId) continue
+    const bounds = getPlanificacionWeekBounds(employeeTurnos[0]!.fecha)
+    const weekRows = await db.select()
+      .from(schema.gastronomiaPlanificacionTurnos)
+      .where(and(
+        eq(schema.gastronomiaPlanificacionTurnos.empleadoId, employeeTurnos[0]!.empleadoId),
+        gte(schema.gastronomiaPlanificacionTurnos.fecha, bounds.start),
+        lt(schema.gastronomiaPlanificacionTurnos.fecha, bounds.end),
+      ))
+    const selectedIds = new Set(employeeTurnos.map(turno => turno.id))
+    const messageTurnos = weekRows.filter(turno => selectedIds.has(turno.id) || turno.publicadoAt)
+    const dedupedMessageTurnos = [...messageTurnos].sort((a, b) => {
+      const dateCompare = String(a.fecha).localeCompare(String(b.fecha))
+      if (dateCompare !== 0) return dateCompare
+      return a.id - b.id
+    })
+
+    await upsertPendingPlanificacionMessage(waId, dedupedMessageTurnos)
+
+    for (const turno of employeeTurnos) {
+      await db.update(schema.gastronomiaPlanificacionTurnos)
+        .set({
+          estado: turno.trabaja ? 'enviado' : 'confirmado',
+          publicadoAt: new Date(),
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(schema.gastronomiaPlanificacionTurnos.id, turno.id))
+        .run()
+    }
     published++
   }
   return { published, skipped }
@@ -3558,8 +3983,103 @@ export async function getPendingPlanificacionForEmpleado(empleadoId: number) {
     .from(schema.gastronomiaPlanificacionTurnos)
     .where(and(
       eq(schema.gastronomiaPlanificacionTurnos.empleadoId, empleadoId),
-      eq(schema.gastronomiaPlanificacionTurnos.estado, 'enviado'),
+      inArray(schema.gastronomiaPlanificacionTurnos.estado, ['enviado', 'sin_respuesta']),
       gte(schema.gastronomiaPlanificacionTurnos.fecha, todayKey),
     ))
     .orderBy(schema.gastronomiaPlanificacionTurnos.fecha)
+}
+
+export async function resetPlanificacionConfirmacionesGastronomia(params: {
+  sector: string
+  desde: string
+  hasta: string
+  actorUserId?: number | null
+  actorNombre: string
+}) {
+  const conditions = and(
+    eq(schema.gastronomiaPlanificacionTurnos.sector, params.sector),
+    gte(schema.gastronomiaPlanificacionTurnos.fecha, params.desde),
+    lt(schema.gastronomiaPlanificacionTurnos.fecha, params.hasta),
+  )
+
+  const rows = await db.select({ id: schema.gastronomiaPlanificacionTurnos.id })
+    .from(schema.gastronomiaPlanificacionTurnos)
+    .where(conditions)
+
+  if (rows.length === 0) {
+    return { reset: 0 }
+  }
+
+  await db.update(schema.gastronomiaPlanificacionTurnos)
+    .set({
+      estado: 'borrador',
+      publicadoAt: null,
+      respondidoAt: null,
+      respuestaNota: null,
+      updatedAt: new Date(),
+    } as any)
+    .where(conditions)
+    .run()
+
+  await db.insert(schema.gastronomiaPlanificacionAuditoria)
+    .values({
+      tipo: 'reset_confirmaciones',
+      sector: params.sector,
+      desde: params.desde,
+      hasta: params.hasta,
+      affectedCount: rows.length,
+      actorUserId: params.actorUserId ?? null,
+      actorNombre: params.actorNombre,
+    } as any)
+    .run()
+
+  return { reset: rows.length }
+}
+
+export async function clearPlanificacionSemanaGastronomia(params: {
+  sector: string
+  desde: string
+  hasta: string
+  scope: 'rechazados' | 'semana_completa'
+  actorUserId?: number | null
+  actorNombre: string
+}) {
+  const conditions = [
+    eq(schema.gastronomiaPlanificacionTurnos.sector, params.sector),
+    gte(schema.gastronomiaPlanificacionTurnos.fecha, params.desde),
+    lt(schema.gastronomiaPlanificacionTurnos.fecha, params.hasta),
+  ]
+
+  if (params.scope === 'rechazados') {
+    conditions.push(eq(schema.gastronomiaPlanificacionTurnos.estado, 'no_trabaja'))
+  }
+
+  const where = and(...conditions)
+  const rows = await db.select({
+    id: schema.gastronomiaPlanificacionTurnos.id,
+  })
+    .from(schema.gastronomiaPlanificacionTurnos)
+    .where(where)
+
+  if (rows.length === 0) {
+    return { cleared: 0, scope: params.scope }
+  }
+
+  await db.delete(schema.gastronomiaPlanificacionTurnos)
+    .where(where)
+    .run()
+
+  await db.insert(schema.gastronomiaPlanificacionAuditoria)
+    .values({
+      tipo: params.scope === 'rechazados' ? 'clear_rechazados' : 'clear_semana_completa',
+      sector: params.sector,
+      desde: params.desde,
+      hasta: params.hasta,
+      affectedCount: rows.length,
+      actorUserId: params.actorUserId ?? null,
+      actorNombre: params.actorNombre,
+    } as any)
+    .run()
+
+  return { cleared: rows.length, scope: params.scope }
 }
