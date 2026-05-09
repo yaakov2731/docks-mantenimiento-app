@@ -371,7 +371,20 @@ export function parsePlanificacionResponse(input: string): { turnoId?: number; r
 async function handlePlanificacionBotResponse(session: BotSession, input: string): Promise<string | null> {
   if (session.userType !== ('gastronomia' as any)) return null
   const parsed = parsePlanificacionResponse(input)
-  if (!parsed) return null
+  if (!parsed) {
+    const pending = await getPendingPlanificacionForEmpleado(session.userId)
+    if (pending.length > 0) {
+      const turno = pending[0]!
+      return [
+        `No entendí tu respuesta para el turno #${turno.id}.`,
+        ``,
+        `Respondé:`,
+        `1 ✅ Confirmo`,
+        `2 ❌ No puedo`,
+      ].join('\n')
+    }
+    return null
+  }
 
   console.log('[bot/gastronomia/planificacion] parsed', {
     empleadoId: session.userId,
