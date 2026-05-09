@@ -498,6 +498,7 @@ export async function initDb() {
     `ALTER TABLE leads ADD COLUMN needs_attention_at INTEGER`,
     `ALTER TABLE empleados ADD COLUMN puede_gastronomia INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE marcaciones_empleados ADD COLUMN local_asignado TEXT`,
+    `ALTER TABLE bot_queue ADD COLUMN scheduled_at INTEGER`,
   ]
   for (const sql of alterStmts) {
     try {
