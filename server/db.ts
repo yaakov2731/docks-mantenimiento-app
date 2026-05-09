@@ -212,7 +212,8 @@ export async function initDb() {
       error_msg TEXT,
       last_attempt_at INTEGER,
       priority INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      scheduled_at INTEGER
     )`,
     `CREATE TABLE IF NOT EXISTS bot_heartbeat (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
