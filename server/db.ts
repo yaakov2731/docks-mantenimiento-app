@@ -3823,45 +3823,51 @@ function getPlanificacionWeekBounds(fecha: string) {
   }
 }
 
-async function upsertPendingPlanificacionMessage(
+async function enqueuePlanificacionMessages(
   waNumber: string,
   turnos: Array<typeof schema.gastronomiaPlanificacionTurnos.$inferSelect>,
 ) {
-  const message = turnos.length === 1
-    ? buildPlanificacionBotMessage(turnos[0]!)
-    : buildPlanificacionWeeklyBotMessage(turnos)
-  const turnoMarkers = turnos.map(turno => `Turno #${turno.id}`)
+  const normalized = normalizeWaNumber(waNumber)
+  if (!normalized) return
+
   const pendingRows = await db.select()
     .from(schema.botQueue)
     .where(and(
-      eq(schema.botQueue.waNumber, normalizeWaNumber(waNumber)),
+      eq(schema.botQueue.waNumber, normalized),
       eq(schema.botQueue.status, 'pending'),
     ))
-
-  const matchingRows = pendingRows.filter(row => {
+  const planificacionRows = pendingRows.filter(row => {
     const body = String(row.message ?? '')
-    return body.includes('Planificación semanal')
-      && turnoMarkers.some(marker => body.includes(marker))
+    return body.includes('Docks | Planificación') || body.includes('Docks | Confirmar turno')
   })
+  if (planificacionRows.length > 0) {
+    await db.delete(schema.botQueue)
+      .where(inArray(schema.botQueue.id, planificacionRows.map(r => r.id)))
+      .run()
+  }
 
-  if (matchingRows.length === 0) {
-    await enqueueBotMessage(waNumber, message)
+  const sorted = [...turnos].sort((a, b) => {
+    const dateCompare = String(a.fecha).localeCompare(String(b.fecha))
+    if (dateCompare !== 0) return dateCompare
+    return a.id - b.id
+  })
+  const workingTurnos = sorted.filter(t => t.trabaja)
+  const now = new Date()
+
+  if (workingTurnos.length === 0) {
+    await enqueueBotMessage(waNumber, buildPlanificacionSummaryMessage(sorted))
     return
   }
 
-  const keeper = matchingRows.sort((a, b) => a.id - b.id)[0]!
-  await db.update(schema.botQueue)
-    .set({ message } as any)
-    .where(eq(schema.botQueue.id, keeper.id))
-    .run()
+  if (workingTurnos.length === 1 && sorted.length === 1) {
+    await enqueueBotMessage(waNumber, buildPlanificacionBotMessage(workingTurnos[0]!))
+    return
+  }
 
-  const duplicateIds = matchingRows
-    .slice(1)
-    .map(row => row.id)
-  if (duplicateIds.length > 0) {
-    await db.delete(schema.botQueue)
-      .where(inArray(schema.botQueue.id, duplicateIds))
-      .run()
+  await enqueueBotMessage(waNumber, buildPlanificacionSummaryMessage(sorted))
+  for (let i = 0; i < workingTurnos.length; i++) {
+    const delay = new Date(now.getTime() + (i + 1) * 5000)
+    await enqueueBotMessage(waNumber, buildPlanificacionBotMessage(workingTurnos[i]!), delay)
   }
 }
 
@@ -3926,7 +3932,7 @@ export async function publishPlanificacionGastronomia(ids: number[]) {
       return a.id - b.id
     })
 
-    await upsertPendingPlanificacionMessage(waId, dedupedMessageTurnos)
+    await enqueuePlanificacionMessages(waId, dedupedMessageTurnos)
 
     for (const turno of employeeTurnos) {
       await db.update(schema.gastronomiaPlanificacionTurnos)
