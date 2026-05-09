@@ -241,21 +241,29 @@ function normalizePlanificacionInput(input: string) {
 
 function parsePlanificacionResponse(input: string): { turnoId?: number; respuesta: 'confirmado' | 'no_trabaja'; planningSpecific: boolean } | null {
   const normalized = normalizePlanificacionInput(input)
-  const explicit = normalized.match(/^(confirmo|confirmar|si|s|no|no puedo|no trabajo|no puedo trabajar)\s+#?(\d+)$/i)
+  const explicit = normalized.match(/^(confirmo|confirmar|si|s|ok|dale|no|no puedo|no trabajo|no puedo trabajar|cancelar|rechazo)\s+#?(\d+)$/i)
   if (explicit) {
     return {
       turnoId: Number(explicit[2]),
-      respuesta: explicit[1].toLowerCase().startsWith('no') ? 'no_trabaja' : 'confirmado',
+      respuesta: ['no', 'no puedo', 'no trabajo', 'no puedo trabajar', 'cancelar', 'rechazo'].includes(explicit[1].toLowerCase()) ? 'no_trabaja' : 'confirmado',
       planningSpecific: true,
     }
   }
-  if (['1'].includes(normalized)) return { respuesta: 'confirmado', planningSpecific: false }
-  if (['2'].includes(normalized)) return { respuesta: 'no_trabaja', planningSpecific: false }
+  const positiveButtonLike = normalized.match(/^1\s*(confirmo|confirmar|si|ok|dale|asistencia confirmada|confirmo asistencia|confirmo mi asistencia|confirmo turno|confirmo el turno)/i)
+  if (positiveButtonLike) {
+    return { respuesta: 'confirmado', planningSpecific: true }
+  }
+  const negativeButtonLike = normalized.match(/^2\s*(no|no puedo|no trabajo|no puedo trabajar|cancelar|rechazo|no voy|no voy a poder)/i)
+  if (negativeButtonLike) {
+    return { respuesta: 'no_trabaja', planningSpecific: true }
+  }
   if ([
     'confirmo',
     'confirmar',
     'si',
     's',
+    'ok',
+    'dale',
     'confirmo asistencia',
     'confirmar asistencia',
     'confirmo mi asistencia',
@@ -269,6 +277,8 @@ function parsePlanificacionResponse(input: string): { turnoId?: number; respuest
     'no trabajo',
     'no puedo trabajar',
     'no puedo asistir',
+    'cancelar',
+    'rechazo',
     'no voy',
     'no voy a poder',
   ].includes(normalized)) return { respuesta: 'no_trabaja', planningSpecific: true }
@@ -280,7 +290,19 @@ async function handlePlanificacionBotResponse(session: BotSession, input: string
   const parsed = parsePlanificacionResponse(input)
   if (!parsed) return null
 
+  console.log('[bot/gastronomia/planificacion] parsed', {
+    empleadoId: session.userId,
+    userName: session.userName,
+    input,
+    parsed,
+  })
+
   const pending = await getPendingPlanificacionForEmpleado(session.userId)
+  console.log('[bot/gastronomia/planificacion] pending', {
+    empleadoId: session.userId,
+    pendingIds: pending.map((item: any) => item.id),
+    count: pending.length,
+  })
   const turno = parsed.turnoId
     ? pending.find((item: any) => item.id === parsed.turnoId)
     : pending.length === 1
@@ -317,6 +339,12 @@ async function handlePlanificacionBotResponse(session: BotSession, input: string
     turnoId: turno.id,
     empleadoId: session.userId,
     respuesta: parsed.respuesta,
+  })
+  console.log('[bot/gastronomia/planificacion] updated', {
+    empleadoId: session.userId,
+    turnoId: turno.id,
+    respuesta: parsed.respuesta,
+    updated: !!updated,
   })
   if (!updated) return `No pude registrar la respuesta. Probá de nuevo o avisale al encargado.`
 

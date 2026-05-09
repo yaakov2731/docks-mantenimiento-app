@@ -40,10 +40,10 @@ export function buildGastronomiaMenu(sector: string, userName: string): string {
     `🍽️ *Asistencia Gastronomía — ${userName}*`,
     `📍 Local: ${localLabel}`,
     SEP,
-    `1️⃣  📍 Entrada`,
-    `2️⃣  🏁 Salida`,
-    `3️⃣  🍽️ Inicio almuerzo`,
-    `4️⃣  ↩️  Fin almuerzo`,
+    `1️⃣  REGISTRAR ENTRADA`,
+    `2️⃣  REGISTRAR SALIDA`,
+    `3️⃣ Iniciar almuerzo`,
+    `4️⃣ Finalizar almuerzo`,
     SEP,
     `0️⃣  Volver`,
   ].join('\n')
@@ -95,21 +95,43 @@ export async function handleGastronomia(session: BotSession, input: string): Pro
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires',
   })
 
-  // Fire-and-forget: la planilla real de sueldos lee Asistencia_App.
-  writeAsistenciaAppRow({
-    sector: session.contextData?.sector as string | null | undefined,
+  const syncResult = await writeAsistenciaAppRow({
+    sector: result.status?.assignedSector ?? session.contextData?.sector as string | null | undefined,
     empleadoNombre: session.userName,
     puesto: session.contextData?.puesto as string | null | undefined,
     canal: 'whatsapp',
     status: result.status,
-  }).catch(console.error)
+  })
 
   const label = LABEL_MAP[accion]
+  if (!syncResult.ok) {
+    console.warn('[bot/gastronomia] attendance:sheet_partial', {
+      empleadoId: session.userId,
+      userName: session.userName,
+      accion,
+      sheetCode: syncResult.code,
+      sheetMessage: syncResult.message ?? null,
+    })
+
+    return [
+      `✅ *${label} registrada en la app*`,
+      ``,
+      `${session.userName} — *${ahora}*`,
+      result.status?.assignedLocalLabel ? `🏢 Local asignado: *${result.status.assignedLocalLabel}*` : '',
+      `⚠️ La sincronización con la planilla quedó pendiente.`,
+      `Si necesitás validarlo ahora, avisale al encargado.`,
+      ``,
+      `0️⃣  Volver`,
+    ].filter(Boolean).join('\n')
+  }
+
   return [
     `✅ *${label} registrada*`,
     ``,
     `${session.userName} — *${ahora}*`,
+    result.status?.assignedLocalLabel ? `🏢 Local asignado: *${result.status.assignedLocalLabel}*` : '',
+    `🧾 También quedó sincronizada en la planilla.`,
     ``,
     `0️⃣  Volver`,
-  ].join('\n')
+  ].filter(Boolean).join('\n')
 }
