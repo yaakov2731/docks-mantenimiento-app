@@ -153,12 +153,25 @@ export const gastronomiaPlanificacionTurnos = sqliteTable('gastronomia_planifica
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
 })
 
+export const gastronomiaPlanificacionAuditoria = sqliteTable('gastronomia_planificacion_auditoria', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tipo: text('tipo', { enum: ['reset_confirmaciones'] }).notNull(),
+  sector: text('sector').notNull(),
+  desde: text('desde').notNull(),
+  hasta: text('hasta').notNull(),
+  affectedCount: integer('affected_count').notNull().default(0),
+  actorUserId: integer('actor_user_id'),
+  actorNombre: text('actor_nombre').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
 export const marcacionesEmpleados = sqliteTable('marcaciones_empleados', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   empleadoId: integer('empleado_id').notNull(),
   entradaAt: integer('entrada_at', { mode: 'timestamp' }).notNull(),
   salidaAt: integer('salida_at', { mode: 'timestamp' }),
   duracionSegundos: integer('duracion_segundos'),
+  localAsignado: text('local_asignado'),
   fuente: text('fuente', { enum: ['whatsapp', 'panel', 'otro'] }).default('whatsapp').notNull(),
   notaEntrada: text('nota_entrada'),
   notaSalida: text('nota_salida'),
@@ -221,6 +234,7 @@ export const botQueue = sqliteTable('bot_queue', {
   // Heartbeat tracking (para saber si el bot sigue conectado)
   priority: integer('priority').default(0).notNull(), // 0=normal, 1=alta, 2=urgente
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+  scheduledAt: integer('scheduled_at', { mode: 'timestamp' }),
 })
 
 export const locatariosCobranza = sqliteTable('locatarios_cobranza', {
