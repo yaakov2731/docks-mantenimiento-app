@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { router, publicProcedure, protectedProcedure, JWT_COOKIE, JWT_SECRET } from './_core/trpc'
@@ -480,15 +480,18 @@ async function replaceLiquidacionClosure(params: {
   const summary = await buildAttendanceSummary(params)
   const period = summary.periodo
 
-  for (const empleado of summary.empleados) {
+  const empleadoIds = summary.empleados.map(e => e.empleadoId)
+
+  if (empleadoIds.length > 0) {
     await database.db.delete(schema.empleadoLiquidacionCierre).where(and(
-      eq(schema.empleadoLiquidacionCierre.empleadoId, empleado.empleadoId),
+      inArray(schema.empleadoLiquidacionCierre.empleadoId, empleadoIds),
       eq(schema.empleadoLiquidacionCierre.periodoTipo, params.periodo),
       eq(schema.empleadoLiquidacionCierre.periodoDesde, period.desde),
       eq(schema.empleadoLiquidacionCierre.periodoHasta, period.hasta),
     )).run()
 
-    await database.db.insert(schema.empleadoLiquidacionCierre).values({
+    const now = new Date()
+    const values = summary.empleados.map(empleado => ({
       empleadoId: empleado.empleadoId,
       periodoTipo: params.periodo,
       periodoDesde: period.desde,
@@ -505,11 +508,13 @@ async function replaceLiquidacionClosure(params: {
       totalPagar: empleado.liquidacion?.totalPagar ?? 0,
       cerradoPorId: params.admin.id,
       cerradoPorNombre: params.admin.name,
-      closedAt: new Date(),
+      closedAt: now,
       pagadoAt: null,
       pagadoPorId: null,
       pagadoPorNombre: null,
-    }).run()
+    }))
+
+    await database.db.insert(schema.empleadoLiquidacionCierre).values(values).run()
   }
 
   return { success: true, closed: summary.empleados.length }
