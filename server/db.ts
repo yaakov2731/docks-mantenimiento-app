@@ -3723,79 +3723,73 @@ function formatPlanificacionFecha(fecha: string) {
   })
 }
 
+function formatPlanificacionFechaCorta(fecha: string) {
+  const [year, month, day] = fecha.split('-').map(Number)
+  const date = new Date(year, (month ?? 1) - 1, day ?? 1)
+  const weekday = date.toLocaleDateString('es-AR', {
+    weekday: 'short',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  })
+  const capitalized = weekday.charAt(0).toUpperCase() + weekday.slice(1)
+  return `${capitalized} ${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`
+}
+
 function buildPlanificacionBotMessage(turno: typeof schema.gastronomiaPlanificacionTurnos.$inferSelect) {
   const local = SECTOR_LABELS[(turno.sector as keyof typeof SECTOR_LABELS)] ?? turno.sector
   if (!turno.trabaja) {
     return [
-      `🍽️ *Docks | Planificación semanal*`,
+      `🍽️ *Docks | Planificación*`,
       ``,
-      `Hola *${turno.empleadoNombre}*, ¿cómo estás?`,
-      `Para el *${formatPlanificacionFecha(turno.fecha)}* figurás como *franco / no trabaja*.`,
+      `Hola *${turno.empleadoNombre}*, para el *${formatPlanificacionFecha(turno.fecha)}* figurás como *franco / no trabaja*.`,
       ``,
       `Si hubo algún cambio, escribile al encargado para revisarlo.`,
-      ``,
-      `Turno #${turno.id}`,
     ].join('\n')
   }
   return [
-    `🍽️ *Docks | Planificación semanal*`,
+    `🍽️ *Docks | Confirmar turno*`,
     ``,
-    `Hola *${turno.empleadoNombre}*, ¿cómo estás?`,
-    `Te compartimos el turno asignado para esta semana:`,
+    `📅 ${formatPlanificacionFecha(turno.fecha)}`,
+    `📍 ${local}`,
+    `🕐 ${turno.horaEntrada} a ${turno.horaSalida}`,
+    turno.puesto ? `👤 ${turno.puesto}` : null,
+    turno.nota ? `📝 ${turno.nota}` : null,
     ``,
-    `📍 *Local:* ${local}`,
-    `📅 *Día:* ${formatPlanificacionFecha(turno.fecha)}`,
-    `🕐 *Horario:* ${turno.horaEntrada} a ${turno.horaSalida}`,
-    turno.puesto ? `👤 *Rol:* ${turno.puesto}` : null,
-    turno.nota ? `📝 *Nota:* ${turno.nota}` : null,
+    `Respondé:`,
+    `1 ✅ Confirmo asistencia`,
+    `2 ❌ No puedo trabajar`,
     ``,
-    `👇 *Confirmá tu disponibilidad:*`,
-    ``,
-    `1. Confirmo asistencia`,
-    `2. No puedo trabajar`,
-    ``,
-    `Si WhatsApp no muestra los botones, respondé *Confirmo asistencia* o *No puedo trabajar*.`,
     `Turno #${turno.id}`,
   ].filter(Boolean).join('\n')
 }
 
-function buildPlanificacionWeeklyBotMessage(turnos: Array<typeof schema.gastronomiaPlanificacionTurnos.$inferSelect>) {
+function buildPlanificacionSummaryMessage(turnos: Array<typeof schema.gastronomiaPlanificacionTurnos.$inferSelect>) {
   const sorted = [...turnos].sort((a, b) => {
     const dateCompare = String(a.fecha).localeCompare(String(b.fecha))
     if (dateCompare !== 0) return dateCompare
     return a.id - b.id
   })
   const first = sorted[0]
-  const workingTurnos = sorted.filter(turno => turno.trabaja)
+  const hasConfirmable = sorted.some(t => t.trabaja)
 
   return [
-    `🍽️ *Docks | Planificación semanal*`,
+    `🍽️ *Docks | Planificación*`,
     ``,
-    `Hola *${first?.empleadoNombre ?? 'equipo'}*, ¿cómo estás?`,
-    `Te compartimos tu planificación de la semana:`,
+    `Hola *${first?.empleadoNombre ?? 'equipo'}*, tenés turnos asignados:`,
     ``,
     ...sorted.map(turno => {
       const local = SECTOR_LABELS[(turno.sector as keyof typeof SECTOR_LABELS)] ?? turno.sector
-      const base = `• Turno #${turno.id} | ${formatPlanificacionFecha(turno.fecha)}`
       if (!turno.trabaja) {
-        return `${base} | *Franco / no trabaja*`
+        return `📅 ${formatPlanificacionFechaCorta(turno.fecha)} → *Franco*`
       }
-      return [
-        `${base}`,
-        `  📍 ${local}`,
-        `  🕐 ${turno.horaEntrada} a ${turno.horaSalida}`,
-        turno.puesto ? `  👤 ${turno.puesto}` : null,
-        turno.nota ? `  📝 ${turno.nota}` : null,
-      ].filter(Boolean).join('\n')
+      const parts = [`📅 ${formatPlanificacionFechaCorta(turno.fecha)} → ${local} | ${turno.horaEntrada} a ${turno.horaSalida}`]
+      if (turno.nota) parts[0] += ` (${turno.nota})`
+      return parts[0]
     }),
     ``,
-    workingTurnos.length > 0
-      ? `Respondé *CONFIRMO <número>* o *NO <número>* para cada turno que necesite respuesta.`
+    hasConfirmable
+      ? `En unos segundos te llegan para confirmar. 👇`
       : `Esta planificación no requiere confirmación.`,
-    workingTurnos.length > 0
-      ? `Ejemplo: *CONFIRMO ${workingTurnos[0]?.id}*`
-      : null,
-  ].filter(Boolean).join('\n')
+  ].join('\n')
 }
 
 function parsePlanificacionDateKey(fecha: string) {
