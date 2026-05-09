@@ -14,7 +14,7 @@
  */
 
 import {
-  getSession, createSession, navigateBack, resetToMain,
+  getSession, createSession, navigateBack, resetToMain, deleteSession,
   isSessionExpired, updateSession, navigateTo,
   type BotSession, type UserType,
 } from './session'
@@ -168,7 +168,76 @@ function buildEmpleadoModoSelectorMenu(userName: string): string {
     SEP,
     `1️⃣  🔧 Mantenimiento`,
     `2️⃣  🍽️ Gastronomía`,
+    `3️⃣  🕐 Elegir asistencia`,
+    SEP,
+    `0️⃣  Volver`,
   ].join('\n')
+}
+
+function buildDualAttendanceSelectorMenu(userName: string, gastroSector?: string): string {
+  const gastroLabel = gastroSector && gastroSector !== 'operativo'
+    ? `Gastronomía (${gastroSector})`
+    : 'Gastronomía'
+
+  return [
+    `🕐 *Asistencias — ${userName}*`,
+    `Elegí qué asistencia querés registrar:`,
+    SEP,
+    `1️⃣  🔧 Mantenimiento / Shopping`,
+    `2️⃣  🍽️ ${gastroLabel}`,
+    SEP,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
+function isDualEmployeeSession(session: Pick<BotSession, 'userType' | 'contextData'>): boolean {
+  return session.userType === 'employee' && session.contextData?.puedeGastronomia === true
+}
+
+function shouldRefreshIdentifiedSession(
+  session: BotSession,
+  identifiedUser: Awaited<ReturnType<typeof identifyUser>> | null,
+): boolean {
+  if (!identifiedUser) return false
+  if (session.userType !== identifiedUser.userType) return true
+  if (session.userId !== identifiedUser.userId) return true
+
+  if (session.userType === 'employee') {
+    const identifiedContext = (identifiedUser as any).contextData ?? {}
+    const identifiedCanUseGastro = identifiedContext.puedeGastronomia === true
+    if (identifiedCanUseGastro && session.contextData?.puedeGastronomia !== true) return true
+    if (
+      identifiedCanUseGastro &&
+      identifiedContext.gastroSector &&
+      session.contextData?.gastroSector !== identifiedContext.gastroSector
+    ) {
+      return true
+    }
+  }
+
+  if (session.userType === ('gastronomia' as any)) {
+    const identifiedContext = (identifiedUser as any).contextData ?? {}
+    if (identifiedContext.sector && session.contextData?.sector !== identifiedContext.sector) return true
+  }
+
+  return false
+}
+
+async function resetSessionHome(session: BotSession): Promise<BotSession> {
+  const resetSession = await resetToMain(session)
+  if (!isDualEmployeeSession(resetSession)) return resetSession
+
+  await updateSession(resetSession.waNumber, {
+    currentMenu: 'empleado_modo_selector',
+    contextData: resetSession.contextData,
+    menuHistory: [],
+  })
+
+  return {
+    ...resetSession,
+    currentMenu: 'empleado_modo_selector',
+    menuHistory: [],
+  }
 }
 
 const MSG_NO_REGISTRADO = [
@@ -206,6 +275,18 @@ async function identifyUser(waNumber: string): Promise<{ userType: UserType; use
     if (empleado.puedeVender) {
       return { userType: 'sales', userId: empleado.id, userName: empleado.nombre }
     }
+    if ((empleado as any).puedeGastronomia) {
+      return {
+        userType: 'employee',
+        userId: empleado.id,
+        userName: empleado.nombre,
+        contextData: {
+          puedeGastronomia: true,
+          gastroSector: (empleado as any).sector ?? '',
+          baseTipoEmpleado: (empleado as any).tipoEmpleado ?? 'operativo',
+        },
+      } as any
+    }
     if ((empleado as any).tipoEmpleado === 'gastronomia') {
       return {
         userType: 'gastronomia' as any,
@@ -239,7 +320,7 @@ function normalizePlanificacionInput(input: string) {
     .trim()
 }
 
-function parsePlanificacionResponse(input: string): { turnoId?: number; respuesta: 'confirmado' | 'no_trabaja'; planningSpecific: boolean } | null {
+export function parsePlanificacionResponse(input: string): { turnoId?: number; respuesta: 'confirmado' | 'no_trabaja'; planningSpecific: boolean } | null {
   const normalized = normalizePlanificacionInput(input)
   const explicit = normalized.match(/^(confirmo|confirmar|si|s|ok|dale|no|no puedo|no trabajo|no puedo trabajar|cancelar|rechazo)\s+#?(\d+)$/i)
   if (explicit) {
@@ -257,6 +338,8 @@ function parsePlanificacionResponse(input: string): { turnoId?: number; respuest
   if (negativeButtonLike) {
     return { respuesta: 'no_trabaja', planningSpecific: true }
   }
+  if (normalized === '1') return { respuesta: 'confirmado', planningSpecific: true }
+  if (normalized === '2') return { respuesta: 'no_trabaja', planningSpecific: true }
   if ([
     'confirmo',
     'confirmar',
@@ -382,10 +465,24 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
 
   // Obtener sesión existente
   let session = await getSession(normalized)
+  let identifiedUser = null as Awaited<ReturnType<typeof identifyUser>>
+
+  // Si un número quedó con una sesión vieja pero hoy corresponde a otra identidad
+  // o capacidades (por ejemplo, dual/gastronomía), se reidentifica y regenera.
+  if (session) {
+    identifiedUser = await identifyUser(waNumber)
+    const shouldRefresh =
+      (session.userType === 'public' && !!identifiedUser) ||
+      shouldRefreshIdentifiedSession(session, identifiedUser)
+    if (shouldRefresh) {
+      await deleteSession(normalized)
+      session = null
+    }
+  }
 
   // Sin sesión → identificar usuario y crear
   if (!session) {
-    const user = await identifyUser(waNumber)
+    const user = identifiedUser ?? await identifyUser(waNumber)
 
     if (!user) {
       // Usuario no registrado → menú comercial público
@@ -446,7 +543,7 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
 
   // Timeout → resetear y mostrar menú
   if (isSessionExpired(session)) {
-    session = await resetToMain(session)
+    session = await resetSessionHome(session)
     // For public users, re-check if they are a lead with follow-ups
     if (session.userType === 'public') {
       const existingLead = await getLeadByWaId(normalized)
@@ -472,15 +569,15 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
   if (maybePlanResponse) return maybePlanResponse
 
   if (['menu', 'menú', 'inicio', 'start', 'hola', 'hi'].includes(msgLower)) {
-    session = await resetToMain(session)
-    return buildMainMenu(session)
+    session = await resetSessionHome(session)
+    return buildMenuDisplay(session, session.currentMenu)
   }
   if (msgLower === 'ayuda' || msgLower === 'help') {
     return buildHelpMessage(session.userType)
   }
   // Para usuarios públicos en el wizard, "cancelar" en cualquier paso vuelve al inicio
   if (session.userType === 'public' && session.currentMenu !== 'main' && msgLower === 'cancelar') {
-    session = await resetToMain(session)
+    session = await resetSessionHome(session)
     return buildPublicMainMenu()
   }
 
@@ -508,6 +605,10 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
 
   // ── EMPLEADO ─────────────────────────────────────────────────────────────────
   if (userType === 'employee') {
+    if (canInterruptEmployeeMenuWithAttendance(currentMenu) && isAttendanceShortcut(input)) {
+      const attendanceSession = await navigateTo(session, 'asistencia', {})
+      return handleAsistencia(attendanceSession, input)
+    }
 
     // Selector mantenimiento / gastronomía para empleados duales
     if (currentMenu === 'empleado_modo_selector') {
@@ -519,12 +620,16 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
       if (input === '2') {
         const gastroSector = contextData?.gastroSector as string ?? ''
         if (gastroSector && gastroSector !== 'operativo') {
-          await navigateTo(session, 'admin_gastro', { sector: gastroSector })
+          await navigateTo(session, 'employee_gastro', { sector: gastroSector })
           return buildGastronomiaMenu(gastroSector, session.userName)
         }
-        await navigateTo(session, 'admin_gastro_sector', {})
-        return buildAdminGastroSectorMenu()
+        return `⚠️ No tenés un local de gastronomía asignado.\n\n${buildEmpleadoModoSelectorMenu(session.userName)}`
       }
+      if (input === '3') {
+        await navigateTo(session, 'dual_asistencia_selector', { gastroSector: contextData?.gastroSector ?? '' })
+        return buildDualAttendanceSelectorMenu(session.userName, contextData?.gastroSector as string | undefined)
+      }
+      if (input === '0') return buildHelpMessage('employee')
       return buildEmpleadoModoSelectorMenu(session.userName)
     }
 
@@ -538,6 +643,10 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
       if (input === '2') { await navigateTo(session, 'tareas_lista', { page: 1 }); return buildTareasLista({ ...session, currentMenu: 'tareas_lista', contextData: { page: 1 } }) }
       if (input === '3') { await navigateTo(session, 'asistencia', {}); return buildAsistenciaMenu({ ...session, currentMenu: 'asistencia' }) }
       if (input === '4') { await navigateTo(session, 'rondas_lista', { page: 1 }); return buildRondasLista({ ...session, currentMenu: 'rondas_lista', contextData: { page: 1 } }) }
+      if (input === '5' && contextData?.puedeGastronomia) {
+        await navigateTo(session, 'empleado_modo_selector', { gastroSector: contextData?.gastroSector ?? '' })
+        return buildEmpleadoModoSelectorMenu(session.userName)
+      }
       if (input === '0') return buildHelpMessage('employee')
       return invalidMenuOption(await buildEmployeeMainMenu(session))
     }
@@ -556,6 +665,25 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'tarea_nota_libre') return handleNotaLibre(session, input)
 
     if (currentMenu === 'asistencia') return handleAsistencia(session, input)
+    if (currentMenu === 'dual_asistencia_selector') {
+      if (input === '1') {
+        await navigateTo(session, 'asistencia', {})
+        return buildAsistenciaMenu({ ...session, currentMenu: 'asistencia' })
+      }
+      if (input === '2') {
+        const gastroSector = contextData?.gastroSector as string ?? ''
+        if (gastroSector && gastroSector !== 'operativo') {
+          await navigateTo(session, 'employee_gastro', { sector: gastroSector })
+          return buildGastronomiaMenu(gastroSector, session.userName)
+        }
+        return `⚠️ No tenés un local de gastronomía asignado.\n\n${buildDualAttendanceSelectorMenu(session.userName)}`
+      }
+      if (input === '0') return null
+      return buildDualAttendanceSelectorMenu(session.userName, contextData?.gastroSector as string | undefined)
+    }
+    if (currentMenu === 'employee_gastro') {
+      return handleGastronomia({ ...session, contextData: { ...session.contextData, sector: session.contextData?.sector ?? session.contextData?.gastroSector ?? '' } }, input)
+    }
 
     if (currentMenu === 'rondas_lista') return handleRondasLista(session, input)
     if (currentMenu === 'ronda_detalle') return handleRondaDetalle(session, input)
@@ -743,19 +871,25 @@ async function buildMainMenu(session: BotSession): Promise<string> {
   return buildSalesMainMenu(session)
 }
 
-async function buildMenuDisplay(session: BotSession, menuName: string): Promise<string> {
+  async function buildMenuDisplay(session: BotSession, menuName: string): Promise<string> {
   // Reconstruir la vista del menú al que se volvió
   const { userType, contextData } = session
 
   if (menuName === 'main') return buildMainMenu(session)
 
-  if (userType === 'employee') {
-    if (menuName === 'tarea_actual')   return buildTareaActual(session)
-    if (menuName === 'tareas_lista')   return buildTareasLista(session)
-    if (menuName === 'tarea_detalle')  return buildTareaDetalle(session)
-    if (menuName === 'asistencia')     return buildAsistenciaMenu(session)
-    if (menuName === 'rondas_lista')   return buildRondasLista(session)
-  }
+    if (userType === 'employee') {
+      if (menuName === 'empleado_modo_selector') return buildEmpleadoModoSelectorMenu(session.userName)
+      if (menuName === 'tarea_actual')   return buildTareaActual(session)
+      if (menuName === 'tareas_lista')   return buildTareasLista(session)
+      if (menuName === 'tarea_detalle')  return buildTareaDetalle(session)
+      if (menuName === 'asistencia')     return buildAsistenciaMenu(session)
+      if (menuName === 'dual_asistencia_selector') return buildDualAttendanceSelectorMenu(session.userName, session.contextData?.gastroSector as string | undefined)
+      if (menuName === 'employee_gastro') {
+        const sector = session.contextData?.sector as string ?? session.contextData?.gastroSector as string ?? ''
+        return buildGastronomiaMenu(sector, session.userName)
+      }
+      if (menuName === 'rondas_lista')   return buildRondasLista(session)
+    }
 
   if (userType === 'admin') {
     if (menuName === 'admin_reclamos_home') return buildAdminReclamosMenu(session)
@@ -874,6 +1008,19 @@ function isAttendanceShortcut(input: string): boolean {
     'ver resumen',
     'resumen',
   ].some(pattern => normalized === pattern || normalized.includes(pattern))
+}
+
+function canInterruptEmployeeMenuWithAttendance(currentMenu: string): boolean {
+  return [
+    'main',
+    'tarea_actual',
+    'tareas_lista',
+    'tarea_detalle',
+    'asistencia',
+    'dual_asistencia_selector',
+    'rondas_lista',
+    'ronda_detalle',
+  ].includes(currentMenu)
 }
 
 function normalizeBotText(input: string): string {
