@@ -20,6 +20,11 @@ const app = express()
 const PORT = process.env.PORT ?? 3001
 const isProd = process.env.NODE_ENV === 'production'
 
+// Railway injects X-Forwarded-For; trust the edge proxy so rate limits key on the real client IP.
+if (isProd) {
+  app.set('trust proxy', 1)
+}
+
 // Security headers
 app.use(helmet({
   contentSecurityPolicy: false, // Vite assets tienen hashes dinámicos
