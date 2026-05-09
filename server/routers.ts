@@ -17,7 +17,7 @@ import {
   getUsers, getSalesUsers, getUserById, createPanelUser, updateUserPassword, deactivateUser, updateUserWhatsapp,
   crearReporte, getReportes, getReporteById, actualizarReporte, eliminarReporte, getEstadisticas,
   crearActualizacion, getActualizacionesByReporte,
-  getEmpleados, crearEmpleado, actualizarEmpleado, getEmpleadoById, getEmpleadoActivoById,
+  getEmpleados, crearEmpleado, actualizarEmpleado, getEmpleadoById, getEmpleadosByIds, getEmpleadoActivoById,
   buildAttendanceTurns,
   ATTENDANCE_ACTIONS, getEmpleadoAttendanceStatus, getEmpleadoAttendanceEvents, registerEmpleadoAttendance,
   createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado,
@@ -1194,13 +1194,16 @@ export const appRouter = router({
             .filter((id): id is number => typeof id === 'number')
         )]
 
+        const fetchedEmployees = await getEmpleadosByIds(employeeIds)
         const empleadosById = new Map<number, Awaited<ReturnType<typeof getEmpleadoById>>>()
-        for (const empleadoId of employeeIds) {
-          const empleado = await getEmpleadoById(empleadoId)
-          if (!empleado) {
-            throw new TRPCError({ code: 'NOT_FOUND', message: `Empleado ${empleadoId} no encontrado` })
+        for (const emp of fetchedEmployees) {
+          empleadosById.set(emp.id, emp)
+        }
+
+        for (const id of employeeIds) {
+          if (!empleadosById.has(id)) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: `Empleado ${id} no encontrado` })
           }
-          empleadosById.set(empleadoId, empleado)
         }
 
         const orderByEmployee = new Map<string, number>()

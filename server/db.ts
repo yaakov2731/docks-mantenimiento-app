@@ -1153,6 +1153,10 @@ export async function getEmpleadoById(id: number) {
   const rows = await db.select().from(schema.empleados).where(eq(schema.empleados.id, id))
   return rows[0] ?? null
 }
+export async function getEmpleadosByIds(ids: number[]) {
+  if (ids.length === 0) return []
+  return db.select().from(schema.empleados).where(inArray(schema.empleados.id, ids))
+}
 export async function getEmpleadoActivoById(id: number) {
   const empleado = await getEmpleadoById(id)
   if (!empleado || empleado.activo === false) return null
