@@ -44,7 +44,6 @@ describe('getEmpleadosGastronomia', () => {
       sector: 'uno_grill',
       puesto: 'Parrilla',
       pagoDiario: 1000,
-      puedeGastronomia: true,
     })
 
     const empleado = await getEmpleadoByWaId('5491138210373')
