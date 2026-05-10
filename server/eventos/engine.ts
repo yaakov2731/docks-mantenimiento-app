@@ -5,8 +5,7 @@ import {
 } from './session'
 import {
   buildEventosWelcome, buildEventosMainMenu, buildEventosHelp,
-  buildUbicacionInfo, buildServiciosInfo, buildHorariosInfo,
-  buildPaquetesInfo, buildGaleriaInfo,
+  buildUbicacionInfo,
   buildSalirMessage, DSEP,
 } from './menus/bienvenida'
 import {
@@ -191,36 +190,20 @@ async function routeMessage(session: EventosSession, input: string): Promise<str
         return buildConsultaP1()
       }
       if (input === '2') {
-        await navigateTo(session, 'paquetes', {})
-        return buildPaquetesInfo()
-      }
-      if (input === '3') {
         await navigateTo(session, 'consulta_p1', { pendingText: true, seguimientoIntent: 'visita' })
         return buildConsultaP1()
       }
-      if (input === '4') {
-        await navigateTo(session, 'galeria', {})
-        return buildGaleriaInfo()
-      }
-      if (input === '5') {
+      if (input === '3') {
         await navigateTo(session, 'ubicacion', {})
         return buildUbicacionInfo()
-      }
-      if (input === '6') {
-        await navigateTo(session, 'horarios', {})
-        return buildHorariosInfo()
       }
       if (input === '0') {
         return buildSalirMessage()
       }
-      return `❓ *Opción no válida.* Ingresá el número de la opción:\n\n${buildEventosMainMenu()}`
+      return `❓ Opción no válida.\n\n${buildEventosMainMenu()}`
     }
 
-    case 'ubicacion':
-    case 'servicios':
-    case 'horarios':
-    case 'paquetes':
-    case 'galeria': {
+    case 'ubicacion': {
       if (input === '0') {
         await resetToMain(session)
         return buildEventosMainMenu()
@@ -229,7 +212,7 @@ async function routeMessage(session: EventosSession, input: string): Promise<str
         await navigateTo(session, 'consulta_p1', { pendingText: true })
         return buildConsultaP1()
       }
-      if (input === '3') {
+      if (input === '2') {
         await navigateTo(session, 'consulta_p1', { pendingText: true, seguimientoIntent: 'visita' })
         return buildConsultaP1()
       }
