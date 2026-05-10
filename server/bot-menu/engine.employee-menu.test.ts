@@ -5,6 +5,7 @@ const sessionMock = vi.hoisted(() => ({
   getSession: vi.fn(),
   createSession: vi.fn(),
   navigateBack: vi.fn(),
+  deleteSession: vi.fn(),
   resetToMain: vi.fn(),
   isSessionExpired: vi.fn(),
   updateSession: vi.fn(),
@@ -35,9 +36,15 @@ const employeeTasksMock = vi.hoisted(() => ({
   handleNotaLibre: vi.fn(async () => 'handled free note'),
 }))
 
+const gastroMock = vi.hoisted(() => ({
+  buildGastronomiaMenu: vi.fn(() => 'gastro menu'),
+  handleGastronomia: vi.fn(async () => 'handled gastro'),
+}))
+
 vi.mock('./session', () => sessionMock)
 vi.mock('./menus/main', () => mainMenuMock)
 vi.mock('./menus/employee/tareas', () => employeeTasksMock)
+vi.mock('./menus/gastronomia/handler', () => gastroMock)
 vi.mock('./menus/employee/asistencia', () => ({
   buildAsistenciaMenu: vi.fn(async () => 'attendance menu'),
   handleAsistencia: vi.fn(async () => 'handled attendance'),
@@ -159,6 +166,7 @@ vi.mock('../db', () => ({
 }))
 
 import { handleIncomingMessage } from './engine'
+import { getEmpleadoByWaId, getUsers } from '../db'
 
 function employeeSession(currentMenu = 'main'): BotSession {
   return {
@@ -175,12 +183,36 @@ function employeeSession(currentMenu = 'main'): BotSession {
   }
 }
 
+function dualEmployeeSession(currentMenu = 'main'): BotSession {
+  return {
+    ...employeeSession(currentMenu),
+    contextData: {
+      puedeGastronomia: true,
+      gastroSector: 'brooklyn',
+    },
+  }
+}
+
 describe('employee current-task-first routing', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     sessionMock.getSession.mockResolvedValue(employeeSession())
+    sessionMock.createSession.mockImplementation(async ({ waNumber, userType, userId, userName }: any) => ({
+      ...employeeSession(),
+      waNumber,
+      userType,
+      userId,
+      userName,
+    }))
     sessionMock.isSessionExpired.mockReturnValue(false)
     sessionMock.updateSession.mockResolvedValue(undefined)
+    vi.mocked(getUsers).mockResolvedValue([])
+    vi.mocked(getEmpleadoByWaId).mockResolvedValue(null)
+    sessionMock.resetToMain.mockImplementation(async (session: BotSession) => ({
+      ...session,
+      currentMenu: 'main',
+      menuHistory: [],
+    }))
     sessionMock.navigateTo.mockImplementation(async (session: BotSession, menu: string, contextData = {}) => ({
       ...session,
       currentMenu: menu,
@@ -213,9 +245,102 @@ describe('employee current-task-first routing', () => {
     expect(sessionMock.navigateTo).toHaveBeenCalledWith(expect.any(Object), 'asistencia', {})
   })
 
+  it('routes direct attendance text from a safe employee submenu', async () => {
+    sessionMock.getSession.mockResolvedValue(employeeSession('tarea_detalle'))
+
+    await expect(handleIncomingMessage('5491111111111', 'entrada')).resolves.toBe('handled attendance')
+
+    expect(sessionMock.navigateTo).toHaveBeenCalledWith(expect.any(Object), 'asistencia', {})
+  })
+
   it('keeps rounds on option 4', async () => {
     await expect(handleIncomingMessage('5491111111111', '4')).resolves.toBe('rounds list')
 
     expect(sessionMock.navigateTo).toHaveBeenCalledWith(expect.any(Object), 'rondas_lista', { page: 1 })
+  })
+
+  it('opens the dual mode selector from option 5 for employees with gastronomy access', async () => {
+    sessionMock.getSession.mockResolvedValue(dualEmployeeSession())
+
+    const result = await handleIncomingMessage('5491111111111', '5')
+
+    expect(sessionMock.navigateTo).toHaveBeenCalledWith(expect.any(Object), 'empleado_modo_selector', { gastroSector: 'brooklyn' })
+    expect(result).toContain('¿Qué menú necesitás hoy?')
+    expect(result).toContain('Mantenimiento')
+    expect(result).toContain('Gastronomía')
+  })
+
+  it('routes dual selector option 1 to regular attendance', async () => {
+    sessionMock.getSession.mockResolvedValue(dualEmployeeSession('dual_asistencia_selector'))
+
+    await expect(handleIncomingMessage('5491111111111', '1')).resolves.toBe('attendance menu')
+
+    expect(sessionMock.navigateTo).toHaveBeenCalledWith(expect.any(Object), 'asistencia', {})
+  })
+
+  it('routes dual selector option 2 to gastronomia attendance', async () => {
+    sessionMock.getSession.mockResolvedValue(dualEmployeeSession('dual_asistencia_selector'))
+
+    await expect(handleIncomingMessage('5491111111111', '2')).resolves.toBe('gastro menu')
+
+    expect(sessionMock.navigateTo).toHaveBeenCalledWith(expect.any(Object), 'employee_gastro', { sector: 'brooklyn' })
+    expect(gastroMock.buildGastronomiaMenu).toHaveBeenCalledWith('brooklyn', 'Diego')
+  })
+
+  it('returns dual employees to the mode selector on menu reset', async () => {
+    sessionMock.getSession.mockResolvedValue(dualEmployeeSession('tarea_detalle'))
+    sessionMock.resetToMain.mockImplementation(async (session: BotSession) => ({
+      ...session,
+      currentMenu: 'main',
+      contextData: dualEmployeeSession().contextData,
+      menuHistory: [],
+    }))
+
+    const result = await handleIncomingMessage('5491111111111', 'menu')
+
+    expect(sessionMock.updateSession).toHaveBeenCalledWith('5491111111111', {
+      currentMenu: 'empleado_modo_selector',
+      contextData: dualEmployeeSession().contextData,
+      menuHistory: [],
+    })
+    expect(result).toContain('¿Qué menú necesitás hoy?')
+  })
+
+  it('reidentifies a stale maintenance session when the same number now resolves to a dual gastronomy employee', async () => {
+    sessionMock.getSession.mockResolvedValue({
+      ...employeeSession('asistencia'),
+      waNumber: '5491138210373',
+      userId: 9,
+      userName: 'Marcos Enriques',
+      contextData: {},
+    })
+    vi.mocked(getEmpleadoByWaId).mockResolvedValue({
+      id: 38,
+      nombre: 'MARCOS',
+      waId: '5491138210373',
+      tipoEmpleado: 'gastronomia',
+      sector: 'uno_grill',
+      puedeGastronomia: true,
+    } as any)
+
+    const result = await handleIncomingMessage('5491138210373', 'hola')
+
+    expect(sessionMock.deleteSession).toHaveBeenCalledWith('5491138210373')
+    expect(sessionMock.createSession).toHaveBeenCalledWith({
+      waNumber: '5491138210373',
+      userType: 'employee',
+      userId: 38,
+      userName: 'MARCOS',
+    })
+    expect(sessionMock.updateSession).toHaveBeenCalledWith('5491138210373', {
+      currentMenu: 'empleado_modo_selector',
+      contextData: {
+        puedeGastronomia: true,
+        gastroSector: 'uno_grill',
+        baseTipoEmpleado: 'gastronomia',
+      },
+    })
+    expect(result).toContain('¿Qué menú necesitás hoy?')
+    expect(result).toContain('Gastronomía')
   })
 })

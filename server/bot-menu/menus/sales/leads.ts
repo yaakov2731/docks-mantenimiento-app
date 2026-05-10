@@ -323,7 +323,7 @@ export async function handleNuevoLeadConfirmar(session: BotSession, input: strin
 
   const { leadNombre, leadTelefono, leadRubro, leadMensaje } = session.contextData
 
-  const id = await crearLead({
+  const { id, created } = await crearLead({
     nombre: leadNombre as string,
     telefono: leadTelefono as string ?? null,
     rubro: leadRubro as string ?? null,
@@ -333,10 +333,12 @@ export async function handleNuevoLeadConfirmar(session: BotSession, input: strin
     fuente: 'whatsapp',
   } as any)
 
-  notifyOwner({
-    title: `Nuevo lead — ${leadNombre}`,
-    content: `Registrado por ${session.userName}. Rubro: ${leadRubro ?? '—'}`,
-  }).catch(console.error)
+  if (created) {
+    notifyOwner({
+      title: `Nuevo lead — ${leadNombre}`,
+      content: `Registrado por ${session.userName}. Rubro: ${leadRubro ?? '—'}`,
+    }).catch(console.error)
+  }
 
   await navigateTo(session, 'sales_leads', { page: 1 })
   return [

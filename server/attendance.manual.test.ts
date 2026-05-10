@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { db, initDb, getEmpleadoAttendanceEvents, createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado, getEmpleadoAttendanceStatus, crearEmpleado, registrarEntradaEmpleado, registrarSalidaEmpleado } from './db'
+import { db, initDb, getEmpleadoAttendanceEvents, createManualAttendanceEvent, correctManualAttendanceEvent, getAttendanceAuditTrailForEmpleado, getEmpleadoAttendanceStatus, crearEmpleado, registrarEntradaEmpleado, registrarSalidaEmpleado, registerEmpleadoAttendance, buildAttendanceTurns } from './db'
 import { resetTestDb } from './test/db-factory'
 import * as schema from '../drizzle/schema'
 
@@ -78,6 +78,21 @@ describe('manual attendance support', () => {
     expect(status.lastLunchEndAt).toEqual(new Date('2026-04-10T14:45:00.000Z'))
   })
 
+  it('ignores duplicate entry events while rebuilding turns', async () => {
+    const turns = buildAttendanceTurns([
+      { tipo: 'entrada', timestamp: new Date('2026-04-10T12:00:00.000Z'), canal: 'whatsapp' },
+      { tipo: 'entrada', timestamp: new Date('2026-04-10T12:00:01.000Z'), canal: 'whatsapp' },
+      { tipo: 'inicio_almuerzo', timestamp: new Date('2026-04-10T14:00:00.000Z'), canal: 'whatsapp' },
+      { tipo: 'fin_almuerzo', timestamp: new Date('2026-04-10T14:45:00.000Z'), canal: 'whatsapp' },
+      { tipo: 'salida', timestamp: new Date('2026-04-10T18:00:00.000Z'), canal: 'whatsapp' },
+    ], new Date('2026-04-10T18:00:00.000Z').getTime())
+
+    expect(turns).toHaveLength(1)
+    expect(turns[0].turnoAbierto).toBe(false)
+    expect(turns[0].lunchSeconds).toBe(2700)
+    expect(turns[0].workedSeconds).toBe(18900)
+  })
+
   it('keeps legacy entry and exit functions synchronized with live attendance status', async () => {
     await crearEmpleado({ nombre: 'Juan' } as any)
 
@@ -106,6 +121,76 @@ describe('manual attendance support', () => {
     expect(status.todayExits).toBe(1)
     expect(status.workedSecondsToday).toBe(0)
     expect(status.lastShiftWorkedSeconds).toBeGreaterThan(0)
+  })
+
+  it('treats a repeated entry retry as idempotent success', async () => {
+    await crearEmpleado({ nombre: 'Juan' } as any)
+
+    const first = await registerEmpleadoAttendance(1, 'entrada', 'whatsapp')
+    const second = await registerEmpleadoAttendance(1, 'entrada', 'whatsapp')
+    const rows = await getEmpleadoAttendanceEvents(1)
+
+    expect(first.success).toBe(true)
+    expect(second.success).toBe(true)
+    expect(rows.map((row) => row.tipo)).toEqual(['entrada'])
+  })
+
+  it('treats a repeated exit retry as idempotent success', async () => {
+    await crearEmpleado({ nombre: 'Juan' } as any)
+
+    await registerEmpleadoAttendance(1, 'entrada', 'whatsapp')
+    const first = await registerEmpleadoAttendance(1, 'salida', 'whatsapp')
+    const second = await registerEmpleadoAttendance(1, 'salida', 'whatsapp')
+    const rows = await getEmpleadoAttendanceEvents(1)
+
+    expect(first.success).toBe(true)
+    expect(second.success).toBe(true)
+    expect(rows.map((row) => row.tipo)).toEqual(['entrada', 'salida'])
+  })
+
+  it('auto-closes a stale legacy open shift before mirroring a new entry', async () => {
+    await crearEmpleado({ nombre: 'Juan' } as any)
+
+    await registerEmpleadoAttendance(1, 'entrada', 'whatsapp')
+    vi.setSystemTime(new Date('2026-04-10T20:00:00.000Z'))
+    await registerEmpleadoAttendance(1, 'salida', 'whatsapp')
+
+    await db.insert(schema.marcacionesEmpleados).values({
+      empleadoId: 1,
+      entradaAt: new Date('2026-04-10T19:00:00.000Z'),
+      salidaAt: null,
+      fuente: 'whatsapp',
+      createdAt: new Date('2026-04-10T19:00:00.000Z'),
+      updatedAt: new Date('2026-04-10T19:00:00.000Z'),
+    }).run()
+
+    vi.setSystemTime(new Date('2026-04-10T21:00:00.000Z'))
+    await registerEmpleadoAttendance(1, 'entrada', 'whatsapp')
+
+    const legacyRows = await db.select().from(schema.marcacionesEmpleados).where(sql`${schema.marcacionesEmpleados.empleadoId} = 1`)
+    const staleRows = legacyRows.filter((row) => row.entradaAt?.getTime?.() === new Date('2026-04-10T19:00:00.000Z').getTime())
+    const latestOpen = legacyRows.find((row) => row.salidaAt == null && row.entradaAt?.getTime?.() === new Date('2026-04-10T21:00:00.000Z').getTime())
+
+    expect(staleRows).toHaveLength(2)
+    expect(staleRows.every((row) => row.salidaAt)).toBe(true)
+    expect(latestOpen).toBeTruthy()
+  })
+
+  it('treats lunch retries as idempotent success', async () => {
+    await crearEmpleado({ nombre: 'Juan' } as any)
+
+    await registerEmpleadoAttendance(1, 'entrada', 'whatsapp')
+    const firstLunchStart = await registerEmpleadoAttendance(1, 'inicio_almuerzo', 'whatsapp')
+    const secondLunchStart = await registerEmpleadoAttendance(1, 'inicio_almuerzo', 'whatsapp')
+    const firstLunchEnd = await registerEmpleadoAttendance(1, 'fin_almuerzo', 'whatsapp')
+    const secondLunchEnd = await registerEmpleadoAttendance(1, 'fin_almuerzo', 'whatsapp')
+    const rows = await getEmpleadoAttendanceEvents(1)
+
+    expect(firstLunchStart.success).toBe(true)
+    expect(secondLunchStart.success).toBe(true)
+    expect(firstLunchEnd.success).toBe(true)
+    expect(secondLunchEnd.success).toBe(true)
+    expect(rows.map((row) => row.tipo)).toEqual(['entrada', 'inicio_almuerzo', 'fin_almuerzo'])
   })
 
   it('rejects a future manual event', async () => {

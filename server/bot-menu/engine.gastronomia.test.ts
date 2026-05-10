@@ -7,6 +7,7 @@ const sessionMock = vi.hoisted(() => ({
   getSession: vi.fn(),
   createSession: vi.fn(),
   navigateBack: vi.fn(),
+  deleteSession: vi.fn(),
   resetToMain: vi.fn(),
   isSessionExpired: vi.fn(),
   updateSession: vi.fn(),
@@ -217,6 +218,11 @@ describe('gastronomia bot routing', () => {
     sessionMock.getSession.mockResolvedValue(null)
     sessionMock.isSessionExpired.mockReturnValue(false)
     sessionMock.updateSession.mockResolvedValue(undefined)
+    sessionMock.resetToMain.mockImplementation(async (session: BotSession) => ({
+      ...session,
+      currentMenu: 'main',
+      menuHistory: [],
+    }))
     sessionMock.navigateTo.mockImplementation(async (session: BotSession, menu: string, contextData = {}) => ({
       ...session,
       currentMenu: menu,
@@ -246,6 +252,60 @@ describe('gastronomia bot routing', () => {
   it('routes a new gastro employee to buildGastronomiaMenu on first message', async () => {
     const result = await handleIncomingMessage('5491112345678', 'hola')
 
+    expect(gastroMock.buildGastronomiaMenu).toHaveBeenCalledWith('brooklyn', 'Ana García')
+    expect(result).toBe('gastro menu')
+  })
+
+  it('routes a dual gastro employee to the employee mode selector on first message', async () => {
+    const { getEmpleadoByWaId } = await import('../db')
+    vi.mocked(getEmpleadoByWaId).mockResolvedValue({
+      id: 42,
+      nombre: 'Ana García',
+      puedeVender: false,
+      puedeGastronomia: true,
+      tipoEmpleado: 'gastronomia',
+      sector: 'brooklyn',
+      sheetsRow: 5,
+    } as any)
+    sessionMock.createSession.mockResolvedValue({
+      ...gastroSession('main'),
+      userType: 'employee',
+      contextData: {},
+    })
+
+    const result = await handleIncomingMessage('5491112345678', 'hola')
+
+    expect(sessionMock.updateSession).toHaveBeenCalledWith('5491112345678', {
+      currentMenu: 'empleado_modo_selector',
+      contextData: {
+        puedeGastronomia: true,
+        gastroSector: 'brooklyn',
+        baseTipoEmpleado: 'gastronomia',
+      },
+    })
+    expect(result).toContain('¿Qué menú necesitás hoy?')
+    expect(result).toContain('Mantenimiento')
+    expect(result).toContain('Gastronomía')
+  })
+
+  it('promotes a stale public session to the gastronomy menu when the number belongs to an employee', async () => {
+    sessionMock.getSession.mockResolvedValueOnce({
+      id: 9,
+      waNumber: '5491112345678',
+      userType: 'public',
+      userId: 0,
+      userName: 'Visitante',
+      currentMenu: 'main',
+      contextData: {},
+      menuHistory: [],
+      lastActivityAt: new Date(),
+      createdAt: new Date(),
+    } as BotSession)
+    sessionMock.createSession.mockResolvedValue(gastroSession('main'))
+
+    const result = await handleIncomingMessage('5491112345678', 'hola')
+
+    expect(sessionMock.deleteSession).toHaveBeenCalledWith('5491112345678')
     expect(gastroMock.buildGastronomiaMenu).toHaveBeenCalledWith('brooklyn', 'Ana García')
     expect(result).toBe('gastro menu')
   })

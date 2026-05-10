@@ -47,7 +47,7 @@ describe('public commercial bot menu', () => {
     vi.clearAllMocks()
     sessionMock.navigateTo.mockResolvedValue(undefined)
     sessionMock.resetToMain.mockResolvedValue(undefined)
-    dbMock.crearLead.mockResolvedValue(101)
+    dbMock.crearLead.mockResolvedValue({ id: 101, created: true })
     dbMock.getUsers.mockResolvedValue([])
   })
 
@@ -121,5 +121,25 @@ describe('public commercial bot menu', () => {
       estado: 'nuevo',
       mensaje: expect.stringContaining('Preferencia visita: Fin de semana'),
     }))
+  })
+
+  it('deduplicates admin notifications when multiple admin users share the same WhatsApp number', async () => {
+    dbMock.getUsers.mockResolvedValue([
+      { id: 1, role: 'admin', waId: '5491122233344', activo: true },
+      { id: 2, role: 'admin', waId: '+54 9 11 2223-3344', activo: true },
+      { id: 3, role: 'admin', waId: '5491199988877', activo: true },
+      { id: 4, role: 'admin', waId: '5491177776666', activo: false },
+    ])
+
+    const session = publicSession({
+      visitaNombre: 'Martin Soto',
+      visitaMarcaRubro: 'Indumentaria premium',
+    }, 'public_visita_p3')
+
+    await handlePublicVisitaP3(session, '3')
+
+    expect(dbMock.enqueueBotMessage).toHaveBeenCalledTimes(2)
+    expect(dbMock.enqueueBotMessage).toHaveBeenCalledWith('5491122233344', expect.any(String))
+    expect(dbMock.enqueueBotMessage).toHaveBeenCalledWith('5491199988877', expect.any(String))
   })
 })

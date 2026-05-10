@@ -1010,11 +1010,13 @@ botRouter.post('/lead', authBot, async (req, res) => {
     const tipoLocal = clamp(normalizeOptionalText(req.body?.tipoLocal), 200)
     const mensaje = clamp(normalizeOptionalText(req.body?.mensaje), MAX_TEXT)
     if (!nombre) return res.status(400).json({ error: 'nombre es requerido' })
-    const id = await crearLead({ nombre, telefono, email, waId, rubro, tipoLocal, mensaje, fuente: 'whatsapp' } as any)
-    notifyOwner({
-      title: `Nuevo lead WhatsApp`,
-      content: `${nombre} (${telefono || waId || 'sin contacto'}) — ${rubro || 'sin rubro'}`,
-    }).catch(console.error)
+    const { id, created } = await crearLead({ nombre, telefono, email, waId, rubro, tipoLocal, mensaje, fuente: 'whatsapp' } as any)
+    if (created) {
+      notifyOwner({
+        title: `Nuevo lead WhatsApp`,
+        content: `${nombre} (${telefono || waId || 'sin contacto'}) — ${rubro || 'sin rubro'}`,
+      }).catch(console.error)
+    }
     return res.json({ success: true, id })
   } catch {
     return res.status(500).json({ error: 'No se pudo registrar el lead' })

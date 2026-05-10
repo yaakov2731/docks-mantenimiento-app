@@ -69,7 +69,7 @@ export const RONDAS_ESTADOS = [
 ] as const
 
 export const SECTORES_GASTRONOMIA = [
-  { value: 'uno_grill', label: 'Uno Grill' },
+  { value: 'uno_grill', label: 'UMO Grill' },
   { value: 'brooklyn', label: 'Brooklyn' },
   { value: 'heladeria', label: 'Puerto Gelato / Heladería' },
   { value: 'trento_cafe', label: 'Trento Café' },

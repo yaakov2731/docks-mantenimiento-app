@@ -237,7 +237,10 @@ export default function Asistencia() {
   const { data: catalogoEmpleados = [] } = trpc.empleados.listar.useQuery()
   const selectedEmpleadoId = empleadoId ? Number(empleadoId) : undefined
 
-  const resumen = trpc.asistencia.resumen.useQuery({ periodo, empleadoId: selectedEmpleadoId, referenceDateMs: referenceMs }, { refetchInterval: 15000 })
+  const resumen = trpc.asistencia.resumen.useQuery(
+    { periodo, empleadoId: selectedEmpleadoId, referenceDateMs: referenceMs },
+    { refetchInterval: 5000, refetchOnWindowFocus: true }
+  )
   const registrar = trpc.asistencia.registrar.useMutation({
     onSuccess: async () => {
       await resumen.refetch()

@@ -33,6 +33,16 @@ function employeeSession(name = 'Diego'): BotSession {
   }
 }
 
+function dualEmployeeSession(name = 'Diego'): BotSession {
+  return {
+    ...employeeSession(name),
+    contextData: {
+      puedeGastronomia: true,
+      gastroSector: 'brooklyn',
+    },
+  }
+}
+
 describe('employee bot main menu', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -79,5 +89,11 @@ describe('employee bot main menu', () => {
     expect(menu).toContain('✅ No tenés tareas activas ahora.')
     expect(menu).toContain('1️⃣  🎯 Ver mi tarea actual')
     expect(menu).toContain('2️⃣  📋 Ver todas mis tareas')
+  })
+
+  it('adds the dual attendance option for employees with gastronomy access', async () => {
+    const menu = await buildEmployeeMainMenu(dualEmployeeSession('Diego'))
+
+    expect(menu).toContain('5️⃣  🔀 Cambiar de área')
   })
 })

@@ -51,7 +51,7 @@ describe('leads eventos', () => {
   })
 
   it('creates and retrieves lead eventos', async () => {
-    const leadId = await crearLead({
+    const { id: leadId } = await crearLead({
       nombre: 'Test Evento',
       telefono: '11 1234-5678',
       fuente: 'web',
@@ -93,5 +93,36 @@ describe('leads eventos', () => {
     const eventos = await caller.leads.eventos({ id: leadId })
     expect(eventos).toHaveLength(1)
     expect(eventos[0]).toMatchObject({ tipo: 'followup1_sent', leadId })
+  })
+
+  it('reuses the same active lead for repeated contact attempts from the same WhatsApp', async () => {
+    const caller = appRouter.createCaller(adminContext as any)
+
+    const first = await caller.leads.crear({
+      nombre: 'Lead Unico',
+      telefono: '11 4444-5555',
+      waId: '5491144445555',
+      rubro: 'Cafe',
+      fuente: 'whatsapp',
+    })
+
+    const second = await caller.leads.crear({
+      nombre: 'Lead Unico',
+      telefono: '11 4444-5555',
+      waId: '5491144445555',
+      rubro: 'Cafe',
+      mensaje: 'Consulta repetida',
+      fuente: 'whatsapp',
+    })
+
+    expect(second.id).toBe(first.id)
+
+    const leads = await db.select().from(schema.leads)
+    expect(leads).toHaveLength(1)
+    expect(leads[0]).toMatchObject({
+      id: first.id,
+      waId: '5491144445555',
+      mensaje: 'Consulta repetida',
+    })
   })
 })

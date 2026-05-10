@@ -67,6 +67,10 @@ export async function buildEmployeeMainMenu(session: BotSession): Promise<string
         `Podés revisar el historial o registrar asistencia.`,
       ]
 
+  const dualAttendanceLines = session.contextData?.puedeGastronomia
+    ? [`5️⃣  🔀 Cambiar de área`]
+    : []
+
   return [
     `👷 *${session.userName}* — Menú principal`,
     SEP,
@@ -76,6 +80,7 @@ export async function buildEmployeeMainMenu(session: BotSession): Promise<string
     `2️⃣  📋 Ver todas mis tareas`,
     `3️⃣  🕐 Registrar asistencia`,
     `4️⃣  🚻 Control de baños`,
+    ...dualAttendanceLines,
     SEP,
     `0️⃣  ❓ Ayuda`,
   ].join('\n')

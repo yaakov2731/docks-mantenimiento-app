@@ -568,6 +568,7 @@ function assertNotFutureAttendanceDate(fechaHora: Date) {
 export const ATTENDANCE_ACTIONS = ['entrada', 'inicio_almuerzo', 'fin_almuerzo', 'salida'] as const
 export type AttendanceAction = typeof ATTENDANCE_ACTIONS[number]
 const ATTENDANCE_DUPLICATE_WINDOW_MS = 15_000
+const MAX_SHIFT_DURATION_MS = 18 * 60 * 60 * 1000 // 18 hours — auto-close stale shifts
 const attendanceRegistrationTails = new Map<number, Promise<void>>()
 
 function logAttendanceDebug(message: string, payload?: Record<string, unknown>) {
@@ -704,14 +705,28 @@ export function buildAttendanceTurns(events: Array<any>, now = Date.now()) {
   }
 
   if (currentTurn) {
-    const grossSeconds = Math.max(0, Math.floor((now - currentTurn.entradaAt.getTime()) / 1000))
-    const lunchSeconds = currentTurn.lunchStartedAt
-      ? currentTurn.lunchSeconds + Math.max(0, Math.floor((now - currentTurn.lunchStartedAt.getTime()) / 1000))
-      : currentTurn.lunchSeconds
-    currentTurn.grossSeconds = grossSeconds
-    currentTurn.lunchSeconds = lunchSeconds
-    currentTurn.workedSeconds = Math.max(0, grossSeconds - lunchSeconds)
-    currentTurn.turnoAbierto = true
+    const elapsedMs = now - currentTurn.entradaAt.getTime()
+    if (elapsedMs > MAX_SHIFT_DURATION_MS) {
+      // Stale shift — auto-close at max duration
+      const autoCloseMs = currentTurn.entradaAt.getTime() + MAX_SHIFT_DURATION_MS
+      currentTurn.salidaAt = new Date(autoCloseMs)
+      currentTurn.grossSeconds = Math.floor(MAX_SHIFT_DURATION_MS / 1000)
+      if (currentTurn.lunchStartedAt) {
+        currentTurn.lunchSeconds += Math.max(0, Math.floor((autoCloseMs - currentTurn.lunchStartedAt.getTime()) / 1000))
+        currentTurn.lunchStartedAt = null
+      }
+      currentTurn.workedSeconds = Math.max(0, currentTurn.grossSeconds - currentTurn.lunchSeconds)
+      currentTurn.turnoAbierto = false
+    } else {
+      const grossSeconds = Math.max(0, Math.floor((now - currentTurn.entradaAt.getTime()) / 1000))
+      const lunchSeconds = currentTurn.lunchStartedAt
+        ? currentTurn.lunchSeconds + Math.max(0, Math.floor((now - currentTurn.lunchStartedAt.getTime()) / 1000))
+        : currentTurn.lunchSeconds
+      currentTurn.grossSeconds = grossSeconds
+      currentTurn.lunchSeconds = lunchSeconds
+      currentTurn.workedSeconds = Math.max(0, grossSeconds - lunchSeconds)
+      currentTurn.turnoAbierto = true
+    }
   }
 
   return turns.map((turn, index) => ({

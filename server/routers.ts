@@ -48,6 +48,8 @@ import {
   savePlanificacionTurnoGastronomia,
   deletePlanificacionTurnoGastronomia,
   publishPlanificacionGastronomia,
+  resetPlanificacionConfirmacionesGastronomia,
+  clearPlanificacionSemanaGastronomia,
 } from './db'
 
 const roundsService = createRoundsService(database as any)
@@ -677,6 +679,21 @@ const gastronomiaRouter = router({
       return publishPlanificacionGastronomia(input.ids)
     }),
 
+  resetPlanificacionConfirmaciones: protectedProcedure
+      .input(z.object({
+        sector: z.string().min(1),
+        desde: z.string().min(10),
+        hasta: z.string().min(10),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      assertAdmin(ctx.user)
+      return resetPlanificacionConfirmacionesGastronomia({
+        ...input,
+        actorUserId: ctx.user.id,
+        actorNombre: ctx.user.name,
+      })
+    }),
+
 })
 
 export const appRouter = router({
@@ -850,11 +867,13 @@ export const appRouter = router({
         fuente: z.enum(['whatsapp', 'web', 'otro']).default('web'),
       }))
       .mutation(async ({ input }) => {
-        const id = await crearLead(input as any)
-        notifyOwner({
-          title: `Nuevo lead de alquiler`,
-          content: `${input.nombre} (${input.telefono ?? input.email ?? 'sin contacto'}) — ${input.rubro ?? 'sin rubro'}`,
-        }).catch(console.error)
+        const { id, created } = await crearLead(input as any)
+        if (created) {
+          notifyOwner({
+            title: `Nuevo lead de alquiler`,
+            content: `${input.nombre} (${input.telefono ?? input.email ?? 'sin contacto'}) — ${input.rubro ?? 'sin rubro'}`,
+          }).catch(console.error)
+        }
         return { success: true, id }
       }),
 
@@ -1100,6 +1119,22 @@ export const appRouter = router({
             id: ctx.user.id,
             name: ctx.user.name,
           },
+        })
+      }),
+
+  clearPlanificacionSemana: protectedProcedure
+      .input(z.object({
+        sector: z.string().min(1),
+        desde: z.string().min(10),
+        hasta: z.string().min(10),
+        scope: z.enum(['rechazados', 'semana_completa']),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        assertAdmin(ctx.user)
+        return clearPlanificacionSemanaGastronomia({
+          ...input,
+          actorUserId: ctx.user.id,
+          actorNombre: ctx.user.name,
         })
       }),
 

@@ -46,6 +46,10 @@ function fmtPhone(waId: string): string {
   return `+${d}`
 }
 
+function normalizeWaForAdminNotify(waId: string): string {
+  return waId.replace(/\D/g, '')
+}
+
 function nowAr(): string {
   return new Date().toLocaleTimeString('es-AR', {
     hour: '2-digit',
@@ -486,7 +490,7 @@ export async function handlePublicAlquilerConfirmar(session: BotSession, input: 
   ].filter(Boolean).join(' | ')
 
   try {
-    const leadId = await crearLead({
+    const { id: leadId, created } = await crearLead({
       nombre,
       telefono: session.waNumber,
       waId: session.waNumber,
@@ -505,21 +509,23 @@ export async function handlePublicAlquilerConfirmar(session: BotSession, input: 
         ? `⏰ _Contactar hoy_`
         : null
 
-    await notifyAdmins([
-      `${tempEmoji[temperature]} *Nueva consulta comercial* · Score: ${score}/100`,
-      `🏢 Docks del Puerto`,
-      DSEP,
-      `👤 *${nombre}*  |  🏷️ ${marca}`,
-      `📞 ${phone}`,
-      `🏬 Rubro: ${rubro}`,
-      instagram && instagram !== 'No tiene' ? `📸 ${instagram}` : null,
-      `📐 Busca: ${tipoEspacio}`,
-      `📅 Inicio: ${desdeCuando}`,
-      seguimiento ? `📌 ${seguimiento}` : null,
-      urgencyLine,
-      DSEP,
-      `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
-    ].filter((l): l is string => !!l).join('\n'))
+    if (created) {
+      await notifyAdmins([
+        `${tempEmoji[temperature]} *Nueva consulta comercial* · Score: ${score}/100`,
+        `🏢 Docks del Puerto`,
+        DSEP,
+        `👤 *${nombre}*  |  🏷️ ${marca}`,
+        `📞 ${phone}`,
+        `🏬 Rubro: ${rubro}`,
+        instagram && instagram !== 'No tiene' ? `📸 ${instagram}` : null,
+        `📐 Busca: ${tipoEspacio}`,
+        `📅 Inicio: ${desdeCuando}`,
+        seguimiento ? `📌 ${seguimiento}` : null,
+        urgencyLine,
+        DSEP,
+        `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
+      ].filter((l): l is string => !!l).join('\n'))
+    }
 
     await navigateTo(session, 'main', {})
     return buildClosingByTemperature(temperature, nombre)
@@ -619,7 +625,7 @@ export async function handlePublicVisitaP3(session: BotSession, input: string): 
   const mensaje = [`Marca/rubro: ${marcaRubro}`, `Preferencia visita: ${horario}`].join(' | ')
 
   try {
-    const leadId = await crearLead({
+    const { id: leadId, created } = await crearLead({
       nombre,
       telefono: session.waNumber,
       waId: session.waNumber,
@@ -632,18 +638,20 @@ export async function handlePublicVisitaP3(session: BotSession, input: string): 
       lastBotMsgAt: new Date(),
     } as any)
 
-    await notifyAdmins([
-      `${tempEmoji[temperature]} *Visita solicitada* · Score: ${score}/100`,
-      `🏢 Docks del Puerto`,
-      DSEP,
-      `👤 *${nombre}*`,
-      `📞 ${phone}`,
-      `🏷️ ${marcaRubro}`,
-      `🕐 Preferencia: ${horario}`,
-      temperature === 'hot' ? `⚡ _Confirmar visita en los próximos 60 minutos_` : null,
-      DSEP,
-      `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
-    ].filter((l): l is string => !!l).join('\n'))
+    if (created) {
+      await notifyAdmins([
+        `${tempEmoji[temperature]} *Visita solicitada* · Score: ${score}/100`,
+        `🏢 Docks del Puerto`,
+        DSEP,
+        `👤 *${nombre}*`,
+        `📞 ${phone}`,
+        `🏷️ ${marcaRubro}`,
+        `🕐 Preferencia: ${horario}`,
+        temperature === 'hot' ? `⚡ _Confirmar visita en los próximos 60 minutos_` : null,
+        DSEP,
+        `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
+      ].filter((l): l is string => !!l).join('\n'))
+    }
 
     await navigateTo(session, 'main', {})
     return [
@@ -746,7 +754,7 @@ export async function handlePublicAsesorP2(session: BotSession, input: string): 
   const phone   = fmtPhone(session.waNumber)
 
   try {
-    const leadId = await crearLead({
+    const { id: leadId, created } = await crearLead({
       nombre,
       telefono: session.waNumber,
       waId: session.waNumber,
@@ -757,16 +765,18 @@ export async function handlePublicAsesorP2(session: BotSession, input: string): 
       lastBotMsgAt: new Date(),
     } as any)
 
-    await notifyAdmins([
-      `💬 *Solicitud de asesor comercial*`,
-      `🏢 Docks del Puerto`,
-      DSEP,
-      `👤 *${nombre}*`,
-      `📞 ${phone}`,
-      `💬 _"${consulta}"_`,
-      DSEP,
-      `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
-    ].join('\n'))
+    if (created) {
+      await notifyAdmins([
+        `💬 *Solicitud de asesor comercial*`,
+        `🏢 Docks del Puerto`,
+        DSEP,
+        `👤 *${nombre}*`,
+        `📞 ${phone}`,
+        `💬 _"${consulta}"_`,
+        DSEP,
+        `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
+      ].join('\n'))
+    }
 
     await navigateTo(session, 'main', {})
     return [
@@ -829,7 +839,7 @@ export async function handlePublicReclamoP2(session: BotSession, input: string):
   const reclamo = trimSafe(input)
 
   try {
-    const leadId = await crearLead({
+    const { id: leadId, created } = await crearLead({
       nombre,
       telefono: session.waNumber,
       waId: session.waNumber,
@@ -839,16 +849,18 @@ export async function handlePublicReclamoP2(session: BotSession, input: string):
       estado: 'nuevo',
     })
 
-    await notifyAdmins([
-      `📢 *Reclamo de locatario*`,
-      `🏢 Docks del Puerto`,
-      DSEP,
-      `👤 *${nombre}*`,
-      `📞 ${phone}`,
-      `🔧 _"${reclamo}"_`,
-      DSEP,
-      `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
-    ].filter((l): l is string => !!l).join('\n'))
+    if (created) {
+      await notifyAdmins([
+        `📢 *Reclamo de locatario*`,
+        `🏢 Docks del Puerto`,
+        DSEP,
+        `👤 *${nombre}*`,
+        `📞 ${phone}`,
+        `🔧 _"${reclamo}"_`,
+        DSEP,
+        `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
+      ].filter((l): l is string => !!l).join('\n'))
+    }
 
     await navigateTo(session, 'main', {})
     return [
@@ -911,7 +923,7 @@ export async function handlePublicMensajeP2(session: BotSession, input: string):
   const mensaje = trimSafe(input)
 
   try {
-    const leadId = await crearLead({
+    const { id: leadId, created } = await crearLead({
       nombre,
       telefono: session.waNumber,
       waId: session.waNumber,
@@ -921,16 +933,18 @@ export async function handlePublicMensajeP2(session: BotSession, input: string):
       estado: 'nuevo',
     })
 
-    await notifyAdmins([
-      `✉️ *Nuevo mensaje de contacto*`,
-      `🏢 Docks del Puerto`,
-      DSEP,
-      `👤 *${nombre}*`,
-      `📞 ${phone}`,
-      `💬 _"${mensaje}"_`,
-      DSEP,
-      `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
-    ].filter((l): l is string => !!l).join('\n'))
+    if (created) {
+      await notifyAdmins([
+        `✉️ *Nuevo mensaje de contacto*`,
+        `🏢 Docks del Puerto`,
+        DSEP,
+        `👤 *${nombre}*`,
+        `📞 ${phone}`,
+        `💬 _"${mensaje}"_`,
+        DSEP,
+        `_Lead #${leadId} · WhatsApp · ${nowAr()}_`,
+      ].filter((l): l is string => !!l).join('\n'))
+    }
 
     await navigateTo(session, 'main', {})
     return [
@@ -951,8 +965,12 @@ async function notifyAdmins(message: string): Promise<void> {
   try {
     const users = await getUsers()
     const admins = users.filter((u: any) => u.role === 'admin' && u.waId && u.activo)
+    const notified = new Set<string>()
     for (const admin of admins) {
-      await enqueueBotMessage(String(admin.waId), message)
+      const normalized = normalizeWaForAdminNotify(String(admin.waId))
+      if (!normalized || notified.has(normalized)) continue
+      notified.add(normalized)
+      await enqueueBotMessage(normalized, message)
     }
   } catch {
     // Notificacion no critica: el lead ya queda registrado.

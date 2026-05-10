@@ -1,6 +1,7 @@
 import { Link } from 'wouter'
 import type { ComponentType } from 'react'
 import DashboardLayout from '../../components/DashboardLayout'
+import { GastronomiaModuleNav } from '../../components/GastronomiaModuleNav'
 import { trpc } from '../../lib/trpc'
 import { SECTORES_GASTRONOMIA } from '@shared/const'
 import {
@@ -76,19 +77,19 @@ function KpiCard({ label, value, hint, icon: Icon, tone }: {
   tone: 'emerald' | 'blue' | 'amber' | 'slate'
 }) {
   const tones = {
-    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-    blue: 'border-sky-200 bg-sky-50 text-sky-900',
-    amber: 'border-amber-200 bg-amber-50 text-amber-900',
-    slate: 'border-slate-200 bg-white text-slate-900',
+    emerald: 'gastro-kpi gastro-kpi-accent text-emerald-900',
+    blue: 'gastro-kpi text-sky-900',
+    amber: 'gastro-kpi text-amber-900',
+    slate: 'gastro-kpi text-slate-900',
   }
   return (
-    <div className={`rounded-[24px] border p-4 shadow-sm ${tones[tone]}`}>
+    <div className={`rounded-[28px] p-4 ${tones[tone]}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-[11px] uppercase tracking-wide opacity-60">{label}</div>
           <div className="mt-2 font-heading text-3xl font-semibold leading-none">{value}</div>
         </div>
-        <div className="rounded-2xl bg-white/75 p-2.5">
+        <div className="rounded-2xl border border-white/70 bg-white/75 p-2.5 shadow-sm">
           <Icon size={18} />
         </div>
       </div>
@@ -126,54 +127,56 @@ export default function GastronomiaIndex() {
 
   return (
     <DashboardLayout title="Centro Gastronomía">
-      <div className="space-y-5">
-        <section className="relative overflow-hidden rounded-[30px] border border-slate-200 bg-slate-950 p-5 md:p-6 text-white shadow-sm">
+      <div className="gastro-premium space-y-5">
+        <GastronomiaModuleNav current="home" />
+
+        <section className="gastro-hero rounded-[34px] p-5 md:p-7 text-white">
           <div className="absolute inset-y-0 right-0 w-2/3 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.34),transparent_62%)]" />
           <div className="relative grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-100">
+              <div className="gastro-chip inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase">
                 <UtensilsCrossed size={14} />
                 Operación independiente
               </div>
-              <h1 className="mt-4 max-w-3xl font-heading text-[30px] md:text-[40px] font-semibold leading-tight">
-                Gastronomía con empleados, reloj y liquidación separados.
+              <h1 className="mt-4 max-w-3xl font-heading text-[30px] md:text-[42px] font-semibold leading-tight">
+                Centro gastronómico con lectura clara, ritmo operativo y control real por local.
               </h1>
-              <p className="mt-3 max-w-2xl text-sm text-slate-300">
-                Control por local, asistencia propia y sueldos del equipo gastronómico sin mezclar datos de mantenimiento.
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+                Personal, asistencia, planificación y liquidación en un circuito propio. Menos ruido, más visibilidad para mover turnos y confirmar equipo sin mezclar mantenimiento.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Link href="/gastronomia/planificacion" className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-300">
+                <Link href="/gastronomia/planificacion" className="gastro-button-primary inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold text-slate-950 transition-all">
                   Planificar semana <ArrowRight size={15} />
                 </Link>
-                <Link href="/gastronomia/asistencia" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white hover:bg-white/12">
+                <Link href="/gastronomia/asistencia" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/12">
                   Abrir reloj
                 </Link>
-                <Link href="/gastronomia/personal" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white hover:bg-white/12">
+                <Link href="/gastronomia/personal" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/12">
                   Personal
                 </Link>
-                <Link href="/gastronomia/liquidacion" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white hover:bg-white/12">
+                <Link href="/gastronomia/liquidacion" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/12">
                   Liquidación
                 </Link>
               </div>
             </div>
-            <div className="rounded-[26px] border border-white/10 bg-white/8 p-4 backdrop-blur">
+            <div className="rounded-[28px] border border-white/10 bg-white/8 p-4 backdrop-blur-xl">
               <div className="flex items-center gap-2 text-sm font-semibold text-emerald-100">
                 <Clock3 size={16} />
-                Reloj operativo
+                Pulso operativo
               </div>
-              <div className="mt-4 font-mono text-[42px] md:text-[54px] font-bold leading-none text-emerald-300">
+              <div className="mt-4 font-mono text-[42px] md:text-[54px] font-bold leading-none tracking-tight text-emerald-300">
                 {today.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="rounded-2xl bg-white/8 p-3">
+                <div className="rounded-2xl border border-white/8 bg-white/8 p-3">
                   <div className="text-white/45">En turno</div>
                   <div className="mt-1 text-xl font-semibold">{onShift}</div>
                 </div>
-                <div className="rounded-2xl bg-white/8 p-3">
+                <div className="rounded-2xl border border-white/8 bg-white/8 p-3">
                   <div className="text-white/45">Almuerzo</div>
                   <div className="mt-1 text-xl font-semibold">{onLunch}</div>
                 </div>
-                <div className="rounded-2xl bg-white/8 p-3">
+                <div className="rounded-2xl border border-white/8 bg-white/8 p-3">
                   <div className="text-white/45">Eventos</div>
                   <div className="mt-1 text-xl font-semibold">{todayEvents.length}</div>
                 </div>
@@ -190,17 +193,17 @@ export default function GastronomiaIndex() {
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-          <div className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="gastro-panel rounded-[28px] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-heading text-xl font-semibold text-slate-900">Locales gastronómicos</h2>
-                <p className="mt-1 text-sm text-slate-500">Cada local con dotación, reloj y sueldo separado.</p>
+                <p className="mt-1 text-sm text-slate-500">Lectura inmediata de dotación, presencia actual y costo acumulado.</p>
               </div>
               <Store size={20} className="text-emerald-700" />
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {bySector.map(sector => (
-                <div key={sector.value} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <div key={sector.value} className="gastro-panel-muted rounded-[24px] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="font-semibold text-slate-900">{sector.label}</div>
@@ -221,10 +224,10 @@ export default function GastronomiaIndex() {
               { href: '/gastronomia/planificacion', icon: CalendarDays, title: 'Planificación semanal', text: 'Horarios editables, publicación por WhatsApp y confirmación del empleado.' },
               { href: '/gastronomia/confirmaciones', icon: UserRoundCheck, title: 'Confirmaciones', text: 'Control semanal de quién confirmó, quién falta responder y cantidad de empleados.' },
             ].map(item => (
-              <Link key={item.title} href={item.href} className="group rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all">
+              <Link key={item.title} href={item.href} className="gastro-panel group rounded-[24px] p-4 transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-xl">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="rounded-2xl bg-emerald-50 p-2.5 text-emerald-700">
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-2.5 text-emerald-700">
                       <item.icon size={18} />
                     </div>
                     <div>
@@ -239,7 +242,7 @@ export default function GastronomiaIndex() {
           </div>
         </section>
 
-        <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-slate-600">
+        <div className="gastro-panel-muted rounded-[26px] p-4 text-sm text-slate-600">
           <div className="flex items-center gap-2 font-semibold text-slate-900">
             <PanelTop size={16} className="text-emerald-700" />
             Mantenimiento queda separado

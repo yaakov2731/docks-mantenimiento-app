@@ -8,3 +8,11 @@ data/
 *.db-wal
 
 .vercel
+logs/
+graphify-out/
+.agents/
+.superpowers/
+.claude/settings.local.json
+.claude/skills/
+skills/
+skills-lock.json

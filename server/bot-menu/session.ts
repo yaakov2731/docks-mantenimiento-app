@@ -63,6 +63,26 @@ function toSession(row: typeof schema.botSession.$inferSelect): BotSession {
   }
 }
 
+function isDuplicateSessionInsertError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '')
+  return message.includes('UNIQUE constraint failed: bot_session.wa_number')
+}
+
+function getPersistentContext(contextData: MenuContext): MenuContext {
+  const persistentEntries = Object.entries(contextData).filter(([key, value]) => {
+    if (value === undefined) return false
+    return [
+      'puedeGastronomia',
+      'gastroSector',
+      'baseTipoEmpleado',
+      'sector',
+      'sheetsRow',
+      'puesto',
+    ].includes(key)
+  })
+  return Object.fromEntries(persistentEntries)
+}
+
 /** Obtiene la sesión activa. Devuelve null si no existe. */
 export async function getSession(waNumber: string): Promise<BotSession | null> {
   const [row] = await db.select().from(schema.botSession)
@@ -77,17 +97,21 @@ export async function createSession(params: {
   userId: number
   userName: string
 }): Promise<BotSession> {
-  await db.insert(schema.botSession).values({
-    waNumber: params.waNumber,
-    userType: params.userType,
-    userId: params.userId,
-    userName: params.userName,
-    currentMenu: 'main',
-    contextData: '{}',
-    menuHistory: '[]',
-    lastActivityAt: new Date(),
-    createdAt: new Date(),
-  } as any).run()
+  try {
+    await db.insert(schema.botSession).values({
+      waNumber: params.waNumber,
+      userType: params.userType,
+      userId: params.userId,
+      userName: params.userName,
+      currentMenu: 'main',
+      contextData: '{}',
+      menuHistory: '[]',
+      lastActivityAt: new Date(),
+      createdAt: new Date(),
+    } as any).run()
+  } catch (error) {
+    if (!isDuplicateSessionInsertError(error)) throw error
+  }
   const session = await getSession(params.waNumber)
   return session!
 }
@@ -146,12 +170,13 @@ export async function navigateBack(session: BotSession): Promise<{ session: BotS
 
 /** Resetea la sesión al menú principal. */
 export async function resetToMain(session: BotSession): Promise<BotSession> {
+  const persistentContext = getPersistentContext(session.contextData)
   await updateSession(session.waNumber, {
     currentMenu: 'main',
-    contextData: {},
+    contextData: persistentContext,
     menuHistory: [],
   })
-  return { ...session, currentMenu: 'main', contextData: {}, menuHistory: [] }
+  return { ...session, currentMenu: 'main', contextData: persistentContext, menuHistory: [] }
 }
 
 /** Verifica si la sesión expiró por inactividad. */

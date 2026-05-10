@@ -729,7 +729,7 @@ export default function Empleados() {
                       onChange={e => setForm(current => ({ ...current, puedeGastronomia: e.target.checked }))}
                       className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/20"
                     />
-                    <span className="text-sm font-medium text-slate-700">También trabaja en gastronomía (menú dual en el bot)</span>
+                    <span className="text-sm font-medium text-slate-700">Empleado doble: también trabaja en gastronomía</span>
                   </label>
                 </div>
               </div>
