@@ -2,12 +2,12 @@ const DSEP = '──────────────────────
 
 export function buildEventosWelcome(): string {
   return [
-    `*DOCKS EVENTOS*`,
+    `🎉 *DOCKS EVENTOS*`,
     `_Salón exclusivo · Tigre, Buenos Aires_`,
     DSEP,
-    `*1 ·* Consultar por mi evento`,
-    `*2 ·* Coordinar visita al salón`,
-    `*3 ·* Ubicación y horarios`,
+    `🎂 *1 ·* Consultar por un evento`,
+    `📅 *2 ·* Coordinar visita al salón`,
+    `📍 *3 ·* Ubicación y horarios`,
     DSEP,
     `_Escribí el número de tu opción_`,
   ].join('\n')
@@ -15,12 +15,12 @@ export function buildEventosWelcome(): string {
 
 export function buildEventosMainMenu(): string {
   return [
-    `*DOCKS EVENTOS*`,
+    `🎉 *DOCKS EVENTOS*`,
     `_Salón exclusivo · Tigre, Buenos Aires_`,
     DSEP,
-    `*1 ·* Consultar por mi evento`,
-    `*2 ·* Coordinar visita al salón`,
-    `*3 ·* Ubicación y horarios`,
+    `🎂 *1 ·* Consultar por un evento`,
+    `📅 *2 ·* Coordinar visita al salón`,
+    `📍 *3 ·* Ubicación y horarios`,
     `*0 ·* Salir`,
     DSEP,
     `_Escribí el número de tu opción_`,
