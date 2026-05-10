@@ -431,6 +431,16 @@ export async function initDb() {
       valor TEXT NOT NULL,
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    `CREATE TABLE IF NOT EXISTS bot_eventos_session (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wa_number TEXT NOT NULL UNIQUE,
+      user_name TEXT NOT NULL DEFAULT 'Visitante',
+      current_menu TEXT NOT NULL DEFAULT 'main',
+      context_data TEXT,
+      menu_history TEXT,
+      last_activity_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
   ]
   for (const sql of stmts) {
     await client.execute(sql)
