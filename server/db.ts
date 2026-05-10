@@ -665,7 +665,21 @@ export function buildAttendanceTurns(events: Array<any>, now = Date.now()) {
 
     if (event.tipo === 'entrada') {
       if (currentTurn) {
-        continue
+        const elapsedSinceEntrada = eventMs - currentTurn.entradaAt.getTime()
+        if (elapsedSinceEntrada <= MAX_SHIFT_DURATION_MS) {
+          continue
+        }
+        // Stale open turn — auto-close before opening the new one
+        const autoCloseMs = currentTurn.entradaAt.getTime() + MAX_SHIFT_DURATION_MS
+        currentTurn.salidaAt = new Date(autoCloseMs)
+        currentTurn.grossSeconds = Math.floor(MAX_SHIFT_DURATION_MS / 1000)
+        if (currentTurn.lunchStartedAt) {
+          currentTurn.lunchSeconds += Math.max(0, Math.floor((autoCloseMs - currentTurn.lunchStartedAt.getTime()) / 1000))
+          currentTurn.lunchStartedAt = null
+        }
+        currentTurn.workedSeconds = Math.max(0, currentTurn.grossSeconds - currentTurn.lunchSeconds)
+        currentTurn.turnoAbierto = false
+        currentTurn = null
       }
       currentTurn = {
         fecha: toBuenosAiresDateKey(eventMs),
