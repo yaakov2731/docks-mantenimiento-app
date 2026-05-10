@@ -209,7 +209,7 @@ export const leads = sqliteTable('leads', {
     enum: ['nuevo', 'contactado', 'visito', 'cerrado', 'descartado'],
   }).default('nuevo').notNull(),
   notas: text('notas'),
-  fuente: text('fuente', { enum: ['whatsapp', 'web', 'otro'] }).default('web').notNull(),
+  fuente: text('fuente', { enum: ['whatsapp', 'web', 'whatsapp_eventos', 'otro'] }).default('web').notNull(),
   firstContactedAt: integer('first_contacted_at', { mode: 'timestamp' }),
   // Scoring automático
   score: integer('score').default(0),
@@ -319,6 +319,18 @@ export const botSession = sqliteTable('bot_session', {
   menuHistory: text('menu_history'), // JSON array de strings: ["main","tareas_lista"]
   lastActivityAt: integer('last_activity_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
+})
+
+// Sesión de conversación para el bot de Eventos (público general)
+export const botEventosSession = sqliteTable('bot_eventos_session', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  waNumber: text('wa_number').notNull().unique(),
+  userName: text('user_name').notNull().default('Visitante'),
+  currentMenu: text('current_menu').notNull().default('main'),
+  contextData: text('context_data').default('{}'),
+  menuHistory: text('menu_history').default('[]'),
+  lastActivityAt: integer('last_activity_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })
 
 export const rondasPlantilla = sqliteTable('rondas_plantilla', {
@@ -481,6 +493,7 @@ export type RondaEvento = typeof rondasEvento.$inferSelect
 export type TareaOperativa = typeof tareasOperativas.$inferSelect
 export type TareaOperativaEvento = typeof tareasOperativasEvento.$inferSelect
 export type LeadEvento = typeof leadsEvento.$inferSelect
+export type BotEventosSessionRow = typeof botEventosSession.$inferSelect
 
 export const appConfig = sqliteTable('app_config', {
   clave: text('clave').primaryKey(),
