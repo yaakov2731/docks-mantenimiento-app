@@ -45,20 +45,16 @@ const SERVICIOS_EXTRA: Record<string, string> = {
 const SEGUIMIENTO_OPCIONES: Record<string, string> = {
   '1': 'Coordinar visita al salón',
   '2': 'Que me llamen',
-  '3': 'Recibir información por WhatsApp',
+  '3': 'Recibir info por WhatsApp',
 }
 
 // --- Paso 1: Nombre ---
 
 export function buildConsultaP1(): string {
   return [
-    `🎉 *Consulta de evento — Docks Eventos*`,
+    `✨ *Consulta — Docks Eventos*`,
     DSEP,
-    `📍 *Paso 1 de 7*`,
-    ``,
-    `¡Empecemos! Te hacemos *7 preguntas rápidas*`,
-    `para entender tu evento y prepararte una propuesta`,
-    `personalizada. ⏱️ _Toma menos de 2 minutos._`,
+    `📍 *Paso 1/7* — ⏱️ _2 minutos_`,
     ``,
     `¿Cuál es tu *nombre y apellido*?`,
     DSEP,
@@ -68,7 +64,7 @@ export function buildConsultaP1(): string {
 
 export async function handleConsultaP1(session: EventosSession, input: string): Promise<string | null> {
   if (input === '0') return null
-  if (input.trim().length < 2) return `⚠️ Por favor ingresá tu nombre.\n\n${buildConsultaP1()}`
+  if (input.trim().length < 2) return `⚠️ Ingresá tu nombre.\n\n${buildConsultaP1()}`
 
   await navigateTo(session, 'consulta_p2', { nombre: trimSafe(input) })
   return buildConsultaP2()
@@ -78,21 +74,19 @@ export async function handleConsultaP1(session: EventosSession, input: string): 
 
 export function buildConsultaP2(): string {
   return [
-    `🎉 *Consulta de evento*`,
+    `✨ *Consulta — Paso 2/7*`,
     DSEP,
-    `📍 *Paso 2 de 7*`,
+    `¿Qué *tipo de evento*?`,
     ``,
-    `¿Qué *tipo de evento* estás organizando?`,
+    `💒  *1*  Boda / Casamiento`,
+    `🎂  *2*  Cumpleaños / Fiesta`,
+    `🎀  *3*  Fiesta de 15 años`,
+    `✡️  *4*  Bar / Bat Mitzvá`,
+    `🏢  *5*  Evento corporativo`,
+    `🎉  *6*  Aniversario / Celebración`,
+    `✏️  *7*  Otro`,
     DSEP,
-    `💒  *1*  →  Boda / Casamiento`,
-    `🎂  *2*  →  Cumpleaños / Fiesta`,
-    `🎀  *3*  →  Fiesta de 15 años`,
-    `✡️  *4*  →  Bar / Bat Mitzvá`,
-    `🏢  *5*  →  Evento corporativo`,
-    `🎉  *6*  →  Aniversario / Celebración`,
-    `✏️  *7*  →  Otro (escribir)`,
-    DSEP,
-    `_Escribí *cancelar* para salir_`,
+    `_*cancelar* para salir_`,
   ].join('\n')
 }
 
@@ -102,19 +96,16 @@ export async function handleConsultaP2(session: EventosSession, input: string): 
   if (input === '7') {
     await navigateTo(session, 'consulta_p2_otro', { pendingText: true, pendingField: 'tipoEvento' })
     return [
-      `🎉 *Consulta de evento*`,
+      `✨ *Consulta — Paso 2/7*`,
       DSEP,
-      `📍 *Paso 2 de 7*`,
-      ``,
-      `¿Qué tipo de evento estás organizando?`,
-      `_(Describilo con tus palabras)_`,
+      `Describí el tipo de evento:`,
       DSEP,
-      `_Escribí *cancelar* para salir_`,
+      `_*cancelar* para salir_`,
     ].join('\n')
   }
 
   const tipo = TIPOS_EVENTO[input]
-  if (!tipo) return `⚠️ Elegí una opción del 1 al 7.\n\n${buildConsultaP2()}`
+  if (!tipo) return `⚠️ Elegí del 1 al 7.\n\n${buildConsultaP2()}`
 
   await navigateTo(session, 'consulta_p3', { tipoEvento: tipo, pendingText: true, pendingField: 'fechaEstimada' })
   return buildConsultaP3()
@@ -122,7 +113,7 @@ export async function handleConsultaP2(session: EventosSession, input: string): 
 
 export async function handleConsultaP2Otro(session: EventosSession, input: string): Promise<string | null> {
   if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return null }
-  if (input.trim().length < 2) return `⚠️ Por favor describí el tipo de evento.`
+  if (input.trim().length < 2) return `⚠️ Describí el tipo de evento.`
 
   await navigateTo(session, 'consulta_p3', { tipoEvento: trimSafe(input), pendingText: true, pendingField: 'fechaEstimada' })
   return buildConsultaP3()
@@ -132,20 +123,18 @@ export async function handleConsultaP2Otro(session: EventosSession, input: strin
 
 export function buildConsultaP3(): string {
   return [
-    `🎉 *Consulta de evento*`,
+    `✨ *Consulta — Paso 3/7*`,
     DSEP,
-    `📍 *Paso 3 de 7*`,
-    ``,
-    `¿Para *cuándo* tenés pensado el evento?`,
-    `_(ej: "diciembre 2026", "próximo mes", "ya tengo fecha: 15/03")_`,
+    `¿Para *cuándo* es el evento?`,
+    `_(ej: "diciembre 2026", "15/03", "próximo mes")_`,
     DSEP,
-    `_Escribí *cancelar* para salir_`,
+    `_*cancelar* para salir_`,
   ].join('\n')
 }
 
 export async function handleConsultaP3(session: EventosSession, input: string): Promise<string | null> {
   if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return null }
-  if (input.trim().length < 2) return `⚠️ Por favor indicá una fecha estimada.\n\n${buildConsultaP3()}`
+  if (input.trim().length < 2) return `⚠️ Indicá una fecha estimada.\n\n${buildConsultaP3()}`
 
   await navigateTo(session, 'consulta_p4', { fechaEstimada: trimSafe(input) })
   return buildConsultaP4()
@@ -155,20 +144,18 @@ export async function handleConsultaP3(session: EventosSession, input: string): 
 
 export function buildConsultaP4(): string {
   return [
-    `🎉 *Consulta de evento*`,
+    `✨ *Consulta — Paso 4/7*`,
     DSEP,
-    `📍 *Paso 4 de 7*`,
+    `¿Cuántos *invitados*?`,
     ``,
-    `¿Cuántos *invitados* estimás?`,
+    `👥  *1*  Hasta 50`,
+    `👥  *2*  50 a 100`,
+    `👥  *3*  100 a 200`,
+    `👥  *4*  200 a 400`,
+    `👥  *5*  Más de 400`,
+    `🤔  *6*  No sé todavía`,
     DSEP,
-    `👥  *1*  →  Hasta 50`,
-    `👥  *2*  →  50 a 100`,
-    `👥  *3*  →  100 a 200`,
-    `👥  *4*  →  200 a 400`,
-    `👥  *5*  →  Más de 400`,
-    `🤔  *6*  →  Todavía no sé`,
-    DSEP,
-    `_Escribí *cancelar* para salir_`,
+    `_*cancelar* para salir_`,
   ].join('\n')
 }
 
@@ -176,30 +163,27 @@ export async function handleConsultaP4(session: EventosSession, input: string): 
   if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return null }
 
   const cantidad = CANTIDAD_INVITADOS[input]
-  if (!cantidad) return `⚠️ Elegí una opción del 1 al 6.\n\n${buildConsultaP4()}`
+  if (!cantidad) return `⚠️ Elegí del 1 al 6.\n\n${buildConsultaP4()}`
 
   await navigateTo(session, 'consulta_p5', { cantidadInvitados: cantidad })
   return buildConsultaP5()
 }
 
-// --- Paso 5: Presupuesto estimado (NEW) ---
+// --- Paso 5: Presupuesto ---
 
 export function buildConsultaP5(): string {
   return [
-    `🎉 *Consulta de evento*`,
+    `✨ *Consulta — Paso 5/7*`,
     DSEP,
-    `📍 *Paso 5 de 7*`,
+    `¿*Presupuesto* estimado?`,
     ``,
-    `¿Tenés un *presupuesto estimado*?`,
-    `_Esto nos ayuda a armarte la mejor propuesta._`,
+    `💰  *1*  Hasta $5M`,
+    `💰  *2*  $5M a $10M`,
+    `💰  *3*  $10M a $20M`,
+    `💰  *4*  Más de $20M`,
+    `🤐  *5*  Prefiero no decir`,
     DSEP,
-    `💰  *1*  →  Hasta $5.000.000`,
-    `💰  *2*  →  $5.000.000 a $10.000.000`,
-    `💰  *3*  →  $10.000.000 a $20.000.000`,
-    `💰  *4*  →  Más de $20.000.000`,
-    `🤐  *5*  →  Prefiero no decir`,
-    DSEP,
-    `_Escribí *cancelar* para salir_`,
+    `_*cancelar* para salir_`,
   ].join('\n')
 }
 
@@ -207,33 +191,31 @@ export async function handleConsultaP5(session: EventosSession, input: string): 
   if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return null }
 
   const presupuesto = PRESUPUESTO_OPCIONES[input]
-  if (!presupuesto) return `⚠️ Elegí una opción del 1 al 5.\n\n${buildConsultaP5()}`
+  if (!presupuesto) return `⚠️ Elegí del 1 al 5.\n\n${buildConsultaP5()}`
 
   await navigateTo(session, 'consulta_p6', { presupuesto })
   return buildConsultaP6()
 }
 
-// --- Paso 6: Servicios extra ---
+// --- Paso 6: Servicios ---
 
 export function buildConsultaP6(): string {
   return [
-    `🎉 *Consulta de evento*`,
+    `✨ *Consulta — Paso 6/7*`,
     DSEP,
-    `📍 *Paso 6 de 7*`,
-    ``,
     `¿Qué *servicios* te interesan?`,
-    `_(Podés elegir varios, ej: "1,3,5")_`,
-    DSEP,
-    `🍖  *1*  →  Catering / Asado premium`,
-    `🎵  *2*  →  DJ / Música en vivo`,
-    `🎨  *3*  →  Ambientación temática`,
-    `📸  *4*  →  Fotografía / Video`,
-    `📋  *5*  →  Coordinación integral`,
-    `🍸  *6*  →  Barra libre`,
+    `_(varios: "1,3,5")_`,
     ``,
-    `🔄  *0*  →  No necesito servicios extras`,
+    `🍖  *1*  Catering / Asado`,
+    `🎵  *2*  DJ / Música`,
+    `🎨  *3*  Ambientación`,
+    `📸  *4*  Foto / Video`,
+    `📋  *5*  Coordinación integral`,
+    `🍸  *6*  Barra libre`,
+    ``,
+    `🔄  *0*  Ninguno`,
     DSEP,
-    `_Escribí *cancelar* para salir_`,
+    `_*cancelar* para salir_`,
   ].join('\n')
 }
 
@@ -247,7 +229,7 @@ export async function handleConsultaP6(session: EventosSession, input: string): 
       const srv = SERVICIOS_EXTRA[n]
       if (srv) servicios.push(srv)
     }
-    if (servicios.length === 0) return `⚠️ Elegí opciones del 1 al 6 separadas por coma, o *0* si no necesitás.\n\n${buildConsultaP6()}`
+    if (servicios.length === 0) return `⚠️ Elegí del 1 al 6 (separados por coma) o *0*.\n\n${buildConsultaP6()}`
   }
 
   await navigateTo(session, 'consulta_p7', { serviciosExtra: servicios })
@@ -258,20 +240,15 @@ export async function handleConsultaP6(session: EventosSession, input: string): 
 
 export function buildConsultaP7(): string {
   return [
-    `🎉 *Consulta de evento*`,
+    `✨ *Consulta — Paso 7/7 ¡Último!*`,
     DSEP,
-    `📍 *Paso 7 de 7 — ¡Último paso!*`,
+    `¿Cómo preferís *continuar*?`,
     ``,
-    `La visita al salón es clave para que veas el espacio,`,
-    `la vista al río y cómo podemos montar tu evento.`,
-    ``,
-    `¿Cómo preferís *seguir adelante*?`,
+    `📅  *1*  Coordinar visita al salón`,
+    `📞  *2*  Que me llamen`,
+    `💬  *3*  Recibir info por WhatsApp`,
     DSEP,
-    `📅  *1*  →  Coordinar visita al salón`,
-    `📞  *2*  →  Que me llamen`,
-    `💬  *3*  →  Recibir información por WhatsApp`,
-    DSEP,
-    `_Escribí *cancelar* para salir_`,
+    `_*cancelar* para salir_`,
   ].join('\n')
 }
 
@@ -279,7 +256,7 @@ export async function handleConsultaP7(session: EventosSession, input: string): 
   if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return null }
 
   const seguimiento = SEGUIMIENTO_OPCIONES[input]
-  if (!seguimiento) return `⚠️ Elegí una opción del 1 al 3.\n\n${buildConsultaP7()}`
+  if (!seguimiento) return `⚠️ Elegí del 1 al 3.\n\n${buildConsultaP7()}`
 
   const newCtx = { ...session.contextData, seguimiento }
   await navigateTo(session, 'consulta_confirmar', { seguimiento })
@@ -294,29 +271,27 @@ export function buildConsultaConfirmar(ctx: EventosMenuContext): string {
     : 'Ninguno'
 
   return [
-    `🎉 *Confirmar consulta — Docks Eventos*`,
+    `✨ *Confirmar — Docks Eventos*`,
     DSEP,
     `👤 *${ctx.nombre ?? ''}*`,
-    `🎂 Evento: *${ctx.tipoEvento ?? ''}*`,
-    `📅 Fecha: ${ctx.fechaEstimada ?? ''}`,
-    `👥 Invitados: ${ctx.cantidadInvitados ?? ''}`,
-    `💰 Presupuesto: ${ctx.presupuesto ?? 'No indicado'}`,
-    `🎯 Servicios: ${servicios}`,
-    `📌 Seguimiento: ${ctx.seguimiento ?? ''}`,
+    `🎂 ${ctx.tipoEvento ?? ''}`,
+    `📅 ${ctx.fechaEstimada ?? ''}`,
+    `👥 ${ctx.cantidadInvitados ?? ''}`,
+    `💰 ${ctx.presupuesto ?? 'No indicado'}`,
+    `🎯 ${servicios}`,
+    `📌 ${ctx.seguimiento ?? ''}`,
     DSEP,
-    `¿Los datos están bien?`,
-    ``,
     `1️⃣  ✅ *Enviar consulta*`,
-    `2️⃣  ✏️  Corregir (empezar de nuevo)`,
+    `2️⃣  ✏️  Corregir`,
   ].join('\n')
 }
 
 export async function handleConsultaConfirmar(session: EventosSession, input: string): Promise<string | '__CONFIRM_CONSULTA__' | null> {
   if (input === '2') {
     await navigateTo(session, 'consulta_p1', { pendingText: true })
-    return [`✏️ Sin problema, empecemos de nuevo.`, ``, buildConsultaP1()].join('\n')
+    return [`✏️ Empecemos de nuevo.`, ``, buildConsultaP1()].join('\n')
   }
-  if (input !== '1') return `⚠️ Elegí 1 para enviar o 2 para corregir.\n\n${buildConsultaConfirmar(session.contextData)}`
+  if (input !== '1') return `⚠️ *1* para enviar o *2* para corregir.\n\n${buildConsultaConfirmar(session.contextData)}`
 
   return '__CONFIRM_CONSULTA__'
 }
