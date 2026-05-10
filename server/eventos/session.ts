@@ -13,11 +13,13 @@ export type EventosMenuContext = {
   tipoEvento?: string
   fechaEstimada?: string
   cantidadInvitados?: string
+  presupuesto?: string
   serviciosExtra?: string[]
   seguimiento?: string
   contactoExtra?: string
   pendingText?: boolean
   pendingField?: string
+  seguimientoIntent?: string
   [key: string]: unknown
 }
 

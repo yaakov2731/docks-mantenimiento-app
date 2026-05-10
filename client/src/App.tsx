@@ -13,6 +13,7 @@ const Configuracion = lazy(() => import('./pages/Configuracion'))
 const ImprimirReclamo = lazy(() => import('./pages/ImprimirReclamo'))
 const ImprimirAsistencia = lazy(() => import('./pages/ImprimirAsistencia'))
 const Leads = lazy(() => import('./pages/Leads'))
+const LeadsEventos = lazy(() => import('./pages/LeadsEventos'))
 const Operaciones = lazy(() => import('./pages/Operaciones'))
 const TareasOperativas = lazy(() => import('./pages/TareasOperativas'))
 const Cobranzas = lazy(() => import('./pages/Cobranzas'))
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="/empleados">{() => <ProtectedRoute component={Empleados} allowedRoles={['admin']} />}</Route>
       <Route path="/configuracion">{() => <ProtectedRoute component={Configuracion} allowedRoles={['admin']} />}</Route>
       <Route path="/leads">{() => <ProtectedRoute component={Leads} allowedRoles={['admin', 'sales']} />}</Route>
+      <Route path="/leads-eventos">{() => <ProtectedRoute component={LeadsEventos} allowedRoles={['admin', 'sales']} />}</Route>
       <Route path="/bot-comercial">{() => <ProtectedRoute component={BotComercial} allowedRoles={['admin']} />}</Route>
       <Route path="/cobranzas">{() => <ProtectedRoute component={Cobranzas} allowedRoles={['admin', 'collections']} />}</Route>
       <Route path="/imprimir">{() => <ProtectedRoute component={ImprimirReclamo} allowedRoles={['admin', 'employee']} />}</Route>

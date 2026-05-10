@@ -3,17 +3,22 @@ const DSEP = '━━━━━━━━━━━━━━━━━━━━━━
 export function buildEventosWelcome(): string {
   return [
     `🎉 *DOCKS EVENTOS*`,
-    `✨ _Salón de eventos · Tigre Centro_`,
+    `✨ _Salón exclusivo con vista al río · Tigre_`,
     DSEP,
-    `El lugar ideal para tu *evento social o corporativo*.`,
-    `Salón exclusivo dentro de Docks del Puerto,`,
-    `con gastronomía premium y atención personalizada.`,
+    `Bienvenido a *Docks Eventos*, el espacio premium`,
+    `para eventos sociales y corporativos en Tigre.`,
+    ``,
+    `🌊 Terraza con vista al río`,
+    `🍽️ Gastronomía de autor`,
+    `👥 Capacidad hasta 400+ invitados`,
+    `🎯 Coordinación integral de tu evento`,
     DSEP,
     `🎂  *1*  →  Consultar por un evento`,
-    `📅  *2*  →  Coordinar una visita al salón`,
-    `📍  *3*  →  Ubicación · Cómo llegar`,
-    `🎯  *4*  →  Nuestros servicios`,
-    `🕐  *5*  →  Horarios de atención`,
+    `💎  *2*  →  Paquetes y precios`,
+    `📅  *3*  →  Coordinar una visita al salón`,
+    `📸  *4*  →  Galería de eventos realizados`,
+    `📍  *5*  →  Ubicación · Cómo llegar`,
+    `🕐  *6*  →  Horarios de atención`,
     DSEP,
     `_Respondé con el número de tu opción_ 👇`,
   ].join('\n')
@@ -22,13 +27,14 @@ export function buildEventosWelcome(): string {
 export function buildEventosMainMenu(): string {
   return [
     `🎉 *DOCKS EVENTOS*`,
-    `✨ _Salón de eventos · Tigre Centro_`,
+    `✨ _Salón exclusivo con vista al río · Tigre_`,
     DSEP,
     `🎂  *1*  →  Consultar por un evento`,
-    `📅  *2*  →  Coordinar una visita al salón`,
-    `📍  *3*  →  Ubicación · Cómo llegar`,
-    `🎯  *4*  →  Nuestros servicios`,
-    `🕐  *5*  →  Horarios de atención`,
+    `💎  *2*  →  Paquetes y precios`,
+    `📅  *3*  →  Coordinar una visita al salón`,
+    `📸  *4*  →  Galería de eventos realizados`,
+    `📍  *5*  →  Ubicación · Cómo llegar`,
+    `🕐  *6*  →  Horarios de atención`,
     DSEP,
     `_Respondé con el número de tu opción_ 👇`,
     `0️⃣   Salir`,
@@ -69,6 +75,74 @@ export function buildUbicacionInfo(): string {
   ].join('\n')
 }
 
+export function buildPaquetesInfo(): string {
+  return [
+    `💎 *Paquetes — Docks Eventos*`,
+    DSEP,
+    ``,
+    `🥉 *PAQUETE ESENCIAL*`,
+    `• Salón con vista al río (hasta 100 invitados)`,
+    `• Ambientación básica incluida`,
+    `• Estacionamiento gratuito`,
+    `• Coordinador de evento`,
+    ``,
+    `🥈 *PAQUETE PREMIUM*`,
+    `• Salón + terraza al río (hasta 250 invitados)`,
+    `• Catering premium con menú personalizado`,
+    `• Ambientación temática completa`,
+    `• DJ + sonido e iluminación profesional`,
+    `• Coordinación integral`,
+    ``,
+    `🥇 *PAQUETE ALL-INCLUSIVE*`,
+    `• Espacio completo (hasta 400+ invitados)`,
+    `• Gastronomía de autor + barra libre`,
+    `• Ambientación premium + centros de mesa`,
+    `• DJ + música en vivo + show`,
+    `• Fotografía y video profesional`,
+    `• Coordinación integral + wedding planner`,
+    ``,
+    DSEP,
+    `_Los precios varían según fecha, invitados y servicios._`,
+    `_Pedí tu presupuesto personalizado:_`,
+    ``,
+    `🎂 Escribí *1* para consultar por tu evento`,
+    `📅 Escribí *3* para coordinar una visita`,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
+export function buildGaleriaInfo(): string {
+  return [
+    `📸 *Eventos realizados — Docks Eventos*`,
+    DSEP,
+    ``,
+    `Más de *200 eventos* realizados con éxito:`,
+    ``,
+    `💒 Bodas y casamientos de ensueño`,
+    `🎂 Cumpleaños memorables`,
+    `🎀 Fiestas de 15 inolvidables`,
+    `🏢 Eventos corporativos de alto nivel`,
+    `✡️ Celebraciones religiosas únicas`,
+    ``,
+    `⭐ *Lo que dicen nuestros clientes:*`,
+    ``,
+    `_"El lugar superó nuestras expectativas._`,
+    `_La vista al río durante la ceremonia fue mágica."_`,
+    `— Pareja casada en Docks`,
+    ``,
+    `_"Organizaron todo impecable._`,
+    `_Nuestros invitados siguen hablando del evento."_`,
+    `— Evento corporativo`,
+    ``,
+    DSEP,
+    `📸 Seguinos en *@dockseventostigre* para más fotos`,
+    ``,
+    `🎂 Escribí *1* para consultar por tu evento`,
+    `📅 Escribí *3* para coordinar una visita`,
+    `0️⃣  Volver`,
+  ].join('\n')
+}
+
 export function buildServiciosInfo(): string {
   return [
     `🎯 *Nuestros Servicios — Docks Eventos*`,
@@ -91,7 +165,7 @@ export function buildServiciosInfo(): string {
     `• Coordinación integral del evento`,
     `• Estacionamiento para invitados`,
     DSEP,
-    `📅 Escribí *2* para coordinar una visita`,
+    `📅 Escribí *3* para coordinar una visita`,
     `🎂 Escribí *1* para consultar por tu evento`,
     `0️⃣  Volver`,
   ].join('\n')
@@ -124,7 +198,7 @@ export function buildSalirMessage(): string {
     `👋 *Hasta luego.*`,
     ``,
     `Si necesitás ayuda en otro momento, escribinos a este número.`,
-    `_Docks Eventos · Tigre 🎉_`,
+    `_Docks Eventos · Salón exclusivo · Tigre 🎉_`,
   ].join('\n')
 }
 

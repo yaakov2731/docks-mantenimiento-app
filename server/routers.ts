@@ -878,7 +878,7 @@ export const appRouter = router({
       }),
 
     listar: protectedProcedure
-      .input(z.object({ estado: z.string().optional() }).optional())
+      .input(z.object({ estado: z.string().optional(), fuente: z.string().optional() }).optional())
       .query(({ input }) => getLeads(input)),
 
     obtener: protectedProcedure

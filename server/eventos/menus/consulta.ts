@@ -25,12 +25,21 @@ const CANTIDAD_INVITADOS: Record<string, string> = {
   '6': 'Todavía no sé',
 }
 
+const PRESUPUESTO_OPCIONES: Record<string, string> = {
+  '1': 'Hasta $5.000.000',
+  '2': '$5.000.000 a $10.000.000',
+  '3': '$10.000.000 a $20.000.000',
+  '4': 'Más de $20.000.000',
+  '5': 'Prefiero no decir',
+}
+
 const SERVICIOS_EXTRA: Record<string, string> = {
   '1': 'Catering / Asado premium',
   '2': 'DJ / Música en vivo',
   '3': 'Ambientación temática',
   '4': 'Fotografía / Video',
   '5': 'Coordinación integral',
+  '6': 'Barra libre',
 }
 
 const SEGUIMIENTO_OPCIONES: Record<string, string> = {
@@ -45,10 +54,11 @@ export function buildConsultaP1(): string {
   return [
     `🎉 *Consulta de evento — Docks Eventos*`,
     DSEP,
-    `📍 *Paso 1 de 6*`,
+    `📍 *Paso 1 de 7*`,
     ``,
-    `¡Empecemos! Te hacemos *6 preguntas rápidas*`,
-    `para entender tu evento y prepararte una propuesta.`,
+    `¡Empecemos! Te hacemos *7 preguntas rápidas*`,
+    `para entender tu evento y prepararte una propuesta`,
+    `personalizada. ⏱️ _Toma menos de 2 minutos._`,
     ``,
     `¿Cuál es tu *nombre y apellido*?`,
     DSEP,
@@ -70,7 +80,7 @@ export function buildConsultaP2(): string {
   return [
     `🎉 *Consulta de evento*`,
     DSEP,
-    `📍 *Paso 2 de 6*`,
+    `📍 *Paso 2 de 7*`,
     ``,
     `¿Qué *tipo de evento* estás organizando?`,
     DSEP,
@@ -94,7 +104,7 @@ export async function handleConsultaP2(session: EventosSession, input: string): 
     return [
       `🎉 *Consulta de evento*`,
       DSEP,
-      `📍 *Paso 2 de 6*`,
+      `📍 *Paso 2 de 7*`,
       ``,
       `¿Qué tipo de evento estás organizando?`,
       `_(Describilo con tus palabras)_`,
@@ -124,7 +134,7 @@ export function buildConsultaP3(): string {
   return [
     `🎉 *Consulta de evento*`,
     DSEP,
-    `📍 *Paso 3 de 6*`,
+    `📍 *Paso 3 de 7*`,
     ``,
     `¿Para *cuándo* tenés pensado el evento?`,
     `_(ej: "diciembre 2026", "próximo mes", "ya tengo fecha: 15/03")_`,
@@ -147,7 +157,7 @@ export function buildConsultaP4(): string {
   return [
     `🎉 *Consulta de evento*`,
     DSEP,
-    `📍 *Paso 4 de 6*`,
+    `📍 *Paso 4 de 7*`,
     ``,
     `¿Cuántos *invitados* estimás?`,
     DSEP,
@@ -172,13 +182,44 @@ export async function handleConsultaP4(session: EventosSession, input: string): 
   return buildConsultaP5()
 }
 
-// --- Paso 5: Servicios extra ---
+// --- Paso 5: Presupuesto estimado (NEW) ---
 
 export function buildConsultaP5(): string {
   return [
     `🎉 *Consulta de evento*`,
     DSEP,
-    `📍 *Paso 5 de 6*`,
+    `📍 *Paso 5 de 7*`,
+    ``,
+    `¿Tenés un *presupuesto estimado*?`,
+    `_Esto nos ayuda a armarte la mejor propuesta._`,
+    DSEP,
+    `💰  *1*  →  Hasta $5.000.000`,
+    `💰  *2*  →  $5.000.000 a $10.000.000`,
+    `💰  *3*  →  $10.000.000 a $20.000.000`,
+    `💰  *4*  →  Más de $20.000.000`,
+    `🤐  *5*  →  Prefiero no decir`,
+    DSEP,
+    `_Escribí *cancelar* para salir_`,
+  ].join('\n')
+}
+
+export async function handleConsultaP5(session: EventosSession, input: string): Promise<string | null> {
+  if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return null }
+
+  const presupuesto = PRESUPUESTO_OPCIONES[input]
+  if (!presupuesto) return `⚠️ Elegí una opción del 1 al 5.\n\n${buildConsultaP5()}`
+
+  await navigateTo(session, 'consulta_p6', { presupuesto })
+  return buildConsultaP6()
+}
+
+// --- Paso 6: Servicios extra ---
+
+export function buildConsultaP6(): string {
+  return [
+    `🎉 *Consulta de evento*`,
+    DSEP,
+    `📍 *Paso 6 de 7*`,
     ``,
     `¿Qué *servicios* te interesan?`,
     `_(Podés elegir varios, ej: "1,3,5")_`,
@@ -188,6 +229,7 @@ export function buildConsultaP5(): string {
     `🎨  *3*  →  Ambientación temática`,
     `📸  *4*  →  Fotografía / Video`,
     `📋  *5*  →  Coordinación integral`,
+    `🍸  *6*  →  Barra libre`,
     ``,
     `🔄  *0*  →  No necesito servicios extras`,
     DSEP,
@@ -195,7 +237,7 @@ export function buildConsultaP5(): string {
   ].join('\n')
 }
 
-export async function handleConsultaP5(session: EventosSession, input: string): Promise<string | null> {
+export async function handleConsultaP6(session: EventosSession, input: string): Promise<string | null> {
   if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return null }
 
   let servicios: string[] = []
@@ -205,20 +247,20 @@ export async function handleConsultaP5(session: EventosSession, input: string): 
       const srv = SERVICIOS_EXTRA[n]
       if (srv) servicios.push(srv)
     }
-    if (servicios.length === 0) return `⚠️ Elegí opciones del 1 al 5 separadas por coma, o *0* si no necesitás.\n\n${buildConsultaP5()}`
+    if (servicios.length === 0) return `⚠️ Elegí opciones del 1 al 6 separadas por coma, o *0* si no necesitás.\n\n${buildConsultaP6()}`
   }
 
-  await navigateTo(session, 'consulta_p6', { serviciosExtra: servicios })
-  return buildConsultaP6()
+  await navigateTo(session, 'consulta_p7', { serviciosExtra: servicios })
+  return buildConsultaP7()
 }
 
-// --- Paso 6: Seguimiento ---
+// --- Paso 7: Seguimiento ---
 
-export function buildConsultaP6(): string {
+export function buildConsultaP7(): string {
   return [
     `🎉 *Consulta de evento*`,
     DSEP,
-    `📍 *Paso 6 de 6 — ¡Último paso!*`,
+    `📍 *Paso 7 de 7 — ¡Último paso!*`,
     ``,
     `La visita al salón es clave para que veas el espacio,`,
     `la vista al río y cómo podemos montar tu evento.`,
@@ -233,11 +275,11 @@ export function buildConsultaP6(): string {
   ].join('\n')
 }
 
-export async function handleConsultaP6(session: EventosSession, input: string): Promise<string | null> {
+export async function handleConsultaP7(session: EventosSession, input: string): Promise<string | null> {
   if (input.trim().toLowerCase() === 'cancelar') { await resetToMain(session); return null }
 
   const seguimiento = SEGUIMIENTO_OPCIONES[input]
-  if (!seguimiento) return `⚠️ Elegí una opción del 1 al 3.\n\n${buildConsultaP6()}`
+  if (!seguimiento) return `⚠️ Elegí una opción del 1 al 3.\n\n${buildConsultaP7()}`
 
   const newCtx = { ...session.contextData, seguimiento }
   await navigateTo(session, 'consulta_confirmar', { seguimiento })
@@ -258,6 +300,7 @@ export function buildConsultaConfirmar(ctx: EventosMenuContext): string {
     `🎂 Evento: *${ctx.tipoEvento ?? ''}*`,
     `📅 Fecha: ${ctx.fechaEstimada ?? ''}`,
     `👥 Invitados: ${ctx.cantidadInvitados ?? ''}`,
+    `💰 Presupuesto: ${ctx.presupuesto ?? 'No indicado'}`,
     `🎯 Servicios: ${servicios}`,
     `📌 Seguimiento: ${ctx.seguimiento ?? ''}`,
     DSEP,

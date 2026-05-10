@@ -2690,11 +2690,14 @@ export async function crearLead(data: typeof schema.leads.$inferInsert): Promise
   const rows = await db.insert(schema.leads).values(normalized).returning({ id: schema.leads.id })
   return { id: rows[0].id, created: true }
 }
-export async function getLeads(filters?: { estado?: string }) {
-  const q = db.select().from(schema.leads)
-  const rows: schema.Lead[] = filters?.estado
-    ? await (q.where(eq(schema.leads.estado, filters.estado as any)) as any)
-    : await q
+export async function getLeads(filters?: { estado?: string; fuente?: string }) {
+  const conditions: any[] = []
+  if (filters?.estado) conditions.push(eq(schema.leads.estado, filters.estado as any))
+  if (filters?.fuente) conditions.push(eq(schema.leads.fuente, filters.fuente as any))
+
+  const rows: schema.Lead[] = conditions.length > 0
+    ? await db.select().from(schema.leads).where(and(...conditions) as any) as any
+    : await db.select().from(schema.leads)
   return rows.sort((a, b) => (b.createdAt as any) - (a.createdAt as any))
 }
 export async function getLeadById(id: number) {

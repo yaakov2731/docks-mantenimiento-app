@@ -6,6 +6,7 @@ import {
 import {
   buildEventosWelcome, buildEventosMainMenu, buildEventosHelp,
   buildUbicacionInfo, buildServiciosInfo, buildHorariosInfo,
+  buildPaquetesInfo, buildGaleriaInfo,
   buildSalirMessage, DSEP,
 } from './menus/bienvenida'
 import {
@@ -15,6 +16,7 @@ import {
   buildConsultaP4, handleConsultaP4,
   buildConsultaP5, handleConsultaP5,
   buildConsultaP6, handleConsultaP6,
+  buildConsultaP7, handleConsultaP7,
   buildConsultaConfirmar, handleConsultaConfirmar,
 } from './menus/consulta'
 import { calcularEventoScore, getEventoTemperature, EventoLeadTemperature } from './scoring'
@@ -58,7 +60,7 @@ function buildClosingByTemperature(temperature: EventoLeadTemperature, nombre: s
         `Un asesor te va a contactar *hoy* para`,
         `coordinar una visita personalizada al salón.`,
         DSEP,
-        `_Docks Eventos · Salón de eventos · Tigre_ ✨`,
+        `_Docks Eventos · Salón exclusivo · Tigre_ ✨`,
       ].join('\n')
     case 'warm':
       return [
@@ -105,11 +107,12 @@ async function processConfirmation(session: EventosSession): Promise<string> {
   const tipoEvento = String(ctx.tipoEvento ?? '')
   const fechaEstimada = String(ctx.fechaEstimada ?? '')
   const cantidadInvitados = String(ctx.cantidadInvitados ?? '')
+  const presupuesto = String(ctx.presupuesto ?? '')
   const servicios = (ctx.serviciosExtra ?? []) as string[]
   const seguimiento = String(ctx.seguimiento ?? '')
   const phone = fmtPhone(session.waNumber)
 
-  const score = calcularEventoScore({ tipoEvento, fechaEstimada, cantidadInvitados, seguimiento })
+  const score = calcularEventoScore({ tipoEvento, fechaEstimada, cantidadInvitados, presupuesto, seguimiento })
   const temperature = getEventoTemperature(score)
   const tempEmoji: Record<EventoLeadTemperature, string> = { hot: '🔥', warm: '🌡️', cold: '❄️' }
 
@@ -117,6 +120,7 @@ async function processConfirmation(session: EventosSession): Promise<string> {
     `Evento: ${tipoEvento}`,
     `Fecha: ${fechaEstimada}`,
     `Invitados: ${cantidadInvitados}`,
+    presupuesto ? `Presupuesto: ${presupuesto}` : null,
     servicios.length > 0 ? `Servicios: ${servicios.join(', ')}` : null,
     `Seguimiento: ${seguimiento}`,
   ].filter(Boolean).join(' | ')
@@ -151,6 +155,7 @@ async function processConfirmation(session: EventosSession): Promise<string> {
         `🎂 Evento: *${tipoEvento}*`,
         `📅 Fecha: ${fechaEstimada}`,
         `👥 Invitados: ${cantidadInvitados}`,
+        presupuesto ? `💰 Presupuesto: ${presupuesto}` : null,
         servicios.length > 0 ? `🎯 Servicios: ${servicios.join(', ')}` : null,
         `📌 ${seguimiento}`,
         urgencyLine,
@@ -186,19 +191,22 @@ async function routeMessage(session: EventosSession, input: string): Promise<str
         return buildConsultaP1()
       }
       if (input === '2') {
-        // Coordinar visita = same as consulta but pre-set seguimiento intent
+        await navigateTo(session, 'paquetes', {})
+        return buildPaquetesInfo()
+      }
+      if (input === '3') {
         await navigateTo(session, 'consulta_p1', { pendingText: true, seguimientoIntent: 'visita' })
         return buildConsultaP1()
       }
-      if (input === '3') {
+      if (input === '4') {
+        await navigateTo(session, 'galeria', {})
+        return buildGaleriaInfo()
+      }
+      if (input === '5') {
         await navigateTo(session, 'ubicacion', {})
         return buildUbicacionInfo()
       }
-      if (input === '4') {
-        await navigateTo(session, 'servicios', {})
-        return buildServiciosInfo()
-      }
-      if (input === '5') {
+      if (input === '6') {
         await navigateTo(session, 'horarios', {})
         return buildHorariosInfo()
       }
@@ -210,7 +218,9 @@ async function routeMessage(session: EventosSession, input: string): Promise<str
 
     case 'ubicacion':
     case 'servicios':
-    case 'horarios': {
+    case 'horarios':
+    case 'paquetes':
+    case 'galeria': {
       if (input === '0') {
         await resetToMain(session)
         return buildEventosMainMenu()
@@ -219,7 +229,7 @@ async function routeMessage(session: EventosSession, input: string): Promise<str
         await navigateTo(session, 'consulta_p1', { pendingText: true })
         return buildConsultaP1()
       }
-      if (input === '2' && menu !== 'horarios') {
+      if (input === '3') {
         await navigateTo(session, 'consulta_p1', { pendingText: true, seguimientoIntent: 'visita' })
         return buildConsultaP1()
       }
@@ -263,6 +273,11 @@ async function routeMessage(session: EventosSession, input: string): Promise<str
       if (result === null) { await resetToMain(session); return buildEventosMainMenu() }
       return result
     }
+    case 'consulta_p7': {
+      const result = await handleConsultaP7(session, input)
+      if (result === null) { await resetToMain(session); return buildEventosMainMenu() }
+      return result
+    }
     case 'consulta_confirmar': {
       const result = await handleConsultaConfirmar(session, input)
       if (result === null) { await resetToMain(session); return buildEventosMainMenu() }
@@ -286,12 +301,10 @@ export async function handleEventosMessage(waNumber: string, rawMessage: string)
   if (!session) {
     session = await createSession(waNumber)
     const welcome = buildEventosWelcome()
-    // If user sent something other than "hola"-like, show welcome and process next time
     const greetings = ['hola', 'hi', 'hello', 'buenas', 'buen dia', 'buenos dias', 'buen día', 'buenos días']
     if (greetings.includes(normalizeInput(input))) {
       return welcome
     }
-    // Non-greeting first message: show welcome anyway (they need to see the menu)
     return welcome
   }
 
@@ -305,7 +318,6 @@ export async function handleEventosMessage(waNumber: string, rawMessage: string)
     ].join('\n')
   }
 
-  // Update activity timestamp
   await updateSession(waNumber, {})
 
   return routeMessage(session, input)
