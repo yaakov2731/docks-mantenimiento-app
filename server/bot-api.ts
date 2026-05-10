@@ -45,6 +45,7 @@ import {
 } from './db'
 import { parseIntent, buildUnknownIntentResponse } from './messages/intent-parser'
 import { handleIncomingMessage } from './bot-menu/engine'
+import { handleEventosMessage } from './eventos/engine'
 import { notifyOwner } from './_core/notification'
 import { readEnv } from './_core/env'
 
@@ -1632,6 +1633,28 @@ botRouter.post('/mensaje-entrante', authBot, async (req, res) => {
     return res.json({ reply })
   } catch (e: any) {
     console.error('[bot/mensaje-entrante]', e)
+    return res.status(500).json({ error: 'Error interno al procesar el mensaje.' })
+  }
+})
+
+botRouter.post('/eventos/mensaje-entrante', authBot, async (req, res) => {
+  try {
+    const waNumber = normalizeText(req.body?.waNumber)
+    const message = normalizeText(req.body?.message)
+
+    if (!waNumber) return res.status(400).json({ error: 'waNumber es requerido' })
+    if (!message)  return res.status(400).json({ error: 'message es requerido' })
+    if (message.length > 1000) return res.status(400).json({ error: 'message demasiado largo' })
+
+    console.log(`[bot/eventos] request ${JSON.stringify({ waNumber, message })}`)
+
+    const reply = await handleEventosMessage(waNumber, message)
+    console.log(`[bot/eventos] reply ${JSON.stringify({
+      waNumber, message, replyPreview: reply.slice(0, 160),
+    })}`)
+    return res.json({ reply })
+  } catch (e: any) {
+    console.error('[bot/eventos]', e)
     return res.status(500).json({ error: 'Error interno al procesar el mensaje.' })
   }
 })
