@@ -333,16 +333,14 @@ export function parsePlanificacionResponse(input: string): { turnoId?: number; r
       planningSpecific: true,
     }
   }
-  const positiveButtonLike = normalized.match(/^1\s*(confirmo|confirmar|si|ok|dale|asistencia confirmada|confirmo asistencia|confirmo mi asistencia|confirmo turno|confirmo el turno)/i)
+  const positiveButtonLike = normalized.match(/^1\s+(confirmo|confirmar|si|ok|dale|asistencia confirmada|confirmo asistencia|confirmo mi asistencia|confirmo turno|confirmo el turno)/i)
   if (positiveButtonLike) {
     return { respuesta: 'confirmado', planningSpecific: true }
   }
-  const negativeButtonLike = normalized.match(/^2\s*(no|no puedo|no trabajo|no puedo trabajar|cancelar|rechazo|no voy|no voy a poder)/i)
+  const negativeButtonLike = normalized.match(/^2\s+(no|no puedo|no trabajo|no puedo trabajar|cancelar|rechazo|no voy|no voy a poder)/i)
   if (negativeButtonLike) {
     return { respuesta: 'no_trabaja', planningSpecific: true }
   }
-  if (normalized === '1') return { respuesta: 'confirmado', planningSpecific: true }
-  if (normalized === '2') return { respuesta: 'no_trabaja', planningSpecific: true }
   if ([
     'confirmo',
     'confirmar',
@@ -375,6 +373,8 @@ async function handlePlanificacionBotResponse(session: BotSession, input: string
   if (session.userType !== ('gastronomia' as any)) return null
   const parsed = parsePlanificacionResponse(input)
   if (!parsed) {
+    // Pure numeric inputs are menu navigation — never intercept them for planificacion
+    if (/^\d+$/.test(input.trim())) return null
     const pending = await getPendingPlanificacionForEmpleado(session.userId)
     if (pending.length > 0) {
       const turno = pending[0]!

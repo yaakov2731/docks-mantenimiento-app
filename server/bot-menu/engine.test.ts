@@ -2,13 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { parsePlanificacionResponse } from './engine'
 
 describe('parsePlanificacionResponse', () => {
-  it('parses "1" as confirmado', () => {
-    const result = parsePlanificacionResponse('1')
+  it('returns null for standalone "1" (menu navigation, not planificacion)', () => {
+    expect(parsePlanificacionResponse('1')).toBeNull()
+  })
+
+  it('returns null for standalone "2" (menu navigation, not planificacion)', () => {
+    expect(parsePlanificacionResponse('2')).toBeNull()
+  })
+
+  it('parses "1 Confirmo" button-like reply as confirmado', () => {
+    const result = parsePlanificacionResponse('1 Confirmo')
     expect(result).toMatchObject({ respuesta: 'confirmado', planningSpecific: true })
   })
 
-  it('parses "2" as no_trabaja', () => {
-    const result = parsePlanificacionResponse('2')
+  it('parses "2 No puedo" button-like reply as no_trabaja', () => {
+    const result = parsePlanificacionResponse('2 No puedo')
     expect(result).toMatchObject({ respuesta: 'no_trabaja', planningSpecific: true })
   })
 

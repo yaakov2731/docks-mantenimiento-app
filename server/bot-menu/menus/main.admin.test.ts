@@ -44,7 +44,7 @@ describe('admin bot main menu', () => {
     dbMock.listUnassignedLeads.mockResolvedValue([])
   })
 
-  it('renders a compact executive welcome with four category options', async () => {
+  it('renders a compact executive welcome with five category options', async () => {
     dbMock.getReportes.mockResolvedValue([
       { estado: 'pendiente', prioridad: 'urgente', asignadoId: null },
       { estado: 'en_progreso', prioridad: 'media', asignadoId: 3 },
@@ -61,7 +61,7 @@ describe('admin bot main menu', () => {
     expect(menu).toContain('2️⃣  Operación diaria')
     expect(menu).toContain('3️⃣  Rondas de baños')
     expect(menu).toContain('4️⃣  Comercial')
-    expect(menu).not.toContain('5️⃣')
+    expect(menu).toContain('5️⃣')
     expect(menu).not.toContain('9️⃣')
     expect(menu).not.toContain('Tareas vencidas')
   })

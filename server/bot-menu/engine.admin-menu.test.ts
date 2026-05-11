@@ -182,7 +182,7 @@ function adminSession(currentMenu = 'main'): BotSession {
 }
 
 describe('admin compact menu routing', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
     sessionMock.getSession.mockResolvedValue(adminSession())
     sessionMock.isSessionExpired.mockReturnValue(false)
@@ -193,6 +193,8 @@ describe('admin compact menu routing', () => {
       contextData,
       menuHistory: [...session.menuHistory, session.currentMenu],
     }))
+    const { getUsers } = await import('../db')
+    vi.mocked(getUsers).mockResolvedValue([])
   })
 
   it('opens the reclamos category from option 1', async () => {

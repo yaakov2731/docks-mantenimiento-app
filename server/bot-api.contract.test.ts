@@ -73,6 +73,9 @@ vi.mock('./rounds/service', () => ({
 vi.mock('./bot-menu/engine', () => ({
   handleIncomingMessage: vi.fn(async () => 'ok'),
 }))
+vi.mock('./eventos/engine', () => ({
+  handleEventosMessage: vi.fn(async () => 'ok'),
+}))
 
 describe('bot api compatibility contract', () => {
   beforeEach(() => {
