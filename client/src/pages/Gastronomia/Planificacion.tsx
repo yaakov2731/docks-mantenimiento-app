@@ -229,6 +229,7 @@ export default function GastronomiaPlanificacion() {
     const capturedSalida = bulkSalida
     const capturedPuesto = bulkPuesto
     const capturedNota = bulkNota
+    const capturedSector = sector
     setPreviewItems(items)
     setPreviewAction(() => async () => {
       const saved = await Promise.all(capturedEmps.map((emp: any) => {
@@ -240,7 +241,7 @@ export default function GastronomiaPlanificacion() {
           trabaja: true,
           horaEntrada: capturedEntrada,
           horaSalida: capturedSalida,
-          sector,
+          sector: capturedSector,
           puesto: capturedPuesto || existing.puesto || undefined,
           nota: capturedNota || existing.nota || undefined,
         })
