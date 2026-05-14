@@ -5,6 +5,7 @@ import { BotSession } from '../../session'
 import { SEP, parseMenuOption, invalidOption } from '../../shared/guards'
 import { registerEmpleadoAttendance } from '../../../db'
 import { writeAsistenciaAppRow } from '../../../gastronomia/sheets'
+import { writeAsistenciaExcelRow } from '../../../gastronomia/excel'
 import { SECTORES_GASTRONOMIA } from '../../../../shared/const'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -95,13 +96,30 @@ export async function handleGastronomia(session: BotSession, input: string): Pro
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires',
   })
 
-  const syncResult = await writeAsistenciaAppRow({
-    sector: result.status?.assignedSector ?? session.contextData?.sector as string | null | undefined,
-    empleadoNombre: session.userName,
-    puesto: session.contextData?.puesto as string | null | undefined,
-    canal: 'whatsapp',
-    status: result.status,
-  })
+  const sector = result.status?.assignedSector ?? session.contextData?.sector as string | null | undefined
+  const referenceDate = result.status?.lastActionAt
+    ? new Date(result.status.lastActionAt)
+    : new Date()
+
+  const [syncResult] = await Promise.all([
+    writeAsistenciaAppRow({
+      sector,
+      empleadoNombre: session.userName,
+      puesto: session.contextData?.puesto as string | null | undefined,
+      canal: 'whatsapp',
+      status: result.status,
+    }),
+    accion === 'entrada'
+      ? writeAsistenciaExcelRow({
+          sector,
+          empleadoNombre: session.userName,
+          puesto: session.contextData?.puesto as string | null | undefined,
+          referenceDate,
+        }).catch((err: unknown) => {
+          console.warn('[bot/gastronomia] excel_sync_error', { err })
+        })
+      : Promise.resolve(),
+  ])
 
   const label = LABEL_MAP[accion]
   if (!syncResult.ok) {
