@@ -101,25 +101,24 @@ export async function handleGastronomia(session: BotSession, input: string): Pro
     ? new Date(result.status.lastActionAt)
     : new Date()
 
-  const [syncResult] = await Promise.all([
-    writeAsistenciaAppRow({
+  if (accion === 'entrada') {
+    writeAsistenciaExcelRow({
       sector,
       empleadoNombre: session.userName,
       puesto: session.contextData?.puesto as string | null | undefined,
-      canal: 'whatsapp',
-      status: result.status,
-    }),
-    accion === 'entrada'
-      ? writeAsistenciaExcelRow({
-          sector,
-          empleadoNombre: session.userName,
-          puesto: session.contextData?.puesto as string | null | undefined,
-          referenceDate,
-        }).catch((err: unknown) => {
-          console.warn('[bot/gastronomia] excel_sync_error', { err })
-        })
-      : Promise.resolve(),
-  ])
+      referenceDate,
+    }).catch((err: unknown) => {
+      console.warn('[bot/gastronomia] excel_sync_error', { err })
+    })
+  }
+
+  const syncResult = await writeAsistenciaAppRow({
+    sector,
+    empleadoNombre: session.userName,
+    puesto: session.contextData?.puesto as string | null | undefined,
+    canal: 'whatsapp',
+    status: result.status,
+  })
 
   const label = LABEL_MAP[accion]
   if (!syncResult.ok) {

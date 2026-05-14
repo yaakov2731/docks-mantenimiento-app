@@ -239,7 +239,7 @@ export default function Asistencia() {
 
   const resumen = trpc.asistencia.resumen.useQuery(
     { periodo, empleadoId: selectedEmpleadoId, referenceDateMs: referenceMs },
-    { refetchInterval: 5000, refetchOnWindowFocus: true }
+    { refetchInterval: 30000, refetchOnWindowFocus: true }
   )
   const registrar = trpc.asistencia.registrar.useMutation({
     onSuccess: async () => {
