@@ -28,8 +28,8 @@ const navItems: Array<{
 
 export function GastronomiaModuleNav({ current }: { current: NavKey }) {
   return (
-    <section className="gastro-nav-shell rounded-[26px] p-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <section className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+      <div className="flex flex-wrap items-center gap-1.5">
         {navItems.map(item => {
           const active = item.key === current
           const Icon = item.icon
@@ -37,7 +37,11 @@ export function GastronomiaModuleNav({ current }: { current: NavKey }) {
             <Link
               key={item.key}
               href={item.href}
-              className={`gastro-nav-link inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold transition-all ${active ? 'is-active' : ''}`}
+              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-semibold transition-all ${
+                active
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-sm'
+                  : 'border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-slate-900'
+              }`}
             >
               <Icon size={15} />
               <span>{item.label}</span>
