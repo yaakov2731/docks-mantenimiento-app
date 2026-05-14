@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { timingSafeEqual } from 'crypto'
 import ExcelJS from 'exceljs'
-import { getLeads, getLeadsForFollowup, updateLeadFollowup, enqueueBotMessage, getAppConfig, createLeadEvento } from '../db'
+import { getLeads, getLeadsForFollowup, updateLeadFollowup, actualizarLead, enqueueBotMessage, getAppConfig, createLeadEvento } from '../db'
 import { readEnv } from '../_core/env'
 import { JWT_COOKIE, JWT_SECRET } from '../_core/trpc'
 
@@ -274,6 +274,7 @@ router.get('/leads-followup', async (req: Request, res: Response) => {
             metadataJson: JSON.stringify({ message: msg }),
           })
           await updateLeadFollowup(lead.id, 2)
+          await actualizarLead(lead.id, { estado: 'contactado' } as any)
           sent++
         }
       } catch (leadErr) {

@@ -6,7 +6,7 @@
  */
 
 import { BotSession, navigateTo } from '../../session'
-import { getLeadByWaId, flagLeadNeedsAttention } from '../../../db'
+import { getLeadByWaId, flagLeadNeedsAttention, actualizarLead } from '../../../db'
 
 export function buildLeadRespondioMenu(nombre: string): string {
   const saludo = nombre && nombre !== 'Sin nombre' ? nombre : 'ahi'
@@ -45,6 +45,7 @@ export async function handleLeadRespondio(session: BotSession, input: string): P
 
   if (input === '3') {
     await flagLeadNeedsAttention(leadId, '⚡ Pidió hablar con un asesor urgente')
+    await actualizarLead(leadId, { estado: 'contactado' } as any)
     return (
       `✅ *¡Listo!* Un asesor se va a comunicar con vos en breve.\n\n` +
       `Dejamos tu número registrado como *prioritario*.\n` +
@@ -55,6 +56,7 @@ export async function handleLeadRespondio(session: BotSession, input: string): P
 
   if (input === '4') {
     await flagLeadNeedsAttention(leadId, '❌ Indicó que ya no le interesa')
+    await actualizarLead(leadId, { estado: 'descartado' } as any)
     return (
       `👍 *Entendido, no hay problema.*\n\n` +
       `Si en el futuro querés retomar la consulta o conocer los espacios, estamos disponibles.\n\n` +
@@ -71,6 +73,7 @@ export async function handleLeadVisita(session: BotSession, input: string): Prom
   const leadId = session.contextData.leadId as number
   const intent = `📅 Quiere visitar: "${input}"`
   await flagLeadNeedsAttention(leadId, intent)
+  await actualizarLead(leadId, { estado: 'contactado' } as any)
   return (
     `✅ *¡Anotado!* Recibimos tu preferencia: _"${input}"_\n\n` +
     `Un asesor de Docks del Puerto te va a contactar para confirmar el horario.\n\n` +
@@ -82,6 +85,7 @@ export async function handleLeadConsulta(session: BotSession, input: string): Pr
   const leadId = session.contextData.leadId as number
   const intent = `💬 Consulta: "${input}"`
   await flagLeadNeedsAttention(leadId, intent)
+  await actualizarLead(leadId, { estado: 'contactado' } as any)
   return (
     `✅ *Recibimos tu consulta.*\n\n` +
     `Un asesor va a revisar tu mensaje y te responderá a la brevedad.\n\n` +
