@@ -1010,12 +1010,14 @@ botRouter.post('/lead', authBot, async (req, res) => {
     const rubro = clamp(normalizeOptionalText(req.body?.rubro), 100)
     const tipoLocal = clamp(normalizeOptionalText(req.body?.tipoLocal), 200)
     const mensaje = clamp(normalizeOptionalText(req.body?.mensaje), MAX_TEXT)
+    const turnoFecha = clamp(normalizeOptionalText(req.body?.turnoFecha), 20)
+    const turnoHora = clamp(normalizeOptionalText(req.body?.turnoHora), 10)
     if (!nombre) return res.status(400).json({ error: 'nombre es requerido' })
-    const { id, created } = await crearLead({ nombre, telefono, email, waId, rubro, tipoLocal, mensaje, fuente: 'whatsapp' } as any)
+    const { id, created } = await crearLead({ nombre, telefono, email, waId, rubro, tipoLocal, mensaje, turnoFecha, turnoHora, fuente: 'whatsapp' } as any)
     if (created) {
       notifyOwner({
         title: `Nuevo lead WhatsApp`,
-        content: `${nombre} (${telefono || waId || 'sin contacto'}) — ${rubro || 'sin rubro'}`,
+        content: `${nombre} (${telefono || waId || 'sin contacto'}) — ${rubro || 'sin rubro'}${turnoFecha ? ` | Turno: ${turnoFecha}${turnoHora ? ` ${turnoHora}` : ''}` : ''}`,
       }).catch(console.error)
     }
     return res.json({ success: true, id })
