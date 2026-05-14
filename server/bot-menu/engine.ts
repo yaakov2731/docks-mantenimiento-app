@@ -213,6 +213,8 @@ function shouldRefreshIdentifiedSession(
     ) {
       return true
     }
+    const identifiedCanVend = identifiedContext.puedeVender === true
+    if (identifiedCanVend && session.contextData?.puedeVender !== true) return true
   }
 
   if (session.userType === ('gastronomia' as any)) {
@@ -276,7 +278,16 @@ async function identifyUser(waNumber: string): Promise<{ userType: UserType; use
   }
   if (empleado) {
     if (empleado.puedeVender) {
-      return { userType: 'sales', userId: empleado.id, userName: empleado.nombre }
+      return {
+        userType: 'employee',
+        userId: empleado.id,
+        userName: empleado.nombre,
+        contextData: {
+          puedeVender: true,
+          puedeGastronomia: !!(empleado as any).puedeGastronomia,
+          gastroSector: (empleado as any).sector ?? '',
+        },
+      } as any
     }
     if ((empleado as any).puedeGastronomia) {
       return {
@@ -554,6 +565,13 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
       return buildEmpleadoModoSelectorMenu(user.userName)
     }
 
+    // For puedeVender employees, persist context so the ventas option stays visible
+    if (user.userType === 'employee' && (user as any).contextData?.puedeVender) {
+      const ctx = (user as any).contextData
+      await updateSession(normalized, { contextData: ctx })
+      session = { ...session, contextData: ctx }
+    }
+
     return buildMainMenu(session)
   }
 
@@ -663,6 +681,10 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
         await navigateTo(session, 'empleado_modo_selector', { gastroSector: contextData?.gastroSector ?? '' })
         return buildEmpleadoModoSelectorMenu(session.userName)
       }
+      if (input === '5' && contextData?.puedeVender) {
+        await navigateTo(session, 'employee_ventas_main', {})
+        return buildSalesMainMenu(session)
+      }
       if (input === '0') return buildHelpMessage('employee')
       return invalidMenuOption(await buildEmployeeMainMenu(session))
     }
@@ -706,6 +728,26 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
     if (currentMenu === 'ronda_observacion') return handleRondaObservacion(session, input)
     if (currentMenu === 'ronda_observacion_libre') return handleRondaObservacionLibre(session, input)
     if (currentMenu === 'ronda_rechazo') return handleRondaRechazo(session, input)
+
+    // Ventas (empleados con puedeVender)
+    if (currentMenu === 'employee_ventas_main') {
+      if (input === '1') { await navigateTo(session, 'sales_bandeja', { page: 1 }); return buildBandeja({ ...session, currentMenu: 'sales_bandeja', contextData: { page: 1 } }) }
+      if (input === '2') { await navigateTo(session, 'sales_nuevo_lead_p1', { pendingText: true }); return buildNuevoLeadPaso1() }
+      if (input === '3') { await navigateTo(session, 'sales_leads', { page: 1 }); return buildLeadsLista({ ...session, currentMenu: 'sales_leads', contextData: { page: 1 } }) }
+      if (input === '0') return null
+      return invalidMenuOption(await buildSalesMainMenu(session))
+    }
+    if (currentMenu === 'sales_bandeja') return handleBandeja(session, input)
+    if (currentMenu === 'sales_leads') return handleLeadsLista(session, input)
+    if (currentMenu === 'sales_lead_detalle') return handleLeadDetalle(session, input)
+    if (currentMenu === 'sales_lead_nota') return handleLeadNota(session, input)
+    if (currentMenu === 'sales_nuevo_lead_p1') return handleNuevoLeadPaso1(session, input)
+    if (currentMenu === 'sales_nuevo_lead_p2') return handleNuevoLeadPaso2(session, input)
+    if (currentMenu === 'sales_nuevo_lead_p3') return handleNuevoLeadPaso3(session, input)
+    if (currentMenu === 'sales_nuevo_lead_p4') return handleNuevoLeadPaso4(session, input)
+    if (currentMenu === 'sales_nuevo_lead_confirmar') return handleNuevoLeadConfirmar(session, input)
+    if (currentMenu === 'sales_leads_libre') return handleLeadsLibre(session, input)
+    if (currentMenu === 'sales_lead_libre_detalle') return handleLeadLibreDetalle(session, input)
   }
 
   // ── ADMIN ─────────────────────────────────────────────────────────────────────
@@ -905,6 +947,10 @@ async function buildMainMenu(session: BotSession): Promise<string> {
         return buildGastronomiaMenu(sector, session.userName)
       }
       if (menuName === 'rondas_lista')   return buildRondasLista(session)
+      if (menuName === 'employee_ventas_main') return buildSalesMainMenu(session)
+      if (menuName === 'sales_bandeja')  return buildBandeja(session)
+      if (menuName === 'sales_leads')    return buildLeadsLista(session)
+      if (menuName === 'sales_leads_libre') return buildLeadsLibre(session)
     }
 
   if (userType === 'admin') {

@@ -69,7 +69,9 @@ export async function buildEmployeeMainMenu(session: BotSession): Promise<string
 
   const dualAttendanceLines = session.contextData?.puedeGastronomia
     ? [`5️⃣  🔀 Cambiar de área`]
-    : []
+    : session.contextData?.puedeVender
+      ? [`5️⃣  🎯 Ventas`]
+      : []
 
   return [
     `👷 *${session.userName}* — Menú principal`,

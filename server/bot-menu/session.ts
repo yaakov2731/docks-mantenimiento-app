@@ -78,6 +78,7 @@ function getPersistentContext(contextData: MenuContext): MenuContext {
       'sector',
       'sheetsRow',
       'puesto',
+      'puedeVender',
     ].includes(key)
   })
   return Object.fromEntries(persistentEntries)
