@@ -7,6 +7,7 @@ import { Contact, FileSpreadsheet, UserPlus, Users } from 'lucide-react'
 
 type EmpleadoForm = {
   nombre: string
+  telefono: string
   waId: string
   sector: string
   puesto: string
@@ -16,7 +17,7 @@ type EmpleadoForm = {
 }
 
 const emptyForm: EmpleadoForm = {
-  nombre: '', waId: '', sector: 'brooklyn', puesto: '', pagoDiario: '0', puedeGastronomia: false, activo: true,
+  nombre: '', telefono: '', waId: '', sector: 'brooklyn', puesto: '', pagoDiario: '0', puedeGastronomia: false, activo: true,
 }
 
 type CsvRow = {
@@ -137,8 +138,14 @@ export default function GastronomiaPersonal() {
     sector: sector === 'todos' ? undefined : sector,
     activo: activoFilter,
   })
-  const createMut = trpc.gastronomia.createEmpleado.useMutation({ onSuccess: () => { refetch(); setShowForm(false); setForm(emptyForm) } })
-  const updateMut = trpc.gastronomia.updateEmpleado.useMutation({ onSuccess: () => { refetch(); setEditId(null); setShowForm(false) } })
+  const createMut = trpc.gastronomia.createEmpleado.useMutation({
+    onSuccess: () => { refetch(); setShowForm(false); setForm(emptyForm) },
+    onError: (err) => alert(`Error al crear: ${err.message}`),
+  })
+  const updateMut = trpc.gastronomia.updateEmpleado.useMutation({
+    onSuccess: () => { refetch(); setEditId(null); setShowForm(false) },
+    onError: (err) => alert(`Error al guardar: ${err.message}`),
+  })
   const bulkMut = trpc.gastronomia.bulkImportEmpleados.useMutation({
     onSuccess: (res) => {
       refetch()
@@ -151,6 +158,7 @@ export default function GastronomiaPersonal() {
     e.preventDefault()
     const payload = {
       nombre: form.nombre,
+      telefono: form.telefono || undefined,
       waId: form.waId || undefined,
       sector: form.sector,
       puesto: form.puesto || undefined,
@@ -168,6 +176,7 @@ export default function GastronomiaPersonal() {
     setEditId(emp.id)
     setForm({
       nombre: emp.nombre ?? '',
+      telefono: emp.telefono ?? '',
       waId: emp.waId ?? '',
       sector: emp.sector ?? 'brooklyn',
       puesto: emp.puesto ?? '',
@@ -314,6 +323,7 @@ export default function GastronomiaPersonal() {
                   <th className="text-left px-4 py-3 font-medium text-slate-500">Nombre</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-500">Local</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-500">Puesto</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-500">Teléfono</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-500">WhatsApp</th>
                   <th className="text-right px-4 py-3 font-medium text-slate-500">Valor día</th>
                   <th className="text-center px-4 py-3 font-medium text-slate-500">Estado</th>
@@ -326,6 +336,7 @@ export default function GastronomiaPersonal() {
                     <td className="px-4 py-3 font-medium text-slate-900">{emp.nombre}</td>
                     <td className="px-4 py-3 text-slate-600">{sectorLabel(emp.sector)}</td>
                     <td className="px-4 py-3 text-slate-600">{emp.puesto ?? '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">{emp.telefono ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{emp.waId ?? '—'}</td>
                     <td className="px-4 py-3 text-right text-slate-900">${emp.pagoDiario?.toLocaleString('es-AR') ?? 0}</td>
                     <td className="px-4 py-3 text-center">
@@ -461,6 +472,15 @@ export default function GastronomiaPersonal() {
                     onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Teléfono</label>
+                  <input
+                    value={form.telefono}
+                    onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Ej: 1123456789"
                   />
                 </div>
                 <div>

@@ -184,7 +184,7 @@ export default function GastronomiaAsistencia() {
 
   const { data } = trpc.gastronomia.getMarcaciones.useQuery(
     { sector: sector === 'todos' ? undefined : sector, year, month },
-    { refetchInterval: 5000, refetchOnWindowFocus: true }
+    { refetchInterval: 30000, refetchOnWindowFocus: true }
   )
   const { data: liquidacion = [] } = trpc.gastronomia.getLiquidacion.useQuery({
     sector: sector === 'todos' ? undefined : sector,
