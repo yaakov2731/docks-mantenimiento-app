@@ -25,12 +25,12 @@ export function PlanningCell({ savedTurno, draft, isDraft, onClick }: Props) {
   return (
     <button
       onClick={onClick}
-      className={`w-full rounded-[14px] border p-2 text-left transition hover:ring-1 hover:ring-slate-300 active:scale-[0.99] ${
+      className={`gastro-plan-cell w-full rounded-[14px] border p-2 text-left transition active:scale-[0.99] ${
         isDraft
-          ? 'border-amber-300 bg-amber-50/60 ring-1 ring-amber-200'
+          ? 'gastro-plan-cell-draft ring-1'
           : savedTurno
-            ? 'border-slate-200 bg-slate-50'
-            : 'border-dashed border-slate-200 bg-white hover:border-slate-300'
+            ? 'gastro-plan-cell-saved'
+            : 'gastro-plan-cell-empty border-dashed'
       }`}
     >
       {savedTurno || isDraft ? (
@@ -52,18 +52,18 @@ export function PlanningCell({ savedTurno, draft, isDraft, onClick }: Props) {
             )}
           </div>
           {trabaja ? (
-            <div className="text-[11px] font-semibold text-slate-800">
+            <div className="gastro-plan-cell-time text-[11px] font-semibold">
               {horaEntrada}–{horaSalida}
             </div>
           ) : (
-            <div className="text-[11px] text-slate-400">No trabaja</div>
+            <div className="gastro-plan-cell-muted text-[11px]">No trabaja</div>
           )}
           {puesto && (
-            <div className="mt-0.5 truncate text-[10px] text-slate-500">{puesto}</div>
+            <div className="gastro-plan-cell-muted mt-0.5 truncate text-[10px]">{puesto}</div>
           )}
         </>
       ) : (
-        <div className="py-2 text-center text-[10px] text-slate-300">+ Agregar</div>
+        <div className="gastro-plan-cell-muted py-2 text-center text-[10px]">+ Agregar</div>
       )}
     </button>
   )

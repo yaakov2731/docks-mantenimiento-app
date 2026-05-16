@@ -50,14 +50,23 @@ export function TurnoEditDrawer({
     onClose()
   }
 
+  const [entradaHora = '0', entradaMin = '0'] = draft.horaEntrada.split(':')
+  const [salidaHora = '0', salidaMin = '0'] = draft.horaSalida.split(':')
+  const durationMinutes = Math.max(0, (Number(salidaHora) * 60 + Number(salidaMin)) - (Number(entradaHora) * 60 + Number(entradaMin)))
+  const durationHours = Math.floor(durationMinutes / 60)
+  const durationRemainder = durationMinutes % 60
+  const durationLabel = durationMinutes > 0
+    ? durationRemainder > 0 ? `${durationHours}h ${durationRemainder}m` : `${durationHours}h`
+    : 'Sin rango'
+
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/30" onClick={handleClose} />
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-slate-200 px-4 py-3">
-          <div>
-            <div className="font-semibold text-slate-900">{emp.nombre}</div>
-            <div className="text-xs capitalize text-slate-500">{dateLabel}</div>
+      <div className="fixed inset-0 z-40 bg-black/55" onClick={handleClose} />
+      <div className="gastro-plan-drawer fixed inset-y-0 right-0 z-50 flex w-full max-w-[370px] flex-col shadow-2xl">
+        <div className="gastro-plan-drawer-header flex items-start justify-between border-b px-4 py-3">
+          <div className="min-w-0">
+            <div className="truncate text-[15px] font-semibold">{emp.nombre}</div>
+            <div className="text-xs capitalize">{dateLabel}</div>
             {savedTurno?.estado && (
               <span
                 className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusClass(savedTurno.estado)}`}
@@ -68,104 +77,117 @@ export function TurnoEditDrawer({
           </div>
           <button
             onClick={handleClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+            className="gastro-employee-icon-button rounded-lg p-1.5"
           >
             <X size={16} />
           </button>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        <div className="gastro-plan-drawer-body flex-1 overflow-y-auto px-4 py-3">
+          <label className="gastro-plan-toggle mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold">
             <input
               type="checkbox"
               checked={draft.trabaja}
               onChange={e => onDraftChange({ trabaja: e.target.checked })}
-              className="h-4 w-4 rounded border-slate-300"
+              className="h-4 w-4 rounded"
             />
             Trabaja este día
           </label>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="gastro-plan-compact-metrics mb-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border px-3 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide">Turno</div>
+              <div className="mt-1 text-sm font-semibold">{draft.horaEntrada} - {draft.horaSalida}</div>
+            </div>
+            <div className="rounded-xl border px-3 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide">Duración</div>
+              <div className="mt-1 text-sm font-semibold">{durationLabel}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
             <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">Entrada</span>
+              <span className="gastro-plan-label text-xs font-semibold">Entrada</span>
               <input
                 type="time"
                 value={draft.horaEntrada}
                 disabled={!draft.trabaja}
                 onChange={e => onDraftChange({ horaEntrada: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:opacity-40"
+                className="gastro-plan-input w-full rounded-xl border px-3 py-2 text-sm disabled:opacity-40"
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">Salida</span>
+              <span className="gastro-plan-label text-xs font-semibold">Salida</span>
               <input
                 type="time"
                 value={draft.horaSalida}
                 disabled={!draft.trabaja}
                 onChange={e => onDraftChange({ horaSalida: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:opacity-40"
+                className="gastro-plan-input w-full rounded-xl border px-3 py-2 text-sm disabled:opacity-40"
               />
             </label>
           </div>
 
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold text-slate-600">Rol / Puesto</span>
-            <input
-              value={draft.puesto}
-              disabled={!draft.trabaja}
-              onChange={e => onDraftChange({ puesto: e.target.value })}
-              placeholder="Caja, cocina, salón…"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:opacity-40"
-            />
-          </label>
-
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold text-slate-600">Nota</span>
-            <input
-              value={draft.nota}
-              disabled={!draft.trabaja}
-              onChange={e => onDraftChange({ nota: e.target.value })}
-              placeholder="Indicaciones adicionales"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:opacity-40"
-            />
-          </label>
-
-          {savedTurno?.estado === 'confirmado' && (
-            <div className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-              <CheckCircle2 size={15} />
-              El empleado confirmó este turno
-            </div>
-          )}
-
-          {!emp.waId && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              Sin WhatsApp — se puede guardar pero no enviar mensaje.
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-2 border-t border-slate-200 px-4 py-3">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="gastro-plan-inline-actions mt-3 grid grid-cols-2 gap-2">
             <button
               onClick={onSave}
               disabled={isSaving}
-              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
+              className="gastro-plan-button-primary flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold disabled:opacity-40"
             >
               <Save size={15} />
               Guardar
             </button>
             <button
               onClick={onCopyToWeek}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="gastro-plan-button-secondary flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold"
             >
               <Copy size={15} />
               Copiar semana
             </button>
           </div>
 
+          <div className="mt-3 grid gap-3">
+            <label className="block space-y-1">
+              <span className="gastro-plan-label text-xs font-semibold">Rol / Puesto</span>
+              <input
+                value={draft.puesto}
+                disabled={!draft.trabaja}
+                onChange={e => onDraftChange({ puesto: e.target.value })}
+                placeholder="Caja, cocina, salón…"
+                className="gastro-plan-input w-full rounded-xl border px-3 py-2 text-sm disabled:opacity-40"
+              />
+            </label>
+
+            <label className="block space-y-1">
+              <span className="gastro-plan-label text-xs font-semibold">Nota breve</span>
+              <input
+                value={draft.nota}
+                disabled={!draft.trabaja}
+                onChange={e => onDraftChange({ nota: e.target.value })}
+                placeholder="Indicaciones adicionales"
+                className="gastro-plan-input w-full rounded-xl border px-3 py-2 text-sm disabled:opacity-40"
+              />
+            </label>
+          </div>
+
+          {savedTurno?.estado === 'confirmado' && (
+            <div className="gastro-plan-alert gastro-plan-alert-success mt-3 flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold">
+              <CheckCircle2 size={15} />
+              El empleado confirmó este turno
+            </div>
+          )}
+
+          {!emp.waId && (
+            <div className="gastro-plan-alert gastro-plan-alert-warning mt-3 rounded-xl border px-3 py-2 text-sm">
+              Sin WhatsApp — se puede guardar pero no enviar mensaje.
+            </div>
+          )}
+        </div>
+
+        <div className="gastro-plan-drawer-footer space-y-2 border-t px-4 py-3">
           {confirmDelete ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
-              <div className="mb-2 text-sm font-semibold text-rose-800">
+            <div className="gastro-plan-alert gastro-plan-alert-error rounded-xl border p-3">
+              <div className="mb-2 text-sm font-semibold">
                 ¿Borrar este turno planificado?
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -178,7 +200,7 @@ export function TurnoEditDrawer({
                 </button>
                 <button
                   onClick={() => setConfirmDelete(false)}
-                  className="rounded-xl border border-slate-200 bg-white py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  className="gastro-plan-button-secondary rounded-xl border py-2 text-sm font-semibold"
                 >
                   Cancelar
                 </button>
@@ -188,7 +210,7 @@ export function TurnoEditDrawer({
             <button
               onClick={() => setConfirmDelete(true)}
               disabled={!savedTurno?.id}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2 text-sm font-semibold text-slate-500 hover:border-rose-300 hover:text-rose-600 disabled:opacity-30"
+              className="gastro-plan-button-secondary flex w-full items-center justify-center gap-2 rounded-xl border py-2 text-sm font-semibold disabled:opacity-30"
             >
               <Trash2 size={14} />
               Borrar turno guardado

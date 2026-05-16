@@ -41,33 +41,28 @@ export default function DashboardLayout({ children, title }: { children: React.R
   const visibleNavItems = navItems.filter(item => !userRole || item.roles.includes(userRole))
 
   const Sidebar = () => (
-    <div className="flex flex-col h-full text-white w-64 relative overflow-hidden"
-      style={{ background: 'linear-gradient(180deg, #0F172A 0%, #0a1422 100%)' }}>
+    <div className="oled-panel-sidebar flex flex-col h-full text-white w-64 relative overflow-hidden">
 
       {/* Glow overlay */}
-      <div className="pointer-events-none absolute top-0 right-0 w-48 h-48 rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
+      <div className="pointer-events-none absolute top-0 right-0 w-48 h-48 rounded-full oled-panel-sidebar-glow" />
 
       {/* Logo */}
-      <div className="px-5 pt-6 pb-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="px-5 pt-6 pb-5 oled-panel-sidebar-section">
         <BrandLogo variant="dark" size="sm" showTagline />
       </div>
 
       {/* User card */}
       {user && (
-        <div className="mx-3 mt-3 mb-1 rounded-xl px-3 py-2.5"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
-          <p className="text-[9px] uppercase tracking-widest font-semibold"
-            style={{ color: 'rgba(255,255,255,0.28)' }}>Conectado como</p>
+        <div className="oled-panel-sidebar-card mx-3 mt-3 mb-1 rounded-xl px-3 py-2.5">
+          <p className="oled-panel-sidebar-caption text-[9px] uppercase tracking-widest font-semibold">Conectado como</p>
           <p className="text-[13px] font-semibold text-white mt-0.5 truncate">{user.name}</p>
-          <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.38)' }}>{roleLabel[userRole ?? 'employee']}</p>
+          <p className="oled-panel-sidebar-subtitle text-[11px]">{roleLabel[userRole ?? 'employee']}</p>
         </div>
       )}
 
       {/* Nav */}
       <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
-        <p className="text-[9px] uppercase tracking-widest font-semibold px-3 mb-2"
-          style={{ color: 'rgba(255,255,255,0.22)' }}>Navegación</p>
+        <p className="oled-panel-sidebar-caption text-[9px] uppercase tracking-widest font-semibold px-3 mb-2">Navegación</p>
         {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = location === href
           return (
@@ -75,18 +70,11 @@ export default function DashboardLayout({ children, title }: { children: React.R
               key={href}
               href={href}
               onClick={() => setOpen(false)}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all ${
+              className={`oled-panel-nav-link flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all ${
                 active
-                  ? 'text-white font-semibold'
+                  ? 'oled-panel-nav-link-active text-white font-semibold'
                   : 'hover:text-white'
               }`}
-              style={active ? {
-                background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-                boxShadow: '0 4px 14px rgba(37,99,235,0.30), inset 0 1px 0 rgba(255,255,255,0.10)',
-                color: '#fff',
-              } : {
-                color: 'rgba(255,255,255,0.45)',
-              }}
             >
               <Icon size={15} className={active ? 'opacity-100' : 'opacity-70'} />
               {label}
@@ -96,20 +84,11 @@ export default function DashboardLayout({ children, title }: { children: React.R
       </nav>
 
       {/* Logout */}
-      <div className="px-2.5 pb-4 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="oled-panel-sidebar-section px-2.5 pb-4 pt-3">
         <button
           type="button"
           onClick={() => logout.mutate()}
-          className="flex items-center gap-2.5 px-3 py-2 w-full rounded-lg text-[13px] transition-all"
-          style={{ color: 'rgba(255,255,255,0.32)', background: 'transparent' }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.65)'
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.32)'
-          }}
+          className="oled-panel-logout flex items-center gap-2.5 px-3 py-2 w-full rounded-lg text-[13px] transition-all"
         >
           <LogOut size={15} />
           Cerrar sesión
@@ -119,7 +98,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
   )
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#F1F5F9' }}>
+    <div className="oled-panel-shell flex h-screen overflow-hidden">
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-shrink-0">
@@ -132,28 +111,27 @@ export default function DashboardLayout({ children, title }: { children: React.R
           <div className="flex-shrink-0">
             <Sidebar />
           </div>
-          <div className="flex-1" style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+          <div className="oled-panel-backdrop flex-1"
             onClick={() => setOpen(false)} />
         </div>
       )}
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="oled-panel-main flex-1 flex flex-col overflow-hidden">
 
         {/* Top bar */}
-        <header className="bg-white border-b px-4 md:px-5 flex items-center gap-3 flex-shrink-0"
-          style={{ height: '52px', borderColor: '#E2E8F0' }}>
+        <header className="oled-panel-topbar px-4 md:px-5 flex items-center gap-3 flex-shrink-0"
+          style={{ height: '52px' }}>
           <button
             type="button"
-            className="md:hidden p-2 rounded-lg transition-colors"
-            style={{ color: '#64748B' }}
+            className="oled-panel-topbar-button md:hidden p-2 rounded-lg transition-colors"
             onClick={() => setOpen(!open)}
             aria-label="Abrir menú"
           >
             {open ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="font-heading font-semibold truncate" style={{ fontSize: '16px', color: '#0F172A' }}>
+            <h1 className="oled-panel-title font-heading font-semibold truncate" style={{ fontSize: '16px' }}>
               {title ?? 'Dashboard'}
             </h1>
           </div>
@@ -161,18 +139,8 @@ export default function DashboardLayout({ children, title }: { children: React.R
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 transition-all border"
-            style={{ color: '#64748B', borderColor: '#E2E8F0', fontSize: '12px' }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLAnchorElement).style.color = '#2563EB'
-              ;(e.currentTarget as HTMLAnchorElement).style.borderColor = '#BFDBFE'
-              ;(e.currentTarget as HTMLAnchorElement).style.background = '#EFF6FF'
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLAnchorElement).style.color = '#64748B'
-              ;(e.currentTarget as HTMLAnchorElement).style.borderColor = '#E2E8F0'
-              ;(e.currentTarget as HTMLAnchorElement).style.background = 'transparent'
-            }}
+            className="oled-panel-topbar-link hidden sm:flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 transition-all border"
+            style={{ fontSize: '12px' }}
           >
             <Home size={12} />
             Ver formulario
@@ -180,7 +148,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-5">
+        <main className="oled-panel-content flex-1 overflow-y-auto p-4 md:p-5">
           {children}
         </main>
       </div>

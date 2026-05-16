@@ -145,18 +145,28 @@ function MetricCard({ label, value, hint, icon: Icon, tone }: {
   icon: ComponentType<{ size?: number; className?: string }>
   tone: string
 }) {
+  const isActiveMetric = label === 'En turno'
+
   return (
-    <div className={`rounded-[22px] border p-4 shadow-sm ${tone}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] uppercase tracking-wide opacity-65">{label}</div>
-          <div className="mt-2 font-heading text-3xl font-semibold leading-none">{value}</div>
+    <div
+      className={`rounded-2xl border px-3.5 py-3 shadow-[0_16px_34px_rgba(15,23,42,0.12)] transition-transform duration-200 hover:-translate-y-0.5 ${tone}`}
+      style={isActiveMetric ? { color: '#ffffff' } : undefined}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className={`rounded-xl p-2 ${isActiveMetric ? 'bg-emerald-50 text-emerald-800' : 'bg-white/75'}`}
+          style={isActiveMetric ? { color: '#065f46' } : undefined}
+        >
+          <Icon size={16} />
         </div>
-        <div className="rounded-2xl bg-white/70 p-2.5">
-          <Icon size={17} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <div className={`truncate text-[10px] font-semibold uppercase tracking-wide ${isActiveMetric ? 'text-emerald-50' : 'opacity-65'}`}>{label}</div>
+            <div className={`font-heading text-xl font-semibold leading-none md:text-2xl ${isActiveMetric ? 'text-white' : ''}`}>{value}</div>
+          </div>
+          <div className={`mt-1 truncate text-[11px] ${isActiveMetric ? 'text-emerald-100' : 'opacity-65'}`}>{hint}</div>
         </div>
       </div>
-      <div className="mt-3 text-xs opacity-70">{hint}</div>
     </div>
   )
 }
@@ -246,7 +256,7 @@ export default function GastronomiaAsistencia() {
       <div className="gastro-premium space-y-5">
         <GastronomiaModuleNav current="asistencia" />
 
-        <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <section className="space-y-3">
           <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -261,12 +271,12 @@ export default function GastronomiaAsistencia() {
                   Reloj central, estado actual, actividad reciente y grilla mensual para el equipo gastronómico.
                 </p>
               </div>
-              <div className="rounded-[26px] bg-slate-950 px-5 py-4 text-right text-white">
-                <div className="text-[10px] uppercase tracking-[0.24em] text-white/45">Reloj de asistencia</div>
-                <div className="mt-2 font-mono text-[42px] font-bold leading-none text-emerald-300">
+              <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-right text-slate-900">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Reloj de asistencia</div>
+                <div className="mt-1 font-mono text-[30px] font-bold leading-none text-emerald-700">
                   {now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
                 </div>
-                <div className="mt-2 text-xs text-white/45">
+                <div className="mt-1 text-xs text-slate-500">
                   {now.toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: 'long' })}
                 </div>
               </div>
@@ -286,11 +296,11 @@ export default function GastronomiaAsistencia() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <MetricCard label="Personal" value={employees.length} hint="Activos en este filtro." icon={Users} tone="border-slate-200 bg-white text-slate-900" />
-            <MetricCard label="En turno" value={stats.onShift} hint="Jornada activa." icon={UserRoundCheck} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
-            <MetricCard label="Almuerzo" value={stats.onLunch} hint="Pausas abiertas." icon={Coffee} tone="border-amber-200 bg-amber-50 text-amber-900" />
-            <MetricCard label="Pago estimado" value={formatCurrency(stats.total)} hint="Mes seleccionado." icon={Wallet} tone="border-sky-200 bg-sky-50 text-sky-900" />
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard label="Personal" value={employees.length} hint="Activos en filtro" icon={Users} tone="border-slate-200 bg-white text-slate-900" />
+            <MetricCard label="En turno" value={stats.onShift} hint="Jornada activa" icon={UserRoundCheck} tone="border-emerald-800 bg-emerald-700 text-white ring-1 ring-emerald-500/40" />
+            <MetricCard label="Almuerzo" value={stats.onLunch} hint="Pausas abiertas" icon={Coffee} tone="border-amber-200 bg-amber-50 text-amber-900" />
+            <MetricCard label="Pago estimado" value={formatCurrency(stats.total)} hint="Mes seleccionado" icon={Wallet} tone="border-slate-200 bg-white text-slate-900" />
           </div>
         </section>
 

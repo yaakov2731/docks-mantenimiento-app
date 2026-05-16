@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Save, Send } from 'lucide-react'
 import DashboardLayout from '../../components/DashboardLayout'
 import { GastronomiaModuleNav } from '../../components/GastronomiaModuleNav'
@@ -132,11 +132,11 @@ export default function GastronomiaPlanificacion() {
     }
   }
 
-  function openDrawer(emp: any, fecha: string) {
+  const openDrawer = useCallback((emp: any, fecha: string) => {
     setDrawerEmp(emp)
     setDrawerFecha(fecha)
     setDrawerOpen(true)
-  }
+  }, [])
 
   function handleDraftChange(patch: Partial<DraftTurno>) {
     if (!drawerEmp) return
@@ -185,13 +185,13 @@ export default function GastronomiaPlanificacion() {
     setDrawerOpen(false)
   }
 
-  function setWeekWorkState(emp: any, trabaja: boolean) {
+  const setWeekWorkState = useCallback((emp: any, trabaja: boolean) => {
     const next: Record<string, DraftTurno> = {}
     for (const day of weekDays) {
       next[draftKey(emp.id, day)] = { ...getCellDraft(emp, day), trabaja }
     }
     setDraft(cur => ({ ...cur, ...next }))
-  }
+  }, [weekDays, draft, turnoByCell, sector])
 
   function applyBulkToDraft() {
     if (selectedEmployees.length === 0 || !bulkDay) return
@@ -286,18 +286,18 @@ export default function GastronomiaPlanificacion() {
 
   return (
     <DashboardLayout title="Planificación Gastronomía">
-      <div className="space-y-4">
+      <div className="gastro-plan-shell space-y-4">
         <GastronomiaModuleNav current="planificacion" />
 
         {errorMsg && (
-          <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+          <div className="gastro-plan-alert gastro-plan-alert-error flex items-center justify-between rounded-xl border px-4 py-3 text-sm font-medium">
             {errorMsg}
             <button onClick={() => setErrorMsg(null)} className="ml-3 text-rose-500 hover:text-rose-700">✕</button>
           </div>
         )}
 
         {publishResult && (
-          <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          <div className="gastro-plan-alert gastro-plan-alert-success flex items-center justify-between rounded-xl border px-4 py-3 text-sm font-medium">
             Planificación enviada — {publishResult.published} mensajes enviados, {publishResult.skipped} sin WhatsApp.
             <button onClick={() => setPublishResult(null)} className="ml-3 text-emerald-600 hover:text-emerald-800">✕</button>
           </div>
@@ -322,14 +322,14 @@ export default function GastronomiaPlanificacion() {
         />
 
         {/* Bulk action panel */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="gastro-plan-bulk rounded-xl border p-4 shadow-sm">
           <div className="grid gap-3 lg:grid-cols-[1fr_110px_110px_1fr_1fr_auto]">
             <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">Día</span>
+              <span className="gastro-plan-label text-xs font-semibold">Día</span>
               <select
                 value={bulkDay}
                 onChange={e => setBulkDay(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="gastro-plan-input w-full rounded-xl border px-3 py-2 text-sm"
               >
                 {weekDays.map(day => {
                   const label = formatDayLabel(day)
@@ -338,46 +338,46 @@ export default function GastronomiaPlanificacion() {
               </select>
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">Entrada</span>
+              <span className="gastro-plan-label text-xs font-semibold">Entrada</span>
               <input
                 type="time"
                 value={bulkEntrada}
                 onChange={e => setBulkEntrada(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="gastro-plan-input w-full rounded-xl border px-3 py-2 text-sm"
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">Salida</span>
+              <span className="gastro-plan-label text-xs font-semibold">Salida</span>
               <input
                 type="time"
                 value={bulkSalida}
                 onChange={e => setBulkSalida(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="gastro-plan-input w-full rounded-xl border px-3 py-2 text-sm"
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">Rol</span>
+              <span className="gastro-plan-label text-xs font-semibold">Rol</span>
               <input
                 value={bulkPuesto}
                 onChange={e => setBulkPuesto(e.target.value)}
                 placeholder="Caja, cocina, salón"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="gastro-plan-input w-full rounded-xl border px-3 py-2 text-sm"
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">Nota</span>
+              <span className="gastro-plan-label text-xs font-semibold">Nota</span>
               <input
                 value={bulkNota}
                 onChange={e => setBulkNota(e.target.value)}
                 placeholder="Indicaciones"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                className="gastro-plan-input w-full rounded-xl border px-3 py-2 text-sm"
               />
             </label>
             <div className="flex items-end gap-2">
               <button
                 onClick={applyBulkToDraft}
                 disabled={selectedEmployees.length === 0}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                className="gastro-plan-button-secondary inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold disabled:opacity-40"
               >
                 <Save size={15} />
                 Cargar
@@ -385,7 +385,7 @@ export default function GastronomiaPlanificacion() {
               <button
                 onClick={openBulkSendPreview}
                 disabled={saveMut.isPending || publishMut.isPending || selectedEmployees.length === 0}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
+                className="gastro-plan-button-primary inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold disabled:opacity-40"
               >
                 <Send size={15} />
                 Enviar

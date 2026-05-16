@@ -28,7 +28,7 @@ const navItems: Array<{
 
 export function GastronomiaModuleNav({ current }: { current: NavKey }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+    <section className="gastro-module-nav rounded-2xl border px-3 py-2.5 shadow-sm">
       <div className="flex flex-wrap items-center gap-1.5">
         {navItems.map(item => {
           const active = item.key === current
@@ -39,8 +39,8 @@ export function GastronomiaModuleNav({ current }: { current: NavKey }) {
               href={item.href}
               className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-semibold transition-all ${
                 active
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-sm'
-                  : 'border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-slate-900'
+                  ? 'gastro-module-nav-active shadow-sm'
+                  : 'gastro-module-nav-link'
               }`}
             >
               <Icon size={15} />

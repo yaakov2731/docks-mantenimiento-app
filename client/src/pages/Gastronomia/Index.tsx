@@ -77,23 +77,23 @@ function KpiCard({ label, value, hint, icon: Icon, tone }: {
   tone: 'emerald' | 'blue' | 'amber' | 'slate'
 }) {
   const tones = {
-    emerald: 'gastro-kpi gastro-kpi-accent text-emerald-900',
-    blue: 'gastro-kpi text-sky-900',
-    amber: 'gastro-kpi text-amber-900',
-    slate: 'gastro-kpi text-slate-900',
+    emerald: 'gastro-home-kpi gastro-home-kpi-emerald',
+    blue: 'gastro-home-kpi gastro-home-kpi-blue',
+    amber: 'gastro-home-kpi gastro-home-kpi-amber',
+    slate: 'gastro-home-kpi gastro-home-kpi-slate',
   }
   return (
-    <div className={`rounded-[28px] p-4 ${tones[tone]}`}>
-      <div className="flex items-start justify-between gap-4">
+    <div className={`rounded-[22px] p-4 ${tones[tone]}`}>
+      <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[11px] uppercase tracking-wide opacity-60">{label}</div>
-          <div className="mt-2 font-heading text-3xl font-semibold leading-none">{value}</div>
+          <div className="mt-1.5 font-heading text-2xl font-semibold leading-none">{value}</div>
         </div>
-        <div className="rounded-2xl border border-white/70 bg-white/75 p-2.5 shadow-sm">
-          <Icon size={18} />
+        <div className="gastro-home-kpi-icon rounded-xl border p-2 shadow-sm">
+          <Icon size={16} />
         </div>
       </div>
-      <div className="mt-3 text-xs opacity-70">{hint}</div>
+      <div className="mt-2.5 text-xs opacity-60">{hint}</div>
     </div>
   )
 }
@@ -127,64 +127,60 @@ export default function GastronomiaIndex() {
 
   return (
     <DashboardLayout title="Centro Gastronomía">
-      <div className="gastro-premium space-y-5">
+      <div className="gastro-home-shell space-y-4">
         <GastronomiaModuleNav current="home" />
 
-        <section className="gastro-hero rounded-[34px] p-5 md:p-7 text-white">
-          <div className="absolute inset-y-0 right-0 w-2/3 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.34),transparent_62%)]" />
-          <div className="relative grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-            <div>
-              <div className="gastro-chip inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase">
-                <UtensilsCrossed size={14} />
-                Operación independiente
+        {/* Header compacto: chip + título + pulso + acciones */}
+        <section className="gastro-home-header rounded-[22px] px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+
+            {/* Identidad del módulo */}
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="gastro-home-header-icon rounded-xl border p-2 shrink-0">
+                <UtensilsCrossed size={18} />
               </div>
-              <h1 className="mt-4 max-w-3xl font-heading text-[30px] md:text-[42px] font-semibold leading-tight">
-                Centro gastronómico con lectura clara, ritmo operativo y control real por local.
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                Personal, asistencia, planificación y liquidación en un circuito propio. Menos ruido, más visibilidad para mover turnos y confirmar equipo sin mezclar mantenimiento.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Link href="/gastronomia/planificacion" className="gastro-button-primary inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold text-slate-950 transition-all">
-                  Planificar semana <ArrowRight size={15} />
-                </Link>
-                <Link href="/gastronomia/asistencia" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/12">
-                  Abrir reloj
-                </Link>
-                <Link href="/gastronomia/personal" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/12">
-                  Personal
-                </Link>
-                <Link href="/gastronomia/liquidacion" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/12">
-                  Liquidación
-                </Link>
+              <div className="min-w-0">
+                <div className="gastro-home-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase mb-1">
+                  Operación independiente
+                </div>
+                <div className="font-heading text-[17px] font-semibold leading-tight truncate">
+                  Control gastronómico
+                </div>
               </div>
             </div>
-            <div className="rounded-[28px] border border-white/10 bg-white/8 p-4 backdrop-blur-xl">
-              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-100">
-                <Clock3 size={16} />
-                Pulso operativo
+
+            {/* Pulso operativo en tiempo real */}
+            <div className="flex items-center gap-2">
+              <div className="gastro-home-pulse-badge rounded-[14px] border px-3 py-2 text-center">
+                <div className="text-[10px] uppercase tracking-wide opacity-55">En turno</div>
+                <div className="font-mono text-xl font-bold leading-none mt-0.5">{onShift}</div>
               </div>
-              <div className="mt-4 font-mono text-[42px] md:text-[54px] font-bold leading-none tracking-tight text-emerald-300">
-                {today.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+              <div className="gastro-home-pulse-badge rounded-[14px] border px-3 py-2 text-center">
+                <div className="text-[10px] uppercase tracking-wide opacity-55">Almuerzo</div>
+                <div className="font-mono text-xl font-bold leading-none mt-0.5">{onLunch}</div>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="rounded-2xl border border-white/8 bg-white/8 p-3">
-                  <div className="text-white/45">En turno</div>
-                  <div className="mt-1 text-xl font-semibold">{onShift}</div>
-                </div>
-                <div className="rounded-2xl border border-white/8 bg-white/8 p-3">
-                  <div className="text-white/45">Almuerzo</div>
-                  <div className="mt-1 text-xl font-semibold">{onLunch}</div>
-                </div>
-                <div className="rounded-2xl border border-white/8 bg-white/8 p-3">
-                  <div className="text-white/45">Eventos</div>
-                  <div className="mt-1 text-xl font-semibold">{todayEvents.length}</div>
+              <div className="gastro-home-pulse-badge rounded-[14px] border px-3 py-2 text-center">
+                <div className="text-[10px] uppercase tracking-wide opacity-55">Reloj</div>
+                <div className="font-mono text-base font-bold leading-none mt-0.5 tabular-nums">
+                  {today.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
                 </div>
               </div>
+            </div>
+
+            {/* Acciones rápidas */}
+            <div className="flex flex-wrap gap-2">
+              <Link href="/gastronomia/planificacion" className="gastro-plan-button-primary inline-flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-semibold transition-all">
+                Planificar semana <ArrowRight size={14} />
+              </Link>
+              <Link href="/gastronomia/asistencia" className="gastro-home-button-soft inline-flex items-center gap-1.5 rounded-2xl border px-4 py-2 text-sm font-semibold transition-all">
+                <Clock3 size={14} />
+                Abrir reloj
+              </Link>
             </div>
           </div>
         </section>
 
+        {/* KPIs */}
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <KpiCard label="Personal activo" value={activeEmployees.length} hint="Solo empleados gastronómicos activos." icon={Users} tone="slate" />
           <KpiCard label="En turno ahora" value={onShift} hint="Calculado desde últimas marcaciones gastro." icon={UserRoundCheck} tone="emerald" />
@@ -192,31 +188,32 @@ export default function GastronomiaIndex() {
           <KpiCard label="Estimado mes" value={formatCurrency(totalToPay)} hint="Liquidación gastronómica mensual." icon={Wallet} tone="amber" />
         </section>
 
+        {/* Locales + navegación */}
         <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-          <div className="gastro-panel rounded-[28px] p-4">
-            <div className="flex items-center justify-between gap-3">
+          <div className="gastro-home-panel rounded-[22px] p-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
               <div>
-                <h2 className="font-heading text-xl font-semibold text-slate-900">Locales gastronómicos</h2>
-                <p className="mt-1 text-sm text-slate-500">Lectura inmediata de dotación, presencia actual y costo acumulado.</p>
+                <h2 className="font-heading text-base font-semibold">Locales gastronómicos</h2>
+                <p className="mt-0.5 text-xs">Dotación, presencia actual y costo acumulado.</p>
               </div>
-              <Store size={20} className="text-emerald-700" />
+              <Store size={18} className="text-emerald-400 opacity-70 shrink-0" />
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="grid gap-2 md:grid-cols-2">
               {bySector.map(sector => (
-                <div key={sector.value} className="gastro-panel-muted rounded-[24px] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold text-slate-900">{sector.label}</div>
-                      <div className="mt-1 text-xs text-slate-500">{sector.employees} activos · {sector.onShift} en turno</div>
+                <div key={sector.value} className="gastro-home-sector rounded-[18px] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm truncate">{sector.label}</div>
+                      <div className="mt-0.5 text-xs opacity-60">{sector.employees} activos · {sector.onShift} en turno</div>
                     </div>
-                    <div className="text-right text-sm font-semibold text-slate-800">{formatCurrency(sector.total)}</div>
+                    <div className="text-right text-sm font-semibold shrink-0">{formatCurrency(sector.total)}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="grid gap-3">
+          <div className="grid gap-2">
             {[
               { href: '/gastronomia/personal', icon: Users, title: 'Personal', text: 'Altas, bajas, locales, WhatsApp y valores por día.' },
               { href: '/gastronomia/asistencia', icon: Clock3, title: 'Reloj y asistencia', text: 'Tarjetas de empleados, estado del día y grilla mensual.' },
@@ -224,30 +221,30 @@ export default function GastronomiaIndex() {
               { href: '/gastronomia/planificacion', icon: CalendarDays, title: 'Planificación semanal', text: 'Horarios editables, publicación por WhatsApp y confirmación del empleado.' },
               { href: '/gastronomia/confirmaciones', icon: UserRoundCheck, title: 'Confirmaciones', text: 'Control semanal de quién confirmó, quién falta responder y cantidad de empleados.' },
             ].map(item => (
-              <Link key={item.title} href={item.href} className="gastro-panel group rounded-[24px] p-4 transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-xl">
+              <Link key={item.title} href={item.href} className="gastro-home-link-card group rounded-[18px] border p-3.5 transition-all hover:-translate-y-0.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-2.5 text-emerald-700">
-                      <item.icon size={18} />
+                    <div className="gastro-home-link-icon rounded-xl border p-2 shrink-0">
+                      <item.icon size={16} />
                     </div>
-                    <div>
-                      <div className="font-semibold text-slate-900">{item.title}</div>
-                      <div className="mt-0.5 text-sm text-slate-500">{item.text}</div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm">{item.title}</div>
+                      <div className="mt-0.5 text-xs truncate">{item.text}</div>
                     </div>
                   </div>
-                  <ArrowRight size={17} className="text-slate-300 group-hover:text-emerald-700" />
+                  <ArrowRight size={15} className="gastro-home-link-arrow shrink-0" />
                 </div>
               </Link>
             ))}
           </div>
         </section>
 
-        <div className="gastro-panel-muted rounded-[26px] p-4 text-sm text-slate-600">
-          <div className="flex items-center gap-2 font-semibold text-slate-900">
-            <PanelTop size={16} className="text-emerald-700" />
+        <div className="gastro-home-note rounded-[18px] p-3.5 text-sm">
+          <div className="flex items-center gap-2 font-semibold text-sm">
+            <PanelTop size={14} className="text-emerald-400" />
             Mantenimiento queda separado
           </div>
-          <p className="mt-1">
+          <p className="mt-1 text-xs">
             El panel de Asistencia general sigue siendo solo mantenimiento. Gastronomía usa estas pantallas propias para empleados, reloj, tarjetas y sueldos.
           </p>
         </div>

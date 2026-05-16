@@ -327,7 +327,7 @@ export default function Leads() {
                     </button>
                   )}
                   <div className="min-w-0">
-                    <h3 className="lead-rental-name font-heading font-semibold text-base leading-tight" style={{ color: 'var(--fg-base)' }}>{l.nombre}</h3>
+                    <h3 className="lead-rental-name font-heading font-semibold text-base leading-tight text-black">{l.nombre}</h3>
                     {l.rubro && <p className="mt-0.5 text-[13px] font-medium" style={{ color: 'var(--fg-muted)' }}>{l.rubro}</p>}
                   </div>
                 </div>
@@ -355,7 +355,7 @@ export default function Leads() {
               </div>
               <div className="mt-2.5 space-y-1 text-[12px] font-medium" style={{ color: 'var(--fg-subtle)' }}>
                 <div>{l.fuente === 'whatsapp' ? 'WhatsApp' : 'Web'} · Recibido {formatDateTime(l.createdAt)}</div>
-                <div className={`flex items-center gap-1.5 ${(l as any).firstContactedAt ? 'text-emerald-600' : 'text-amber-600'}`}>
+                <div className={`flex items-center gap-1.5 ${(l as any).firstContactedAt ? 'text-emerald-600' : 'text-red-700 font-semibold'}`}>
                   <Clock size={11}/>
                   {(l as any).firstContactedAt
                     ? `Respondido en ${formatElapsed(l.createdAt, (l as any).firstContactedAt)}`
@@ -444,7 +444,7 @@ export default function Leads() {
                   <span className="text-gray-400">Respuesta:</span>{' '}
                   {(lead as any).firstContactedAt
                     ? `${formatDateTime((lead as any).firstContactedAt)} (${formatElapsed(lead.createdAt, (lead as any).firstContactedAt)})`
-                    : `pendiente hace ${formatElapsed(lead.createdAt)}`}
+                    : <span className="font-semibold text-red-700">pendiente hace {formatElapsed(lead.createdAt)}</span>}
                 </div>
               </div>
               {lead.mensaje && (

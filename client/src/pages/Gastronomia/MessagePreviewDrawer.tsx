@@ -28,76 +28,76 @@ export function MessagePreviewDrawer({ open, onClose, onConfirm, isLoading, item
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <div className="fixed inset-0 z-40 bg-black/55" onClick={onClose} />
+      <div className="gastro-plan-drawer fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col shadow-2xl">
+        <div className="gastro-plan-drawer-header flex items-center justify-between border-b px-4 py-3">
           <div>
-            <div className="font-semibold text-slate-900">
+            <div className="font-semibold">
               Vista previa — Envío por WhatsApp
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs">
               {withWa.length} recibirán mensaje · {withoutWa.length} sin WhatsApp
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+            className="gastro-employee-icon-button rounded-lg p-1.5"
           >
             <X size={16} />
           </button>
         </div>
 
-        <div className="flex-1 divide-y divide-slate-100 overflow-y-auto">
+        <div className="gastro-plan-preview-list flex-1 overflow-y-auto px-3 py-3">
           {items.map(item => {
             const label = formatDayLabel(item.fecha)
             return (
-              <div key={item.turnoId} className="px-4 py-3">
+              <div key={item.turnoId} className="gastro-plan-preview-card rounded-2xl border px-3 py-3">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-semibold text-slate-900">{item.nombre}</div>
+                  <div className="text-sm font-semibold">{item.nombre}</div>
                   {item.waId ? (
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    <span className="gastro-plan-mini-badge gastro-plan-mini-confirmed rounded-full px-2 py-0.5 text-[10px] font-semibold">
                       WhatsApp ✓
                     </span>
                   ) : (
-                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                    <span className="gastro-plan-mini-badge gastro-plan-mini-draft rounded-full px-2 py-0.5 text-[10px] font-semibold">
                       Sin WA
                     </span>
                   )}
                 </div>
-                <div className="mt-1 text-xs text-slate-500">
+                <div className="gastro-plan-cell-muted mt-1 text-xs">
                   {label.long} {label.number} · {item.horaEntrada}–{item.horaSalida}
                   {item.puesto ? ` · ${item.puesto}` : ''}
                 </div>
                 {item.nota && (
-                  <div className="mt-0.5 text-xs text-slate-400">{item.nota}</div>
+                  <div className="gastro-plan-cell-muted mt-0.5 text-xs">{item.nota}</div>
                 )}
               </div>
             )
           })}
           {items.length === 0 && (
-            <div className="p-8 text-center text-sm text-slate-400">
+            <div className="gastro-plan-cell-muted p-8 text-center text-sm">
               No hay turnos pendientes para enviar.
             </div>
           )}
         </div>
 
-        <div className="space-y-2 border-t border-slate-200 px-4 py-3">
+        <div className="gastro-plan-drawer-footer space-y-2 border-t px-4 py-3">
           {withoutWa.length > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <div className="gastro-plan-alert gastro-plan-alert-warning rounded-xl border px-3 py-2 text-xs">
               {withoutWa.length} empleado(s) sin WhatsApp se guardan pero no reciben mensaje.
             </div>
           )}
           <button
             onClick={onConfirm}
             disabled={isLoading || withWa.length === 0}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
+            className="gastro-plan-button-primary flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold disabled:opacity-40"
           >
             <MessageSquareText size={15} />
             Enviar {withWa.length} mensaje(s)
           </button>
           <button
             onClick={onClose}
-            className="w-full rounded-xl border border-slate-200 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="gastro-plan-button-secondary w-full rounded-xl border py-2 text-sm font-semibold"
           >
             Cancelar
           </button>
