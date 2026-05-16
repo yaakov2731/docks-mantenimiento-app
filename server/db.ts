@@ -1267,7 +1267,10 @@ export async function getActualizacionesByReporte(reporteId: number) {
 
 // --- EMPLEADOS ---
 export async function getEmpleados() {
-  return db.select().from(schema.empleados).where(eq(schema.empleados.activo, true))
+  return db.select().from(schema.empleados).where(and(
+    eq(schema.empleados.activo, true),
+    eq(schema.empleados.tipoEmpleado, 'operativo'),
+  ))
 }
 export async function crearEmpleado(data: typeof schema.empleados.$inferInsert) {
   await db.insert(schema.empleados).values({
@@ -3533,7 +3536,10 @@ export async function getPoolTasks() {
 // ─── Gastronomía ─────────────────────────────────────────────────────────────
 
 export async function getEmpleadosGastronomia(sector?: string, activo?: boolean) {
-  const conditions: any[] = [eq(schema.empleados.tipoEmpleado, 'gastronomia')]
+  const conditions: any[] = [or(
+    eq(schema.empleados.tipoEmpleado, 'gastronomia'),
+    eq(schema.empleados.puedeGastronomia, true),
+  )]
   if (sector && sector !== 'todos') {
     conditions.push(eq(schema.empleados.sector, sector as any))
   }
@@ -3545,7 +3551,13 @@ export async function getEmpleadosGastronomia(sector?: string, activo?: boolean)
 
 export async function getEmpleadoGastroById(id: number) {
   const rows = await db.select().from(schema.empleados)
-    .where(and(eq(schema.empleados.id, id), eq(schema.empleados.tipoEmpleado, 'gastronomia')))
+    .where(and(
+      eq(schema.empleados.id, id),
+      or(
+        eq(schema.empleados.tipoEmpleado, 'gastronomia'),
+        eq(schema.empleados.puedeGastronomia, true),
+      ),
+    ))
   return rows[0] ?? null
 }
 
@@ -3757,19 +3769,18 @@ async function resolveAttendanceAssignedLocal(empleadoId: number, referenceDate:
 }
 
 function formatPlanificacionFecha(fecha: string) {
-  const [year, month, day] = fecha.split('-').map(Number)
-  const date = new Date(year, (month ?? 1) - 1, day ?? 1)
-  return date.toLocaleDateString('es-AR', {
+  const [, month, day] = fecha.split('-').map(Number)
+  const date = parsePlanificacionDateKey(fecha)
+  const weekday = date.toLocaleDateString('es-AR', {
     weekday: 'long',
-    day: '2-digit',
-    month: '2-digit',
     timeZone: 'America/Argentina/Buenos_Aires',
   })
+  return `${weekday} ${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`
 }
 
 function formatPlanificacionFechaCorta(fecha: string) {
   const [year, month, day] = fecha.split('-').map(Number)
-  const date = new Date(year, (month ?? 1) - 1, day ?? 1)
+  const date = parsePlanificacionDateKey(fecha)
   const weekday = date.toLocaleDateString('es-AR', {
     weekday: 'short',
     timeZone: 'America/Argentina/Buenos_Aires',
@@ -3799,8 +3810,10 @@ function buildPlanificacionBotMessage(turno: typeof schema.gastronomiaPlanificac
     turno.nota ? `📝 ${turno.nota}` : null,
     ``,
     `Respondé:`,
-    `1 ✅ Confirmo asistencia`,
-    `2 ❌ No puedo trabajar`,
+    `1️⃣  ✅ Confirmo este turno`,
+    `2️⃣  ❌ No puedo trabajar`,
+    ``,
+    `También podés responder: *CONFIRMO #${turno.id}* o *NO #${turno.id}*`,
     ``,
     `Turno #${turno.id}`,
   ].filter(Boolean).join('\n')
@@ -3836,24 +3849,110 @@ function buildPlanificacionSummaryMessage(turnos: Array<typeof schema.gastronomi
   ].join('\n')
 }
 
+function buildPlanificacionBulkConfirmMessage(turnos: Array<typeof schema.gastronomiaPlanificacionTurnos.$inferSelect>) {
+  const sorted = [...turnos].sort((a, b) => {
+    const dateCompare = String(a.fecha).localeCompare(String(b.fecha))
+    if (dateCompare !== 0) return dateCompare
+    return a.id - b.id
+  })
+  const first = sorted[0]
+
+  return [
+    `🍽️ *Docks | Confirmar turnos*`,
+    ``,
+    `Hola *${first?.empleadoNombre ?? 'equipo'}*, tenés ${sorted.length} turnos pendientes:`,
+    ``,
+    ...sorted.map(turno => {
+      const local = SECTOR_LABELS[(turno.sector as keyof typeof SECTOR_LABELS)] ?? turno.sector
+      return `• #${turno.id} — ${formatPlanificacionFechaCorta(turno.fecha)} | ${local} | ${turno.horaEntrada} a ${turno.horaSalida}`
+    }),
+    ``,
+    `Elegí una opción:`,
+    `1️⃣  ✅ Confirmar todos`,
+    `2️⃣  📅 Elegir un turno`,
+    ``,
+    `Si no podés trabajar, respondé *NO* y te muestro las opciones.`,
+  ].join('\n')
+}
+
+async function setPlanificacionBulkSession(
+  waNumber: string,
+  turno: typeof schema.gastronomiaPlanificacionTurnos.$inferSelect,
+) {
+  const normalized = normalizeWaNumber(waNumber)
+  if (!normalized) return
+
+  const context = {
+    sector: turno.sector,
+    planificacionAccion: 'confirmado',
+  }
+  const [existing] = await db.select()
+    .from(schema.botSession)
+    .where(eq(schema.botSession.waNumber, normalized))
+
+  if (existing) {
+    let previousContext: Record<string, unknown> = {}
+    try {
+      previousContext = JSON.parse(existing.contextData ?? '{}')
+    } catch {
+      previousContext = {}
+    }
+    await db.update(schema.botSession)
+      .set({
+        currentMenu: 'planificacion_confirmar_multiple',
+        contextData: JSON.stringify({ ...previousContext, ...context }),
+        menuHistory: '[]',
+        lastActivityAt: new Date(),
+      } as any)
+      .where(eq(schema.botSession.waNumber, normalized))
+      .run()
+    return
+  }
+
+  await db.insert(schema.botSession).values({
+    waNumber: normalized,
+    userType: 'gastronomia' as any,
+    userId: turno.empleadoId,
+    userName: turno.empleadoNombre,
+    currentMenu: 'planificacion_confirmar_multiple',
+    contextData: JSON.stringify(context),
+    menuHistory: '[]',
+    lastActivityAt: new Date(),
+    createdAt: new Date(),
+  } as any).run()
+}
+
 function parsePlanificacionDateKey(fecha: string) {
   const [year, month, day] = fecha.split('-').map(Number)
-  return new Date(year, (month ?? 1) - 1, day ?? 1)
+  return new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1, 12, 0, 0))
 }
 
 function getPlanificacionWeekStart(fecha: string) {
   const date = parsePlanificacionDateKey(fecha)
-  const day = date.getDay()
+  const day = date.getUTCDay()
   const diff = day === 0 ? -6 : 1 - day
-  date.setDate(date.getDate() + diff)
-  date.setHours(0, 0, 0, 0)
+  date.setUTCDate(date.getUTCDate() + diff)
+  date.setUTCHours(12, 0, 0, 0)
   return date
 }
 
 function formatPlanificacionDateKey(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDateKeyInBuenosAires(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const year = parts.find(part => part.type === 'year')?.value ?? String(date.getUTCFullYear())
+  const month = parts.find(part => part.type === 'month')?.value ?? String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = parts.find(part => part.type === 'day')?.value ?? String(date.getUTCDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
@@ -3908,11 +4007,8 @@ async function enqueuePlanificacionMessages(
     return
   }
 
-  await enqueueBotMessage(waNumber, buildPlanificacionSummaryMessage(sorted))
-  for (let i = 0; i < workingTurnos.length; i++) {
-    const delay = new Date(now.getTime() + (i + 1) * 5000)
-    await enqueueBotMessage(waNumber, buildPlanificacionBotMessage(workingTurnos[i]!), delay)
-  }
+  await setPlanificacionBulkSession(waNumber, workingTurnos[0]!)
+  await enqueueBotMessage(waNumber, buildPlanificacionBulkConfirmMessage(workingTurnos))
 }
 
 const SECTOR_LABELS: Record<string, string> = {
@@ -4021,8 +4117,7 @@ export async function responderPlanificacionGastronomia(params: {
 }
 
 export async function getPendingPlanificacionForEmpleado(empleadoId: number) {
-  const today = new Date()
-  const todayKey = today.toISOString().slice(0, 10)
+  const todayKey = formatDateKeyInBuenosAires(new Date())
   return db.select()
     .from(schema.gastronomiaPlanificacionTurnos)
     .where(and(

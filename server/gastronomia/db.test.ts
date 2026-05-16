@@ -221,15 +221,15 @@ describe('getEmpleadosGastronomia', () => {
     const publishedRows = await db.select().from(schema.gastronomiaPlanificacionTurnos)
 
     expect(result).toMatchObject({ published: 1, skipped: 0 })
-    expect(queueRows).toHaveLength(3)
-    expect(queueRows[0]?.message).toContain('Docks | Planificación')
-    expect(queueRows[0]?.message).toContain('tenés turnos asignados')
-    expect(queueRows[1]?.message).toContain('Docks | Confirmar turno')
-    expect(queueRows[1]?.message).toContain(`Turno #${first.id}`)
-    expect((queueRows[1] as any)?.scheduledAt).toBeTruthy()
-    expect(queueRows[2]?.message).toContain('Docks | Confirmar turno')
-    expect(queueRows[2]?.message).toContain(`Turno #${second.id}`)
-    expect((queueRows[2] as any)?.scheduledAt).toBeTruthy()
+    const [session] = await db.select().from(schema.botSession)
+    expect(queueRows).toHaveLength(1)
+    expect(queueRows[0]?.message).toContain('Docks | Confirmar turnos')
+    expect(queueRows[0]?.message).toContain(`• #${first.id}`)
+    expect(queueRows[0]?.message).toContain(`• #${second.id}`)
+    expect(queueRows[0]?.message).toContain(`1️⃣  ✅ Confirmar todos`)
+    expect(queueRows[0]?.message).toContain(`2️⃣  📅 Elegir un turno`)
+    expect(session?.currentMenu).toBe('planificacion_confirmar_multiple')
+    expect(session?.contextData).toContain('planificacionAccion')
     expect(publishedRows.every(row => row.estado === 'enviado')).toBe(true)
   })
 
@@ -274,10 +274,39 @@ describe('getEmpleadosGastronomia', () => {
     const afterSecondQueue = await db.select().from(schema.botQueue).orderBy(schema.botQueue.id)
 
     expect(secondPublish).toMatchObject({ published: 1, skipped: 0 })
-    expect(afterSecondQueue).toHaveLength(3)
-    expect(afterSecondQueue[0]?.message).toContain('Docks | Planificación')
-    expect(afterSecondQueue[1]?.message).toContain(`Turno #${first.id}`)
-    expect(afterSecondQueue[2]?.message).toContain(`Turno #${second.id}`)
+    expect(afterSecondQueue).toHaveLength(1)
+    expect(afterSecondQueue[0]?.message).toContain('Docks | Confirmar turnos')
+    expect(afterSecondQueue[0]?.message).toContain(`• #${first.id}`)
+    expect(afterSecondQueue[0]?.message).toContain(`• #${second.id}`)
+    expect(afterSecondQueue[0]?.message).toContain(`1️⃣  ✅ Confirmar todos`)
+  })
+
+  it('formats planning date-only values without shifting the day in Argentina', async () => {
+    await initDb()
+    const empleado = await createEmpleadoGastro({
+      nombre: 'Sofia',
+      sector: 'brooklyn',
+      puesto: 'Caja',
+      pagoDiario: 1000,
+      waId: '5491177766655',
+    })
+
+    const monday = await savePlanificacionTurnoGastronomia({
+      empleadoId: empleado.id,
+      fecha: '2026-10-12',
+      trabaja: true,
+      horaEntrada: '18:00',
+      horaSalida: '00:00',
+      sector: 'brooklyn',
+      puesto: 'Caja',
+    })
+
+    await publishPlanificacionGastronomia([monday.id])
+    const queueRows = await db.select().from(schema.botQueue).orderBy(schema.botQueue.id)
+
+    expect(queueRows[0]?.message).toContain('lunes')
+    expect(queueRows[0]?.message).toContain('12/10')
+    expect(queueRows[0]?.message).not.toContain('domingo')
   })
 
   it('registers entry with the assigned local from today planning', async () => {

@@ -53,6 +53,7 @@ export function buildGastronomiaMenu(sector: string, userName: string): string {
 // ── Handle input ──────────────────────────────────────────────────────────────
 
 export async function handleGastronomia(session: BotSession, input: string): Promise<string | null> {
+  const isAdminViewing = session.userType === 'admin'
   const opt = parseMenuOption(input, 4)
 
   if (opt === null) {
@@ -70,6 +71,18 @@ export async function handleGastronomia(session: BotSession, input: string): Pro
       session.contextData?.sector as string ?? '',
       session.userName,
     ))
+  }
+
+  if (isAdminViewing) {
+    const label = LABEL_MAP[accion]
+    return [
+      `ℹ️ *Modo administrador — solo lectura*`,
+      ``,
+      `Acción "${label}" no se ejecuta en modo admin.`,
+      `Este menú es solo para visualizar las opciones del empleado.`,
+      ``,
+      `0️⃣  Volver`,
+    ].join('\n')
   }
 
   const result = await registerEmpleadoAttendance(session.userId, accion, 'whatsapp')
@@ -101,16 +114,17 @@ export async function handleGastronomia(session: BotSession, input: string): Pro
     ? new Date(result.status.lastActionAt)
     : new Date()
 
-  if (accion === 'entrada') {
-    writeAsistenciaExcelRow({
+  const excelResult = accion === 'entrada'
+    ? await writeAsistenciaExcelRow({
       sector,
       empleadoNombre: session.userName,
       puesto: session.contextData?.puesto as string | null | undefined,
       referenceDate,
     }).catch((err: unknown) => {
       console.warn('[bot/gastronomia] excel_sync_error', { err })
+      return { ok: false as const, code: 'unknown' as const, message: String(err) }
     })
-  }
+    : null
 
   const syncResult = await writeAsistenciaAppRow({
     sector,
@@ -121,13 +135,15 @@ export async function handleGastronomia(session: BotSession, input: string): Pro
   })
 
   const label = LABEL_MAP[accion]
-  if (!syncResult.ok) {
+  if (!syncResult.ok || (excelResult && !excelResult.ok)) {
     console.warn('[bot/gastronomia] attendance:sheet_partial', {
       empleadoId: session.userId,
       userName: session.userName,
       accion,
       sheetCode: syncResult.code,
       sheetMessage: syncResult.message ?? null,
+      excelCode: excelResult?.code ?? null,
+      excelMessage: excelResult?.message ?? null,
     })
 
     return [

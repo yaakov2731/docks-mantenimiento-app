@@ -372,6 +372,33 @@ describe('gastronomia bot routing', () => {
     expect(result).toContain('Turno confirmado')
   })
 
+  it('accepts numeric confirmation when there is exactly one pending shift', async () => {
+    sessionMock.getSession.mockResolvedValue(gastroSession('main'))
+    const dbMock = await import('../db')
+    vi.mocked(dbMock.getPendingPlanificacionForEmpleado).mockResolvedValue([
+      {
+        id: 91,
+        empleadoId: 42,
+        empleadoNombre: 'Ana García',
+        fecha: '2026-05-12',
+        horaEntrada: '12:00',
+        horaSalida: '18:00',
+        estado: 'enviado',
+      },
+    ] as any)
+    vi.mocked(dbMock.responderPlanificacionGastronomia).mockResolvedValue({ id: 91, estado: 'confirmado' } as any)
+
+    const result = await handleIncomingMessage('5491112345678', '1')
+
+    expect(dbMock.responderPlanificacionGastronomia).toHaveBeenCalledWith({
+      turnoId: 91,
+      empleadoId: 42,
+      respuesta: 'confirmado',
+    })
+    expect(gastroMock.handleGastronomia).not.toHaveBeenCalled()
+    expect(result).toContain('Turno confirmado')
+  })
+
   it('accepts short negative replies for a pending shift', async () => {
     sessionMock.getSession.mockResolvedValue(gastroSession('main'))
     const dbMock = await import('../db')
@@ -409,7 +436,19 @@ describe('gastronomia bot routing', () => {
     expect(gastroMock.handleGastronomia).not.toHaveBeenCalled()
   })
 
-  it('does not hijack gastro attendance menu option 1 when there is a pending planning shift', async () => {
+  it('does not hijack gastro attendance menu option 1 when there are no pending shifts', async () => {
+    sessionMock.getSession.mockResolvedValue(gastroSession('main'))
+    const dbMock = await import('../db')
+    vi.mocked(dbMock.getPendingPlanificacionForEmpleado).mockResolvedValue([])
+
+    const result = await handleIncomingMessage('5491112345678', '1')
+
+    expect(dbMock.responderPlanificacionGastronomia).not.toHaveBeenCalled()
+    expect(gastroMock.handleGastronomia).toHaveBeenCalled()
+    expect(result).toBe('handled gastro')
+  })
+
+  it('asks for the shift number when numeric confirmation is ambiguous', async () => {
     sessionMock.getSession.mockResolvedValue(gastroSession('main'))
     const dbMock = await import('../db')
     vi.mocked(dbMock.getPendingPlanificacionForEmpleado).mockResolvedValue([
@@ -422,13 +461,221 @@ describe('gastronomia bot routing', () => {
         horaSalida: '18:00',
         estado: 'enviado',
       },
+      {
+        id: 92,
+        empleadoId: 42,
+        empleadoNombre: 'Ana García',
+        fecha: '2026-05-12',
+        horaEntrada: '10:00',
+        horaSalida: '18:00',
+        estado: 'enviado',
+      },
     ] as any)
 
     const result = await handleIncomingMessage('5491112345678', '1')
 
     expect(dbMock.responderPlanificacionGastronomia).not.toHaveBeenCalled()
-    expect(gastroMock.handleGastronomia).toHaveBeenCalled()
-    expect(result).toBe('handled gastro')
+    expect(gastroMock.handleGastronomia).not.toHaveBeenCalled()
+    expect(result).toContain('Confirmación de turnos')
+    expect(result).toContain('1️⃣ Confirmar todos')
+    expect(result).toContain('2️⃣ Elegir un turno')
+  })
+
+  it('opens a professional bulk confirmation selector when multiple shifts are pending', async () => {
+    sessionMock.getSession.mockResolvedValue(gastroSession('main'))
+    const dbMock = await import('../db')
+    vi.mocked(dbMock.getPendingPlanificacionForEmpleado).mockResolvedValue([
+      {
+        id: 93,
+        empleadoId: 42,
+        empleadoNombre: 'Ana García',
+        fecha: '2026-05-13',
+        horaEntrada: '10:00',
+        horaSalida: '18:00',
+        estado: 'enviado',
+      },
+      {
+        id: 94,
+        empleadoId: 42,
+        empleadoNombre: 'Ana García',
+        fecha: '2026-05-14',
+        horaEntrada: '10:00',
+        horaSalida: '18:00',
+        estado: 'enviado',
+      },
+    ] as any)
+
+    const result = await handleIncomingMessage('5491112345678', 'confirmo asistencia')
+
+    expect(dbMock.responderPlanificacionGastronomia).not.toHaveBeenCalled()
+    expect(sessionMock.updateSession).toHaveBeenCalledWith('5491112345678', expect.objectContaining({
+      currentMenu: 'planificacion_confirmar_multiple',
+      contextData: expect.objectContaining({ planificacionAccion: 'confirmado' }),
+    }))
+    expect(result).toContain('Confirmación de turnos')
+    expect(result).toContain('1️⃣ Confirmar todos')
+    expect(result).toContain('2️⃣ Elegir un turno')
+  })
+
+  it('handles planning confirmation replies even when the gastronomy session expired', async () => {
+    sessionMock.getSession.mockResolvedValue(gastroSession('main'))
+    sessionMock.isSessionExpired.mockReturnValue(true)
+    sessionMock.resetToMain.mockImplementation(async (session: BotSession) => ({
+      ...session,
+      currentMenu: 'main',
+      menuHistory: [],
+      contextData: { sector: 'brooklyn' },
+    }))
+    const dbMock = await import('../db')
+    vi.mocked(dbMock.getPendingPlanificacionForEmpleado).mockResolvedValue([
+      {
+        id: 98,
+        empleadoId: 42,
+        empleadoNombre: 'Ana García',
+        fecha: '2026-05-18',
+        horaEntrada: '10:00',
+        horaSalida: '18:00',
+        estado: 'enviado',
+      },
+      {
+        id: 99,
+        empleadoId: 42,
+        empleadoNombre: 'Ana García',
+        fecha: '2026-05-19',
+        horaEntrada: '10:00',
+        horaSalida: '18:00',
+        estado: 'enviado',
+      },
+    ] as any)
+
+    const result = await handleIncomingMessage('5491112345678', 'confirmo asistencia')
+
+    expect(dbMock.responderPlanificacionGastronomia).not.toHaveBeenCalled()
+    expect(result).toContain('Sesión expirada')
+    expect(result).toContain('Confirmación de turnos')
+    expect(result).toContain('1️⃣ Confirmar todos')
+    expect(gastroMock.buildGastronomiaMenu).not.toHaveBeenCalled()
+  })
+
+  it('handles planning replies for a stale employee session when the WhatsApp belongs to a gastronomy record', async () => {
+    sessionMock.getSession.mockResolvedValue({
+      ...gastroSession('main'),
+      userType: 'employee',
+      userId: 9,
+      userName: 'Marcos',
+      contextData: {},
+    })
+    const dbMock = await import('../db')
+    vi.mocked(dbMock.getEmpleadoByWaId).mockResolvedValue({
+      id: 38,
+      nombre: 'MARCOS',
+      tipoEmpleado: 'gastronomia',
+      puedeGastronomia: true,
+      sector: 'uno_grill',
+    } as any)
+    vi.mocked(dbMock.getPendingPlanificacionForEmpleado).mockResolvedValue([
+      {
+        id: 59,
+        empleadoId: 38,
+        empleadoNombre: 'MARCOS',
+        fecha: '2026-05-16',
+        horaEntrada: '10:00',
+        horaSalida: '17:00',
+        estado: 'enviado',
+      },
+      {
+        id: 60,
+        empleadoId: 38,
+        empleadoNombre: 'MARCOS',
+        fecha: '2026-05-17',
+        horaEntrada: '09:00',
+        horaSalida: '17:00',
+        estado: 'enviado',
+      },
+    ] as any)
+
+    const result = await handleIncomingMessage('5491138210373', 'Confirmo')
+
+    expect(dbMock.getPendingPlanificacionForEmpleado).toHaveBeenCalledWith(38)
+    expect(dbMock.responderPlanificacionGastronomia).not.toHaveBeenCalled()
+    expect(gastroMock.handleGastronomia).not.toHaveBeenCalled()
+    expect(result).toContain('Confirmación de turnos')
+    expect(result).toContain('1️⃣ Confirmar todos')
+  })
+
+  it('confirms all pending planning shifts from the bulk selector', async () => {
+    sessionMock.getSession.mockResolvedValue({
+      ...gastroSession('planificacion_confirmar_multiple'),
+      contextData: { sector: 'brooklyn', planificacionAccion: 'confirmado' },
+    })
+    const dbMock = await import('../db')
+    vi.mocked(dbMock.getPendingPlanificacionForEmpleado).mockResolvedValue([
+      {
+        id: 95,
+        empleadoId: 42,
+        empleadoNombre: 'Ana García',
+        fecha: '2026-05-15',
+        horaEntrada: '10:00',
+        horaSalida: '18:00',
+        estado: 'enviado',
+      },
+      {
+        id: 96,
+        empleadoId: 42,
+        empleadoNombre: 'Ana García',
+        fecha: '2026-05-16',
+        horaEntrada: '10:00',
+        horaSalida: '18:00',
+        estado: 'enviado',
+      },
+    ] as any)
+    vi.mocked(dbMock.responderPlanificacionGastronomia).mockResolvedValue({ id: 95, estado: 'confirmado' } as any)
+
+    const result = await handleIncomingMessage('5491112345678', '1')
+
+    expect(dbMock.responderPlanificacionGastronomia).toHaveBeenCalledTimes(2)
+    expect(dbMock.responderPlanificacionGastronomia).toHaveBeenNthCalledWith(1, {
+      turnoId: 95,
+      empleadoId: 42,
+      respuesta: 'confirmado',
+    })
+    expect(dbMock.responderPlanificacionGastronomia).toHaveBeenNthCalledWith(2, {
+      turnoId: 96,
+      empleadoId: 42,
+      respuesta: 'confirmado',
+    })
+    expect(sessionMock.updateSession).toHaveBeenCalledWith('5491112345678', expect.objectContaining({
+      currentMenu: 'main',
+      contextData: expect.not.objectContaining({ planificacionAccion: expect.anything() }),
+    }))
+    expect(result).toContain('2 turnos confirmados')
+    expect(result).toContain('Ya no quedan pendientes')
+  })
+
+  it('shows only still-pending shifts when choosing one from the selector', async () => {
+    sessionMock.getSession.mockResolvedValue({
+      ...gastroSession('planificacion_confirmar_multiple'),
+      contextData: { sector: 'brooklyn', planificacionAccion: 'confirmado' },
+    })
+    const dbMock = await import('../db')
+    vi.mocked(dbMock.getPendingPlanificacionForEmpleado).mockResolvedValue([
+      {
+        id: 97,
+        empleadoId: 42,
+        empleadoNombre: 'Ana García',
+        fecha: '2026-05-17',
+        horaEntrada: '10:00',
+        horaSalida: '18:00',
+        estado: 'enviado',
+      },
+    ] as any)
+
+    const result = await handleIncomingMessage('5491112345678', '2')
+
+    expect(dbMock.responderPlanificacionGastronomia).not.toHaveBeenCalled()
+    expect(result).toContain('Elegí el turno')
+    expect(result).toContain('CONFIRMO #97')
+    expect(result).not.toContain('CONFIRMO #95')
   })
 
   it('rebuilds gastro menu when handleGastronomia returns null (option 0)', async () => {

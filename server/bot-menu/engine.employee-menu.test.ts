@@ -343,4 +343,88 @@ describe('employee current-task-first routing', () => {
     expect(result).toContain('¿Qué menú necesitás hoy?')
     expect(result).toContain('Gastronomía')
   })
+
+  it('offers a commercial/employee selector when a sales user is also an employee', async () => {
+    sessionMock.getSession.mockResolvedValue(null)
+    vi.mocked(getUsers).mockResolvedValue([
+      { id: 5, username: 'dario2026', name: 'Dario Cabrera', role: 'sales', activo: true, waId: '5491166889170' },
+    ] as any)
+    vi.mocked(getEmpleadoByWaId).mockResolvedValue({
+      id: 4,
+      nombre: 'Dario Cabrera',
+      waId: '5491166889170',
+      tipoEmpleado: 'operativo',
+      sector: 'operativo',
+      puedeVender: true,
+    } as any)
+
+    const result = await handleIncomingMessage('5491166889170', 'hola')
+
+    expect(sessionMock.createSession).toHaveBeenCalledWith({
+      waNumber: '5491166889170',
+      userType: 'sales',
+      userId: 5,
+      userName: 'Dario Cabrera',
+    })
+    expect(sessionMock.updateSession).toHaveBeenCalledWith('5491166889170', {
+      currentMenu: 'sales_employee_selector',
+      contextData: expect.objectContaining({
+        canUseEmployeeBot: true,
+        employeeId: 4,
+        employeeName: 'Dario Cabrera',
+      }),
+    })
+    expect(result).toContain('Comercial')
+    expect(result).toContain('Empleado')
+  })
+
+  it('routes a sales employee selector to the employee menu', async () => {
+    sessionMock.getSession.mockResolvedValue({
+      ...employeeSession('sales_employee_selector'),
+      userType: 'sales',
+      userId: 5,
+      userName: 'Dario Cabrera',
+      contextData: {
+        canUseEmployeeBot: true,
+        employeeId: 4,
+        employeeName: 'Dario Cabrera',
+      },
+    })
+
+    await expect(handleIncomingMessage('5491166889170', '2')).resolves.toBe('employee main')
+
+    expect(sessionMock.navigateTo).toHaveBeenCalledWith(expect.any(Object), 'sales_employee_main', {})
+    expect(mainMenuMock.buildEmployeeMainMenu).toHaveBeenCalledWith(expect.objectContaining({
+      userType: 'employee',
+      userId: 4,
+      userName: 'Dario Cabrera',
+    }))
+  })
+
+  it('refreshes an old sales-only session for a sales user who is also an employee', async () => {
+    sessionMock.getSession.mockResolvedValue({
+      ...employeeSession('main'),
+      userType: 'sales',
+      userId: 5,
+      userName: 'Dario Cabrera',
+      contextData: {},
+    })
+    vi.mocked(getUsers).mockResolvedValue([
+      { id: 5, username: 'dario2026', name: 'Dario Cabrera', role: 'sales', activo: true, waId: '5491166889170' },
+    ] as any)
+    vi.mocked(getEmpleadoByWaId).mockResolvedValue({
+      id: 4,
+      nombre: 'Dario Cabrera',
+      waId: '5491166889170',
+      tipoEmpleado: 'operativo',
+      sector: 'operativo',
+      puedeVender: true,
+    } as any)
+
+    const result = await handleIncomingMessage('5491166889170', 'menu')
+
+    expect(sessionMock.deleteSession).toHaveBeenCalledWith('5491166889170')
+    expect(result).toContain('Comercial')
+    expect(result).toContain('Empleado')
+  })
 })

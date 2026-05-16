@@ -13,6 +13,7 @@ const DEFAULT_ITEM_ID  = 'BD6EFBDE79F39AEE!sd37295d1360c4261a9d28650b8fde5eb'
 
 const ASISTENCIA_SHEET_NAME = 'Asistencia'
 const HEADERS = ['FECHA', 'DIA', 'LOCAL', 'EMPLEADO', 'PUESTO', '✓']
+const ATTENDANCE_PRESENT_VALUE = 'Presente'
 
 const LOCAL_LABELS: Record<string, string> = {
   uno_grill:   'UMO Grill',
@@ -141,10 +142,25 @@ async function ensureSheet(token: string): Promise<void> {
   )
 }
 
-async function getUsedRange(token: string): Promise<{ values: string[][]; rowCount: number }> {
+function excelSheetRef(name: string): string {
+  return name.replace(/'/g, "''")
+}
+
+async function getWorksheetNames(token: string): Promise<string[]> {
+  const data = await graphGet<{ value: Array<{ name: string }> }>(
+    `${workbookUrl()}/worksheets`,
+    token,
+  )
+  return data.value.map(ws => ws.name)
+}
+
+async function getUsedRange(
+  token: string,
+  sheetName = ASISTENCIA_SHEET_NAME,
+): Promise<{ values: string[][]; rowCount: number }> {
   try {
     const data = await graphGet<{ values: string[][]; rowCount: number }>(
-      `${workbookUrl()}/worksheets('${ASISTENCIA_SHEET_NAME}')/usedRange`,
+      `${workbookUrl()}/worksheets('${excelSheetRef(sheetName)}')/usedRange`,
       token,
     )
     return { values: data.values ?? [], rowCount: data.rowCount ?? 0 }
@@ -152,6 +168,98 @@ async function getUsedRange(token: string): Promise<{ values: string[][]; rowCou
     // Sheet empty or no used range
     return { values: [], rowCount: 0 }
   }
+}
+
+function normalizeText(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+function getBaDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(date)
+
+  return {
+    day: Number(parts.find(part => part.type === 'day')?.value ?? date.getDate()),
+    month: Number(parts.find(part => part.type === 'month')?.value ?? date.getMonth() + 1),
+  }
+}
+
+function cellMatchesDay(value: unknown, referenceDate: Date): boolean {
+  const text = String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+  if (!text) return false
+
+  const { day, month } = getBaDateParts(referenceDate)
+  const dayPattern = String(day).padStart(1, '0')
+  const monthPattern = String(month).padStart(1, '0')
+  const monthPadded = String(month).padStart(2, '0')
+  const dayPadded = String(day).padStart(2, '0')
+
+  return new RegExp(`(^|\\D)${dayPattern}\\s*/\\s*${monthPattern}(\\D|$)`).test(text)
+    || new RegExp(`(^|\\D)${dayPadded}\\s*/\\s*${monthPadded}(\\D|$)`).test(text)
+    || new RegExp(`(^|\\D)${dayPadded}\\s*/\\s*${monthPattern}(\\D|$)`).test(text)
+    || new RegExp(`(^|\\D)${dayPattern}\\s*/\\s*${monthPadded}(\\D|$)`).test(text)
+}
+
+function columnLetter(index: number): string {
+  let value = index + 1
+  let result = ''
+  while (value > 0) {
+    const remainder = (value - 1) % 26
+    result = String.fromCharCode(65 + remainder) + result
+    value = Math.floor((value - 1) / 26)
+  }
+  return result
+}
+
+export function findAttendanceTemplateCell(params: {
+  values: unknown[][]
+  local: string
+  empleadoNombre: string
+  referenceDate: Date
+}): { address: string; rowNumber: number; columnIndex: number } | null {
+  const localNeedle = normalizeText(params.local)
+  const employeeNeedle = normalizeText(params.empleadoNombre)
+  if (!localNeedle || !employeeNeedle) return null
+
+  for (let headerIndex = 0; headerIndex < params.values.length; headerIndex++) {
+    const header = params.values[headerIndex] ?? []
+    const localCol = header.findIndex(cell => normalizeText(cell) === 'local')
+    const employeeCol = header.findIndex(cell => normalizeText(cell) === 'empleado')
+    const dayCol = header.findIndex(cell => cellMatchesDay(cell, params.referenceDate))
+
+    if (localCol < 0 || employeeCol < 0 || dayCol < 0) continue
+
+    for (let rowIndex = headerIndex + 1; rowIndex < params.values.length; rowIndex++) {
+      const row = params.values[rowIndex] ?? []
+      const localCell = normalizeText(row[localCol])
+      const employeeCell = normalizeText(row[employeeCol])
+
+      if (!localCell && !employeeCell) continue
+
+      if (localCell === localNeedle && employeeCell === employeeNeedle) {
+        const rowNumber = rowIndex + 1
+        return {
+          address: `${columnLetter(dayCol)}${rowNumber}`,
+          rowNumber,
+          columnIndex: dayCol,
+        }
+      }
+    }
+  }
+
+  return null
 }
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -175,7 +283,7 @@ function formatBaDia(date: Date): string {
 
 export type GastronomiaExcelResult = {
   ok: boolean
-  code: 'ok' | 'missing_credentials' | 'file_not_found' | 'api_error' | 'unknown'
+  code: 'ok' | 'missing_credentials' | 'file_not_found' | 'template_not_found' | 'employee_not_found' | 'api_error' | 'unknown'
   message?: string | null
 }
 
@@ -191,36 +299,58 @@ export async function writeAsistenciaExcelRow(params: {
 
   try {
     const token = await getAccessToken()
-    await ensureSheet(token)
 
     const refDate = params.referenceDate ?? new Date()
-    const fecha   = formatBaDate(refDate)
-    const dia     = formatBaDia(refDate)
     const local   = LOCAL_LABELS[params.sector ?? ''] ?? (params.sector ?? '')
     const empleado = params.empleadoNombre
-    const puesto  = params.puesto ?? ''
 
-    const { values, rowCount } = await getUsedRange(token)
+    const preferredSheet = process.env.ONEDRIVE_ASISTENCIA_SHEET_NAME ?? ASISTENCIA_SHEET_NAME
+    const worksheetNames = await getWorksheetNames(token)
+    const resolvedPreferredSheet = worksheetNames.find(name => normalizeText(name) === normalizeText(preferredSheet)) ?? preferredSheet
+    const targetSheets = Array.from(new Set([
+      resolvedPreferredSheet,
+      ...worksheetNames.filter(name => normalizeText(name).startsWith('sueldos')),
+      ...worksheetNames.filter(name => normalizeText(name) !== normalizeText(resolvedPreferredSheet)),
+    ])).filter(name => worksheetNames.includes(name))
 
-    // Search for existing row for same fecha + local + empleado (skip header at index 0)
-    let existingRow: number | null = null
-    for (let i = 1; i < values.length; i++) {
-      const row = values[i]
-      if (
-        String(row[0] ?? '') === fecha &&
-        String(row[2] ?? '') === local &&
-        String(row[3] ?? '') === empleado
-      ) {
-        existingRow = i + 1 // 1-indexed
+    let match: { sheetName: string; address: string } | null = null
+    let sawAttendanceTemplate = false
+
+    for (const sheetName of targetSheets) {
+      const { values } = await getUsedRange(token, sheetName)
+      const hasTemplateHeader = values.some(row =>
+        row.some(cell => normalizeText(cell) === 'local')
+        && row.some(cell => normalizeText(cell) === 'empleado')
+        && row.some(cell => cellMatchesDay(cell, refDate))
+      )
+      if (hasTemplateHeader) sawAttendanceTemplate = true
+
+      const cell = findAttendanceTemplateCell({
+        values,
+        local,
+        empleadoNombre: empleado,
+        referenceDate: refDate,
+      })
+      if (cell) {
+        match = { sheetName, address: cell.address }
         break
       }
     }
 
-    const targetRow = existingRow ?? rowCount + 1
+    if (!match) {
+      return {
+        ok: false,
+        code: sawAttendanceTemplate ? 'employee_not_found' : 'template_not_found',
+        message: sawAttendanceTemplate
+          ? `No se encontro fila para ${empleado} en ${local}`
+          : 'No se encontro una plantilla de asistencia con la fecha del periodo',
+      }
+    }
+
     await graphPatch(
-      `${workbookUrl()}/worksheets('${ASISTENCIA_SHEET_NAME}')/range(address='A${targetRow}:F${targetRow}')`,
+      `${workbookUrl()}/worksheets('${excelSheetRef(match.sheetName)}')/range(address='${match.address}')`,
       token,
-      { values: [[fecha, dia, local, empleado, puesto, '✓']] },
+      { values: [[ATTENDANCE_PRESENT_VALUE]] },
     )
 
     return { ok: true, code: 'ok' }

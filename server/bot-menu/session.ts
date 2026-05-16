@@ -79,6 +79,10 @@ function getPersistentContext(contextData: MenuContext): MenuContext {
       'sheetsRow',
       'puesto',
       'puedeVender',
+      'canUseEmployeeBot',
+      'employeeId',
+      'employeeName',
+      'employeeSector',
     ].includes(key)
   })
   return Object.fromEntries(persistentEntries)

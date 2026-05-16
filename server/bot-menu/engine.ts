@@ -190,8 +190,24 @@ function buildDualAttendanceSelectorMenu(userName: string, gastroSector?: string
   ].join('\n')
 }
 
+function buildSalesEmployeeSelectorMenu(userName: string): string {
+  return [
+    `👋 Hola, *${userName}*`,
+    `Elegí qué bot querés usar:`,
+    SEP,
+    `1️⃣  🎯 Comercial`,
+    `2️⃣  🔧 Empleado`,
+    SEP,
+    `0️⃣  Ayuda`,
+  ].join('\n')
+}
+
 function isDualEmployeeSession(session: Pick<BotSession, 'userType' | 'contextData'>): boolean {
   return session.userType === 'employee' && session.contextData?.puedeGastronomia === true
+}
+
+function isSalesEmployeeSession(session: Pick<BotSession, 'userType' | 'contextData'>): boolean {
+  return session.userType === 'sales' && session.contextData?.canUseEmployeeBot === true
 }
 
 function shouldRefreshIdentifiedSession(
@@ -217,6 +233,17 @@ function shouldRefreshIdentifiedSession(
     if (identifiedCanVend && session.contextData?.puedeVender !== true) return true
   }
 
+  if (session.userType === 'sales') {
+    const identifiedContext = (identifiedUser as any).contextData ?? {}
+    if (identifiedContext.canUseEmployeeBot && session.contextData?.canUseEmployeeBot !== true) return true
+    if (
+      identifiedContext.employeeId &&
+      session.contextData?.employeeId !== identifiedContext.employeeId
+    ) {
+      return true
+    }
+  }
+
   if (session.userType === ('gastronomia' as any)) {
     const identifiedContext = (identifiedUser as any).contextData ?? {}
     if (identifiedContext.sector && session.contextData?.sector !== identifiedContext.sector) return true
@@ -227,6 +254,20 @@ function shouldRefreshIdentifiedSession(
 
 async function resetSessionHome(session: BotSession): Promise<BotSession> {
   const resetSession = await resetToMain(session)
+  if (isSalesEmployeeSession(resetSession)) {
+    await updateSession(resetSession.waNumber, {
+      currentMenu: 'sales_employee_selector',
+      contextData: resetSession.contextData,
+      menuHistory: [],
+    })
+
+    return {
+      ...resetSession,
+      currentMenu: 'sales_employee_selector',
+      menuHistory: [],
+    }
+  }
+
   if (!isDualEmployeeSession(resetSession)) return resetSession
 
   await updateSession(resetSession.waNumber, {
@@ -268,6 +309,24 @@ async function identifyUser(waNumber: string): Promise<{ userType: UserType; use
   if (panelUser) {
     if (panelUser.role !== 'admin' && panelUser.role !== 'sales') return null
     const userType: UserType = panelUser.role === 'admin' ? 'admin' : 'sales'
+    if (userType === 'sales') {
+      const empleado = await getEmpleadoByWaId(waNumber)
+      if (empleado) {
+        return {
+          userType,
+          userId: panelUser.id,
+          userName: panelUser.name,
+          contextData: {
+            canUseEmployeeBot: true,
+            employeeId: empleado.id,
+            employeeName: empleado.nombre,
+            employeeSector: (empleado as any).sector ?? '',
+            puedeGastronomia: !!(empleado as any).puedeGastronomia,
+            gastroSector: (empleado as any).sector ?? '',
+          },
+        } as any
+      }
+    }
     return { userType, userId: panelUser.id, userName: panelUser.name }
   }
 
@@ -334,8 +393,10 @@ function normalizePlanificacionInput(input: string) {
     .trim()
 }
 
-export function parsePlanificacionResponse(input: string): { turnoId?: number; respuesta: 'confirmado' | 'no_trabaja'; planningSpecific: boolean } | null {
+export function parsePlanificacionResponse(input: string): { turnoId?: number; respuesta: 'confirmado' | 'no_trabaja'; planningSpecific: boolean; numericOnly?: boolean } | null {
   const normalized = normalizePlanificacionInput(input)
+  if (normalized === '1') return { respuesta: 'confirmado', planningSpecific: true, numericOnly: true }
+  if (normalized === '2') return { respuesta: 'no_trabaja', planningSpecific: true, numericOnly: true }
   const explicit = normalized.match(/^(confirmo|confirmar|si|s|ok|dale|no|no puedo|no trabajo|no puedo trabajar|cancelar|rechazo)\s+#?(\d+)$/i)
   if (explicit) {
     return {
@@ -344,13 +405,13 @@ export function parsePlanificacionResponse(input: string): { turnoId?: number; r
       planningSpecific: true,
     }
   }
-  const positiveButtonLike = normalized.match(/^1\s+(confirmo|confirmar|si|ok|dale|asistencia confirmada|confirmo asistencia|confirmo mi asistencia|confirmo turno|confirmo el turno)/i)
+  const positiveButtonLike = normalized.match(/^1\s+(confirmo|confirmar|si|ok|dale|asistencia confirmada|confirmo asistencia|confirmo mi asistencia|confirmo turno|confirmo el turno)(?:\s+#?(\d+))?/i)
   if (positiveButtonLike) {
-    return { respuesta: 'confirmado', planningSpecific: true }
+    return { turnoId: positiveButtonLike[2] ? Number(positiveButtonLike[2]) : undefined, respuesta: 'confirmado', planningSpecific: true }
   }
-  const negativeButtonLike = normalized.match(/^2\s+(no|no puedo|no trabajo|no puedo trabajar|cancelar|rechazo|no voy|no voy a poder)/i)
+  const negativeButtonLike = normalized.match(/^2\s+(no|no puedo|no trabajo|no puedo trabajar|cancelar|rechazo|no voy|no voy a poder)(?:\s+#?(\d+))?/i)
   if (negativeButtonLike) {
-    return { respuesta: 'no_trabaja', planningSpecific: true }
+    return { turnoId: negativeButtonLike[2] ? Number(negativeButtonLike[2]) : undefined, respuesta: 'no_trabaja', planningSpecific: true }
   }
   if ([
     'confirmo',
@@ -380,13 +441,165 @@ export function parsePlanificacionResponse(input: string): { turnoId?: number; r
   return null
 }
 
+function buildPlanificacionTurnoLine(turno: any) {
+  return `• #${turno.id} — ${turno.fecha} ${turno.horaEntrada}-${turno.horaSalida}`
+}
+
+function buildPlanificacionBulkSelector(
+  pending: any[],
+  accion: 'confirmado' | 'no_trabaja',
+) {
+  const isConfirming = accion === 'confirmado'
+  return [
+    `📅 *Confirmación de turnos*`,
+    ``,
+    `Tenés ${pending.length} turnos pendientes:`,
+    ...pending.map(buildPlanificacionTurnoLine),
+    ``,
+    `Elegí una opción:`,
+    isConfirming
+      ? `1️⃣ Confirmar todos`
+      : `1️⃣ Marcar todos como "no puedo"`,
+    `2️⃣ Elegir un turno`,
+    ``,
+    `0️⃣ Volver al menú`,
+  ].join('\n')
+}
+
+function buildPlanificacionChooseOne(pending: any[], accion: 'confirmado' | 'no_trabaja') {
+  const verb = accion === 'confirmado' ? 'confirmar' : 'marcar como no disponible'
+  return [
+    `📅 *Elegí el turno*`,
+    ``,
+    `Estos son los turnos que siguen pendientes para ${verb}:`,
+    ...pending.map(buildPlanificacionTurnoLine),
+    ``,
+    `Respondé con el turno exacto:`,
+    ...pending.flatMap(turno => accion === 'confirmado'
+      ? [`✅ *CONFIRMO #${turno.id}*`]
+      : [`❌ *NO #${turno.id}*`]),
+    ``,
+    `0️⃣ Volver al menú`,
+  ].join('\n')
+}
+
+function clearPlanificacionContext(session: BotSession) {
+  const { planificacionAccion: _planificacionAccion, ...contextData } = session.contextData ?? {}
+  return contextData
+}
+
+function asSalesEmployeeSession(session: BotSession, currentMenu = session.currentMenu): BotSession | null {
+  const employeeId = Number(session.contextData?.employeeId)
+  if (!employeeId) return null
+  return {
+    ...session,
+    userType: 'employee',
+    userId: employeeId,
+    userName: String(session.contextData?.employeeName ?? session.userName),
+    currentMenu,
+  }
+}
+
+async function finishPlanificacionMenu(session: BotSession) {
+  await updateSession(session.waNumber, {
+    currentMenu: 'main',
+    contextData: clearPlanificacionContext(session),
+    menuHistory: [],
+  })
+}
+
+async function handlePlanificacionMultipleMenu(session: BotSession, input: string): Promise<string | null> {
+  if (session.currentMenu !== 'planificacion_confirmar_multiple') return null
+  const choice = input.trim()
+  const accion = (session.contextData?.planificacionAccion === 'no_trabaja' ? 'no_trabaja' : 'confirmado') as 'confirmado' | 'no_trabaja'
+
+  if (choice === '0') {
+    await finishPlanificacionMenu(session)
+    return buildGastronomiaMenu(session.contextData?.sector as string ?? '', session.userName)
+  }
+
+  const pending = await getPendingPlanificacionForEmpleado(session.userId)
+  if (pending.length === 0) {
+    await finishPlanificacionMenu(session)
+    return [
+      `📅 *Planificación Docks*`,
+      ``,
+      `No tenés turnos pendientes para confirmar.`,
+      `Los turnos ya confirmados no vuelven a aparecer en este menú.`,
+    ].join('\n')
+  }
+
+  if (choice === '1') {
+    let updatedCount = 0
+    for (const turno of pending) {
+      const updated = await responderPlanificacionGastronomia({
+        turnoId: turno.id,
+        empleadoId: session.userId,
+        respuesta: accion,
+      })
+      if (updated) updatedCount++
+    }
+    await finishPlanificacionMenu(session)
+    const label = accion === 'confirmado' ? 'confirmados' : 'marcados como no disponibles'
+    return [
+      accion === 'confirmado' ? `✅ *Turnos confirmados*` : `⚠️ *Disponibilidad registrada*`,
+      ``,
+      `${updatedCount} turnos ${label}.`,
+      `Ya no quedan pendientes en tu menú de confirmación.`,
+      ``,
+      `Cuando llegues, fichá la entrada desde este mismo bot.`,
+    ].join('\n')
+  }
+
+  if (choice === '2') {
+    return buildPlanificacionChooseOne(pending, accion)
+  }
+
+  return buildPlanificacionBulkSelector(pending, accion)
+}
+
+async function resolvePlanificacionSession(
+  session: BotSession,
+  parsed: ReturnType<typeof parsePlanificacionResponse>,
+): Promise<BotSession | null> {
+  if (session.userType === ('gastronomia' as any)) return session
+
+  const isPlanificacionMenu = session.currentMenu === 'planificacion_confirmar_multiple'
+  if (session.userType !== 'employee' || (!parsed?.planningSpecific && !isPlanificacionMenu)) {
+    return null
+  }
+
+  const empleado = await getEmpleadoByWaId(session.waNumber)
+  if (!empleado) return null
+
+  const isGastronomia = (empleado as any).tipoEmpleado === 'gastronomia' || (empleado as any).puedeGastronomia === true
+  if (!isGastronomia) return null
+
+  return {
+    ...session,
+    userType: 'gastronomia' as any,
+    userId: empleado.id,
+    userName: empleado.nombre,
+    contextData: {
+      ...session.contextData,
+      sector: (empleado as any).sector ?? session.contextData?.sector ?? session.contextData?.gastroSector ?? '',
+      sheetsRow: (empleado as any).sheetsRow ?? session.contextData?.sheetsRow ?? null,
+    },
+  }
+}
+
 async function handlePlanificacionBotResponse(session: BotSession, input: string): Promise<string | null> {
-  if (session.userType !== ('gastronomia' as any)) return null
   const parsed = parsePlanificacionResponse(input)
+  const planificacionSession = await resolvePlanificacionSession(session, parsed)
+  if (!planificacionSession) return null
+
+  const multipleMenuReply = await handlePlanificacionMultipleMenu(planificacionSession, input)
+  if (multipleMenuReply) return multipleMenuReply
+
   if (!parsed) {
     // Pure numeric inputs are menu navigation — never intercept them for planificacion
     if (/^\d+$/.test(input.trim())) return null
-    const pending = await getPendingPlanificacionForEmpleado(session.userId)
+    const pending = await getPendingPlanificacionForEmpleado(planificacionSession.userId)
     if (pending.length > 0) {
       const turno = pending[0]!
       return [
@@ -401,18 +614,20 @@ async function handlePlanificacionBotResponse(session: BotSession, input: string
   }
 
   console.log('[bot/gastronomia/planificacion] parsed', {
-    empleadoId: session.userId,
-    userName: session.userName,
+    empleadoId: planificacionSession.userId,
+    userName: planificacionSession.userName,
     input,
     parsed,
   })
 
-  const pending = await getPendingPlanificacionForEmpleado(session.userId)
+  const pending = await getPendingPlanificacionForEmpleado(planificacionSession.userId)
   console.log('[bot/gastronomia/planificacion] pending', {
-    empleadoId: session.userId,
+    empleadoId: planificacionSession.userId,
     pendingIds: pending.map((item: any) => item.id),
     count: pending.length,
   })
+  if (parsed.numericOnly && pending.length === 0) return null
+
   const turno = parsed.turnoId
     ? pending.find((item: any) => item.id === parsed.turnoId)
     : pending.length === 1
@@ -423,17 +638,13 @@ async function handlePlanificacionBotResponse(session: BotSession, input: string
     if (parsed.turnoId) {
       return `No encontré un turno pendiente con ese número.\n\nRespondé *menú* para volver al inicio.`
     }
-    if (pending.length > 1) {
-      return [
-        `📅 *Tenés más de un turno pendiente*`,
-        ``,
-        `Para confirmar, respondé con el número del turno:`,
-        ``,
-        ...pending.map((item: any) => `• Turno #${item.id}: ${item.fecha} ${item.horaEntrada}-${item.horaSalida}`),
-        ``,
-        `Ejemplo: *CONFIRMO ${pending[0].id}* o *NO ${pending[0].id}*`,
-      ].join('\n')
-    }
+      if (pending.length > 1) {
+        await updateSession(planificacionSession.waNumber, {
+          currentMenu: 'planificacion_confirmar_multiple',
+          contextData: { ...planificacionSession.contextData, planificacionAccion: parsed.respuesta },
+        })
+        return buildPlanificacionBulkSelector(pending, parsed.respuesta)
+      }
     if (parsed.planningSpecific) {
       return [
         `📅 *Planificación Docks*`,
@@ -447,11 +658,11 @@ async function handlePlanificacionBotResponse(session: BotSession, input: string
 
   const updated = await responderPlanificacionGastronomia({
     turnoId: turno.id,
-    empleadoId: session.userId,
+    empleadoId: planificacionSession.userId,
     respuesta: parsed.respuesta,
   })
   console.log('[bot/gastronomia/planificacion] updated', {
-    empleadoId: session.userId,
+    empleadoId: planificacionSession.userId,
     turnoId: turno.id,
     respuesta: parsed.respuesta,
     updated: !!updated,
@@ -562,7 +773,23 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
     if (user.userType === 'employee' && (user as any).contextData?.puedeGastronomia) {
       const ctx = (user as any).contextData
       await updateSession(normalized, { currentMenu: 'empleado_modo_selector', contextData: ctx })
+      const maybePlanResponse = await handlePlanificacionBotResponse({
+        ...session,
+        userType: user.userType,
+        userId: user.userId,
+        userName: user.userName,
+        currentMenu: 'empleado_modo_selector',
+        contextData: ctx,
+      } as any, message)
+      if (maybePlanResponse) return maybePlanResponse
       return buildEmpleadoModoSelectorMenu(user.userName)
+    }
+
+    // For sales users who are also employees, offer an explicit bot selector.
+    if (user.userType === 'sales' && (user as any).contextData?.canUseEmployeeBot) {
+      const ctx = (user as any).contextData
+      await updateSession(normalized, { currentMenu: 'sales_employee_selector', contextData: ctx })
+      return buildSalesEmployeeSelectorMenu(user.userName)
     }
 
     // For puedeVender employees, persist context so the ventas option stays visible
@@ -578,6 +805,9 @@ export async function handleIncomingMessage(waNumber: string, rawMessage: string
   // Timeout → resetear y mostrar menú
   if (isSessionExpired(session)) {
     session = await resetSessionHome(session)
+    const maybePlanResponse = await handlePlanificacionBotResponse(session, message)
+    if (maybePlanResponse) return MSG_SESSION_EXPIRADA + maybePlanResponse
+
     // For public users, re-check if they are a lead with follow-ups
     if (session.userType === 'public') {
       const existingLead = await getLeadByWaId(normalized)
@@ -859,6 +1089,73 @@ async function routeMessage(session: BotSession, input: string): Promise<string 
 
   // ── VENTAS ────────────────────────────────────────────────────────────────────
   if (userType === 'sales') {
+    const employeeSession = asSalesEmployeeSession(session)
+
+    if (currentMenu === 'sales_employee_selector') {
+      if (input === '1') {
+        await updateSession(session.waNumber, { currentMenu: 'main', contextData: session.contextData, menuHistory: [] })
+        return buildSalesMainMenu({ ...session, currentMenu: 'main', menuHistory: [] })
+      }
+      if (input === '2') {
+        if (!employeeSession) return buildSalesEmployeeSelectorMenu(session.userName)
+        await navigateTo(session, 'sales_employee_main', {})
+        return buildEmployeeMainMenu({ ...employeeSession, currentMenu: 'main' })
+      }
+      if (input === '0') return buildHelpMessage('sales')
+      return buildSalesEmployeeSelectorMenu(session.userName)
+    }
+
+    if (currentMenu === 'sales_employee_main') {
+      if (!employeeSession) return buildSalesEmployeeSelectorMenu(session.userName)
+      if (isAttendanceShortcut(input)) {
+        const attendanceSession = await navigateTo(session, 'asistencia', {})
+        return handleAsistencia({ ...employeeSession, ...attendanceSession, userType: 'employee', userId: employeeSession.userId, userName: employeeSession.userName }, input)
+      }
+      if (input === '1') {
+        await navigateTo(session, 'tarea_actual', {})
+        return buildTareaActual({ ...employeeSession, currentMenu: 'tarea_actual' })
+      }
+      if (input === '2') {
+        await navigateTo(session, 'tareas_lista', { page: 1 })
+        return buildTareasLista({ ...employeeSession, currentMenu: 'tareas_lista', contextData: { ...session.contextData, page: 1 } })
+      }
+      if (input === '3') {
+        await navigateTo(session, 'asistencia', {})
+        return buildAsistenciaMenu({ ...employeeSession, currentMenu: 'asistencia' })
+      }
+      if (input === '4') {
+        await navigateTo(session, 'rondas_lista', { page: 1 })
+        return buildRondasLista({ ...employeeSession, currentMenu: 'rondas_lista', contextData: { ...session.contextData, page: 1 } })
+      }
+      if (input === '0') {
+        await updateSession(session.waNumber, { currentMenu: 'sales_employee_selector', contextData: session.contextData, menuHistory: [] })
+        return buildSalesEmployeeSelectorMenu(session.userName)
+      }
+      return invalidMenuOption(await buildEmployeeMainMenu({ ...employeeSession, currentMenu: 'main' }))
+    }
+
+    if (employeeSession) {
+      const employeeRouteSession = { ...employeeSession, currentMenu }
+      if (canInterruptEmployeeMenuWithAttendance(currentMenu) && isAttendanceShortcut(input)) {
+        const attendanceSession = await navigateTo(session, 'asistencia', {})
+        return handleAsistencia({ ...employeeRouteSession, ...attendanceSession, userType: 'employee', userId: employeeSession.userId, userName: employeeSession.userName }, input)
+      }
+      if (currentMenu === 'tarea_actual') return handleTareaActual(employeeRouteSession, input)
+      if (currentMenu === 'tareas_lista') return handleTareasLista(employeeRouteSession, input)
+      if (currentMenu === 'tarea_detalle') return handleTareaDetalle(employeeRouteSession, input)
+      if (currentMenu === 'tarea_confirmar_completar') return handleConfirmarCompletar(employeeRouteSession, input)
+      if (currentMenu === 'tarea_pausa_motivo') return handlePausaMotivo(employeeRouteSession, input)
+      if (currentMenu === 'tarea_pausa_motivo_libre') return handlePausaMotivoLibre(employeeRouteSession, input)
+      if (currentMenu === 'tarea_problema') return handleProblema(employeeRouteSession, input)
+      if (currentMenu === 'tarea_problema_libre') return handleProblemaLibre(employeeRouteSession, input)
+      if (currentMenu === 'tarea_nota_libre') return handleNotaLibre(employeeRouteSession, input)
+      if (currentMenu === 'asistencia') return handleAsistencia(employeeRouteSession, input)
+      if (currentMenu === 'rondas_lista') return handleRondasLista(employeeRouteSession, input)
+      if (currentMenu === 'ronda_detalle') return handleRondaDetalle(employeeRouteSession, input)
+      if (currentMenu === 'ronda_observacion') return handleRondaObservacion(employeeRouteSession, input)
+      if (currentMenu === 'ronda_observacion_libre') return handleRondaObservacionLibre(employeeRouteSession, input)
+      if (currentMenu === 'ronda_rechazo') return handleRondaRechazo(employeeRouteSession, input)
+    }
 
     if (currentMenu === 'main') {
       if (input === '1') { await navigateTo(session, 'sales_bandeja', { page: 1 }); return buildBandeja({ ...session, currentMenu: 'sales_bandeja', contextData: { page: 1 } }) }
@@ -981,6 +1278,11 @@ async function buildMainMenu(session: BotSession): Promise<string> {
         }
       }
     }
+    if (menuName === 'admin_gastro_sector') return buildAdminGastroSectorMenu()
+    if (menuName === 'admin_gastro') {
+      const sector = contextData?.sector as string ?? ''
+      return buildGastronomiaMenu(sector, session.userName)
+    }
     if (menuName === 'admin_bot_autorespuesta')  return buildAdminBotAutorespuesta()
     if (menuName === 'admin_nueva_tarea_p1')    return buildNuevaTareaP1(session)
     if (menuName === 'admin_nueva_tarea_p2')    return buildNuevaTareaP2(session.contextData.tareaEmpleadoNombre as string)
@@ -997,6 +1299,19 @@ async function buildMainMenu(session: BotSession): Promise<string> {
   }
 
   if (userType === 'sales') {
+    if (menuName === 'sales_employee_selector') return buildSalesEmployeeSelectorMenu(session.userName)
+    if (menuName === 'sales_employee_main') {
+      const employeeSession = asSalesEmployeeSession(session, 'main')
+      return employeeSession ? buildEmployeeMainMenu(employeeSession) : buildSalesEmployeeSelectorMenu(session.userName)
+    }
+    const employeeSession = asSalesEmployeeSession(session, menuName)
+    if (employeeSession) {
+      if (menuName === 'tarea_actual')   return buildTareaActual(employeeSession)
+      if (menuName === 'tareas_lista')   return buildTareasLista(employeeSession)
+      if (menuName === 'tarea_detalle')  return buildTareaDetalle(employeeSession)
+      if (menuName === 'asistencia')     return buildAsistenciaMenu(employeeSession)
+      if (menuName === 'rondas_lista')   return buildRondasLista(employeeSession)
+    }
     if (menuName === 'sales_bandeja')     return buildBandeja(session)
     if (menuName === 'sales_leads')       return buildLeadsLista(session)
     if (menuName === 'sales_leads_libre') return buildLeadsLibre(session)
